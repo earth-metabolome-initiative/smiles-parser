@@ -1,7 +1,7 @@
 //! Submodule creating the `TokenIter` struct, which is an iterator over
 //! the `Token`s found in a provided string.
 
-use elements_rs::{Element, Isotope};
+use elements_rs::Element;
 
 use crate::token::Token;
 

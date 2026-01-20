@@ -1,7 +1,6 @@
 //! Tests of the parser module for several corner cases.
 
-use smiles_parser::parser::token_iter::TokenIter;
-use smiles_parser::prelude::Smiles;
+use smiles_parser::{parser::token_iter::TokenIter, prelude::Smiles};
 const SMILES_STR: &[&str] = &[
     "C1=CC=CC=C1",
     "[OH2]",
