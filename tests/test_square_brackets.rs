@@ -1,6 +1,6 @@
 const SMILES_WITH_BRACKETS: &[&str] = &[
     "[OH2]",
-    "[OH3+]"
+    "[OH3+]",
     "[Ti+4]",
     "[Co+3]",
     "[Ga+]$[As-]",
