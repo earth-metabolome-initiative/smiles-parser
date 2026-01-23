@@ -1,10 +1,8 @@
 //! Submodule creating the `TokenIter` struct, which is an iterator over
 //! the `Token`s found in a provided string.
 
-use elements_rs::{
-    Element,
-    errors::{self, Error},
-};
+use elements_rs::
+    Element;
 
 use crate::{errors::SmilesError, token::Token};
 
@@ -36,7 +34,7 @@ impl TokenIter<'_> {
                 let molecule_iter = self.chars.by_ref().take_while(|c| *c != ']');
                 todo!()
             }
-            ']' => todo!(),
+            ']' => Token::RightSquareBracket,
             number @ '0'..='9' => {
                 if let Some(num) = number.to_digit(10) {
                     let label = u8::try_from(num)?;

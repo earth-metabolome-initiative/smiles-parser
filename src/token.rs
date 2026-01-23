@@ -25,6 +25,10 @@ pub enum Token {
     ForwardSlash,
     /// A back slash '\' character
     BackSlash,
+    /// A left square bracket `[`
+    LeftSquareBracket,
+    /// A right square bracket `]`
+    RightSquareBracket,
     /// A label that can only go from 0 to 9
     Label(u8),
     /// TODO: Figure out if this how we want to shape this enum variant.
