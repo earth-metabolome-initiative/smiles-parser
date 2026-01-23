@@ -21,8 +21,8 @@ impl<'a> From<&'a str> for TokenIter<'a> {
 impl TokenIter<'_> {
     fn parse_token(&mut self, current_char: char) -> Result<Token, crate::errors::SmilesError> {
         Ok(match current_char {
-            '(' => Token::OpenRoundBracket,
-            ')' => Token::CloseRoundBracket,
+            '(' => Token::LeftRoundBracket,
+            ')' => Token::RightRoundBracket,
             '=' => Token::Equal,
             '#' => Token::Hashtag,
             '$' => Token::Dollar,

@@ -5,32 +5,42 @@ use elements_rs::{Element, Isotope};
 #[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord, Hash)]
 /// Represents a token in a molecular formula.
 pub enum Token {
-    /// An open round bracket
-    OpenRoundBracket,
-    /// A close round bracket
-    CloseRoundBracket,
-    /// A dot
-    Dot,
-    /// A dash '-' character
-    Dash,
-    /// An equal '=' character i.e. a double bond
-    Equal,
-    /// A hash '#' character i.e. a triple bond
-    Hashtag,
-    /// A dollar '$' character i.e. a quadruple bond
-    Dollar,
-    /// A colon ':' character
-    Colon,
-    /// A foward slash '/' character
-    ForwardSlash,
+    /// the ampersand `&`
+    Ampersand,
+    /// The at sign `@`
+    AtSign,
     /// A back slash '\' character
     BackSlash,
-    /// A left square bracket `[`
-    LeftSquareBracket,
-    /// A right square bracket `]`
-    RightSquareBracket,
+    /// A colon ':' character
+    Colon,
+    /// A dash '-' character
+    Dash,
+    /// A dollar '$' character i.e. a quadruple bond
+    Dollar,
+    /// A dot
+    Dot,
+    /// An equal '=' character i.e. a double bond
+    Equal,
+    /// A forward slash '/' character
+    ForwardSlash,
+    /// A hash '#' character i.e. a triple bond
+    Hashtag,
     /// A label that can only go from 0 to 9
     Label(u8),
+    /// A left round bracket `(`
+    LeftRoundBracket,
+    /// A left square bracket `[`
+    LeftSquareBracket,
+    /// The minus sign `-`
+    Minus, 
+    /// The percent sign `%`
+    Percent, 
+    /// The plus sign `+`
+    Plus,
+    /// A right round bracket `)`
+    RightRoundBracket,
+    /// A right square bracket `]`
+    RightSquareBracket,
     /// TODO: Figure out if this how we want to shape this enum variant.
     SquareBracketMolecule {
         /// Optional isotope specification
