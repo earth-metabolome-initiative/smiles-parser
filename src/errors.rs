@@ -1,8 +1,10 @@
 //! Defines errors used in the SMILES parser.
 
+use std::num::TryFromIntError;
+
 /// The errors that could occur during SMILES parsing.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Error {
+pub enum SmilesError {
     /// Error indicating that an unknown element was encountered.
     Element(elements_rs::errors::Error),
     /// Error indicating that an invalid number was encountered.
@@ -12,12 +14,10 @@ pub enum Error {
         /// The unexpected character.
         character: char,
     },
-    /// Error indicating a problem in the molecular formula.
-    MolecularFormula(molecular_formulas::errors::Error),
 }
 
-impl From<molecular_formulas::errors::Error> for Error {
-    fn from(err: molecular_formulas::errors::Error) -> Self {
-        Error::MolecularFormula(err)
+impl From<TryFromIntError> for SmilesError {
+    fn from(_: TryFromIntError) -> Self {
+        SmilesError::InvalidNumber
     }
 }

@@ -1,10 +1,10 @@
 use std::str::FromStr;
 
 use super::Smiles;
-use crate::{parser::token_iter::TokenIter, token::Token};
+use crate::{errors::SmilesError, parser::token_iter::TokenIter};
 
 impl FromStr for Smiles {
-    type Err = crate::errors::Error;
+    type Err = SmilesError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let token_iter = TokenIter::from(s);
         let tokens = token_iter.collect::<Result<Vec<_>, _>>()?;

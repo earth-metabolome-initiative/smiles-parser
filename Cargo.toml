@@ -9,9 +9,10 @@ description = "A SMILES parser in Rust"
 readme = "README.md"
 
 [dependencies]
+elements_rs = "0.1.1"
 geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", branch = "main" }
-elements_rs = "0.1.0"
-thiserror = "2.0"
+thiserror = "2.0.18"
+
 
 [lints.rust]
 missing_docs = "forbid"

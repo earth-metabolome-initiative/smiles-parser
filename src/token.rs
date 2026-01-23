@@ -27,12 +27,17 @@ pub enum Token {
     BackSlash,
     /// A label that can only go from 0 to 9
     Label(u8),
-    ///
+    /// TODO: Figure out if this how we want to shape this enum variant.
     SquareBracketMolecule {
+        /// Optional isotope specification
         isotope: Option<Isotope>,
+        /// Chemical element symbol inside the brackets.
         element: Element,
+        /// Whether the atom is
         aromatic: bool,
+        /// Formal charge on the atom
         charge: i8,
+        /// Explicit number of hydrogens attached to the atom
         hydrogens: u8,
     },
 }

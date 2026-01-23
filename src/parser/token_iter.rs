@@ -1,9 +1,12 @@
 //! Submodule creating the `TokenIter` struct, which is an iterator over
 //! the `Token`s found in a provided string.
 
-use elements_rs::Element;
+use elements_rs::{
+    Element,
+    errors::{self, Error},
+};
 
-use crate::token::Token;
+use crate::{errors::SmilesError, token::Token};
 
 /// An iterator over the tokens found in a SMILES string.
 pub struct TokenIter<'a> {
@@ -18,7 +21,7 @@ impl<'a> From<&'a str> for TokenIter<'a> {
 }
 
 impl TokenIter<'_> {
-    fn parse_token(&mut self, current_char: char) -> Result<Token, crate::errors::Error> {
+    fn parse_token(&mut self, current_char: char) -> Result<Token, crate::errors::SmilesError> {
         Ok(match current_char {
             '(' => Token::OpenRoundBracket,
             ')' => Token::CloseRoundBracket,
@@ -31,37 +34,35 @@ impl TokenIter<'_> {
             '\\' => Token::BackSlash,
             '[' => {
                 let molecule_iter = self.chars.by_ref().take_while(|c| *c != ']');
-                let molecule = MolecularFormula::try_from_iter(molecule_iter)?;
-                Token::MolecularFormula(molecule)
+                todo!()
             }
-            maybe_number @ '0'..='9' => {
-                let label = u8::try_from(maybe_number.to_digit(10).unwrap()).unwrap();
-                Token::Label(label)
+            ']' => todo!(),
+            number @ '0'..='9' => {
+                if let Some(num) = number.to_digit(10) {
+                    let label = u8::try_from(num)?;
+                    return Ok(Token::Label(label));
+                } else {
+                    return Err(SmilesError::InvalidNumber);
+                }
             }
             maybe_element_char => {
                 if let Some(next_char) = self.chars.peek()
                     && let Ok(element) = Element::try_from([maybe_element_char, *next_char])
                 {
                     self.chars.next();
-                    return Ok(Token::MolecularFormula(
-                        Atom::new(element, maybe_element_char.is_lowercase(), None).into(),
-                    ));
+                    todo!()
                 }
                 if let Ok(element) = Element::try_from(maybe_element_char) {
-                    return Ok(Token::MolecularFormula(
-                        Atom::new(element, maybe_element_char.is_lowercase(), None).into(),
-                    ));
+                    todo!()
                 }
-                return Err(crate::errors::Error::UnexpectedCharacter {
-                    character: maybe_element_char,
-                });
+                return Err(SmilesError::UnexpectedCharacter { character: maybe_element_char });
             }
         })
     }
 }
 
 impl Iterator for TokenIter<'_> {
-    type Item = Result<crate::token::Token, crate::errors::Error>;
+    type Item = Result<crate::token::Token, SmilesError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.chars.next().map(|current_char| self.parse_token(current_char))
