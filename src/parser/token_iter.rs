@@ -46,58 +46,34 @@ impl TokenIter<'_> {
                 Token::RightSquareBracket
             }
             num if num.is_ascii_digit() => {
-                // safe to get value by casting to ascii value and offset. 
+                // safe to get value by casting to ascii value and offset.
                 Token::Label(num as u8 - b'0')
             }
 
             element_char if element_char.is_ascii_alphabetic() => {
-                if element_char.is_uppercase() {
-                    let next = self.chars.peek();
-                    match element_char {
-                        'A' => {
-                            match next {
-                                Some(&c) => {
-                                    match c {
-                                        'c' |'g'|'l'|'m'|'r'|'s'|'t'|'u' => {
-                                            let element = Element::try_from([element_char, c])?;
-                                            self.chars.next();
-                                            Token::Atom { element: element, aromatic: false }
-                                        }
-                                    }
-                                },
-                                None => return Err(SmilesError::IncompleteElementName(element_char))
-                            }
-                        },
-                        'B' => {},
-                        'C' => {},
-                        'D' => {},
-                        'E' => {},
-                        'F' => {},
-                        'G' => {},
-                        'H' => {},
-                        'I' => {},
-                        'J' => {},
-                        'K' => {},
-                        'L' => {},
-                        'M' => {},
-                        'N' => {},
-                        'O' => {},
-                        'P' => {},
-                        'Q' => {},
-                        'R' => {},
-                        'S' => {},
-                        'T' => {},
-                        'U' => {},
-                        'V' => {},
-                        'W' => {},
-                        'X' => {},
-                        'Y' => {},
-                        'Z' => {},
+                if element_char.is_ascii_uppercase() {
+                    let two = self
+                        .chars
+                        .peek()
+                        .copied()
+                        .filter(|c| c.is_ascii_lowercase())
+                        .and_then(|c| Element::try_from([element_char, c]).ok());
+
+                    if let Some(element) = two {
+                        self.chars.next(); 
+                        Token::Atom { element, aromatic: false }
+                    } else if let Ok(element) = Element::try_from(element_char) {
+                        Token::Atom { element, aromatic: false }
+                    } else {
+                        return Err(SmilesError::UnexpectedCharacter { character: element_char });
                     }
                 } else {
-
+                    // aromatic / lowercase atom cases
+                    // e.g. 'c', 'n', 'o', 's', 'p', maybe 'se', 'as'
+                    todo!()
                 }
             }
+
             // maybe_element_char => {
             //     let molecule_iter = self.chars.by_ref().take_while(|c| c.is_alphabetic());
             //     if let Some(next_char) = self.chars.peek()
@@ -116,14 +92,11 @@ impl TokenIter<'_> {
     }
 
     /// determines whether an aromatic is valid for a given [`Token::Atom`]
-    /// 
+    ///
     /// # Parameters
     /// - the tokens as `self`
     /// - the [`Element`] being passed
-    fn aromatic_from_element(
-        &self,
-        element: Element
-    ) -> Result<bool, SmilesError> {
+    fn aromatic_from_element(&self, element: Element) -> Result<bool, SmilesError> {
         let allowed = if self.in_bracket {
             matches!(
                 element,
