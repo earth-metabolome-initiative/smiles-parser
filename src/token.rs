@@ -7,6 +7,8 @@ use elements_rs::{Element, Isotope};
 pub enum Token {
     /// the ampersand `&`
     Ampersand,
+    /// An Atom with associated properties
+    Atom(AtomToken),
     /// The at sign `@`
     AtSign,
     /// A back slash '\' character
@@ -27,31 +29,39 @@ pub enum Token {
     Hashtag,
     /// A label that can only go from 0 to 9
     Label(u8),
-    /// A left round bracket `(`
-    LeftRoundBracket,
-    /// A left square bracket `[`
-    LeftSquareBracket,
+    /// A left parentheses `(`
+    LeftParentheses,
     /// The minus sign `-`
     Minus, 
     /// The percent sign `%`
     Percent, 
     /// The plus sign `+`
     Plus,
-    /// A right round bracket `)`
-    RightRoundBracket,
-    /// A right square bracket `]`
-    RightSquareBracket,
-    /// TODO: Figure out if this how we want to shape this enum variant.
-    SquareBracketMolecule {
-        /// Optional isotope specification
-        isotope: Option<Isotope>,
-        /// Chemical element symbol inside the brackets.
+    /// A right parentheses `)`
+    RightParentheses,
+}
+
+#[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord, Hash)]
+/// Represents the Atomic Token variants in a SMILES string
+pub enum AtomToken {
+    /// The atoms in the [organic subset](http://opensmiles.org/opensmiles.html#orgsbst)
+    Bare {
+        /// The element as an [`Element`] 
         element: Element,
-        /// Whether the atom is
+        /// Whether the bare atom is aromatic   
+        aromatic: bool,     
+    },
+    /// Atoms parsed from within square brackets `[..]` 
+    Bracketed {
+        /// Optional isotope specification as [`Isotope`]
+        isotope: Option<Isotope>,
+        /// The element as an [`Element`]
+        element: Element,
+        /// Whether the atom is aromatic
         aromatic: bool,
-        /// Formal charge on the atom
+        /// The charge of the atom as an [`i8`]
         charge: i8,
-        /// Explicit number of hydrogens attached to the atom
+        /// The number of bonded hydrogens as [`u8`]
         hydrogens: u8,
     },
 }

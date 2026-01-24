@@ -21,8 +21,8 @@ impl<'a> From<&'a str> for TokenIter<'a> {
 impl TokenIter<'_> {
     fn parse_token(&mut self, current_char: char) -> Result<Token, crate::errors::SmilesError> {
         Ok(match current_char {
-            '(' => Token::LeftRoundBracket,
-            ')' => Token::RightRoundBracket,
+            '(' => Token::LeftParentheses,
+            ')' => Token::RightParentheses,
             '=' => Token::Equal,
             '#' => Token::Hashtag,
             '$' => Token::Dollar,
@@ -34,7 +34,7 @@ impl TokenIter<'_> {
                 let molecule_iter = self.chars.by_ref().take_while(|c| *c != ']');
                 todo!()
             }
-            ']' => Token::RightSquareBracket,
+            ']' => todo!(),
             number @ '0'..='9' => {
                 if let Some(num) = number.to_digit(10) {
                     let label = u8::try_from(num)?;
@@ -66,3 +66,5 @@ impl Iterator for TokenIter<'_> {
         self.chars.next().map(|current_char| self.parse_token(current_char))
     }
 }
+
+
