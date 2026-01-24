@@ -1,8 +1,7 @@
 //! Submodule creating the `TokenIter` struct, which is an iterator over
 //! the `Token`s found in a provided string.
 
-use elements_rs::
-    Element;
+use elements_rs::Element;
 
 use crate::{errors::SmilesError, token::Token};
 
@@ -11,7 +10,7 @@ pub struct TokenIter<'a> {
     /// The peekable chars iterator
     chars: std::iter::Peekable<std::str::Chars<'a>>,
     /// Denotes whether currently inside brackets
-    in_bracket: bool, 
+    in_bracket: bool,
 }
 
 impl<'a> From<&'a str> for TokenIter<'a> {
@@ -33,31 +32,117 @@ impl TokenIter<'_> {
             '/' => Token::ForwardSlash,
             '\\' => Token::BackSlash,
             '[' => {
-                let molecule_iter = self.chars.by_ref().take_while(|c| *c != ']');
-                todo!()
+                if self.in_bracket {
+                    return Err(SmilesError::UnexpectedLeftBracket);
+                }
+                self.in_bracket = true;
+                Token::LeftSquareBracket
             }
-            ']' => todo!(),
-            number @ '0'..='9' => {
-                if let Some(num) = number.to_digit(10) {
-                    let label = u8::try_from(num)?;
-                    return Ok(Token::Label(label));
+            ']' => {
+                if !self.in_bracket {
+                    return Err(SmilesError::UnexpectedRightBracket);
+                }
+                self.in_bracket = false;
+                Token::RightSquareBracket
+            }
+            num if num.is_ascii_digit() => {
+                // safe to get value by casting to ascii value and offset. 
+                Token::Label(num as u8 - b'0')
+            }
+
+            element_char if element_char.is_ascii_alphabetic() => {
+                if element_char.is_uppercase() {
+                    let next = self.chars.peek();
+                    match element_char {
+                        'A' => {
+                            match next {
+                                Some(&c) => {
+                                    match c {
+                                        'c' |'g'|'l'|'m'|'r'|'s'|'t'|'u' => {
+                                            let element = Element::try_from([element_char, c])?;
+                                            self.chars.next();
+                                            Token::Atom { element: element, aromatic: false }
+                                        }
+                                    }
+                                },
+                                None => return Err(SmilesError::IncompleteElementName(element_char))
+                            }
+                        },
+                        'B' => {},
+                        'C' => {},
+                        'D' => {},
+                        'E' => {},
+                        'F' => {},
+                        'G' => {},
+                        'H' => {},
+                        'I' => {},
+                        'J' => {},
+                        'K' => {},
+                        'L' => {},
+                        'M' => {},
+                        'N' => {},
+                        'O' => {},
+                        'P' => {},
+                        'Q' => {},
+                        'R' => {},
+                        'S' => {},
+                        'T' => {},
+                        'U' => {},
+                        'V' => {},
+                        'W' => {},
+                        'X' => {},
+                        'Y' => {},
+                        'Z' => {},
+                    }
                 } else {
-                    return Err(SmilesError::InvalidNumber);
+
                 }
             }
-            maybe_element_char => {
-                if let Some(next_char) = self.chars.peek()
-                    && let Ok(element) = Element::try_from([maybe_element_char, *next_char])
-                {
-                    self.chars.next();
-                    todo!()
-                }
-                if let Ok(element) = Element::try_from(maybe_element_char) {
-                    todo!()
-                }
-                return Err(SmilesError::UnexpectedCharacter { character: maybe_element_char });
-            }
+            // maybe_element_char => {
+            //     let molecule_iter = self.chars.by_ref().take_while(|c| c.is_alphabetic());
+            //     if let Some(next_char) = self.chars.peek()
+            //         && let Ok(element) = Element::try_from([maybe_element_char, *next_char])
+            //     {
+            //         self.chars.next();
+            //         todo!()
+            //     }
+            //     if let Ok(element) = Element::try_from(maybe_element_char) {
+            //         todo!()
+            //     }
+            //     return Err(SmilesError::UnexpectedCharacter { character: maybe_element_char });
+            // }
+            c => return Err(SmilesError::UnexpectedCharacter { character: c }),
         })
+    }
+
+    /// determines whether an aromatic is valid for a given [`Token::Atom`]
+    /// 
+    /// # Parameters
+    /// - the tokens as `self`
+    /// - the [`Element`] being passed
+    fn aromatic_from_element(
+        &self,
+        element: Element
+    ) -> Result<bool, SmilesError> {
+        let allowed = if self.in_bracket {
+            matches!(
+                element,
+                Element::B
+                    | Element::C
+                    | Element::N
+                    | Element::O
+                    | Element::P
+                    | Element::S
+                    | Element::Se
+                    | Element::As
+            )
+        } else {
+            matches!(
+                element,
+                Element::B | Element::C | Element::N | Element::O | Element::S | Element::P
+            )
+        };
+        if allowed { Ok(true) } else { Err(SmilesError::InvalidAromaticElement { element }) }
     }
 }
 
@@ -68,5 +153,3 @@ impl Iterator for TokenIter<'_> {
         self.chars.next().map(|current_char| self.parse_token(current_char))
     }
 }
-
-
