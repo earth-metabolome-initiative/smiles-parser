@@ -10,11 +10,13 @@ use crate::{errors::SmilesError, token::Token};
 pub struct TokenIter<'a> {
     /// The peekable chars iterator
     chars: std::iter::Peekable<std::str::Chars<'a>>,
+    /// Denotes whether currently inside brackets
+    in_bracket: bool, 
 }
 
 impl<'a> From<&'a str> for TokenIter<'a> {
     fn from(s: &'a str) -> Self {
-        TokenIter { chars: s.chars().peekable() }
+        TokenIter { chars: s.chars().peekable(), in_bracket: false }
     }
 }
 

@@ -2,6 +2,8 @@
 
 use std::num::TryFromIntError;
 
+use elements_rs::Element;
+
 /// The errors that could occur during SMILES parsing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SmilesError {
@@ -14,6 +16,21 @@ pub enum SmilesError {
         /// The unexpected character.
         character: char,
     },
+    /// An unexpected left bracket `[` was found
+    UnexpectedLeftBracket,
+    /// An unexpected right bracket `]` was found
+    UnexpectedRightBracket,
+    /// A closing `]` bracket was not found
+    UnclosedBracket,
+    /// A non bare element found outside of brackets
+    ElementRequiresBrackets,
+    /// found `[..]` that did not contain an element
+    MissingBracketElement,
+    /// Element forbidden to be written as aromatic here
+    InvalidAromaticElement {
+        /// The forbidden aromatic element
+        element: Element
+    }
 }
 
 impl From<TryFromIntError> for SmilesError {

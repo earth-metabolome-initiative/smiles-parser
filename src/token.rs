@@ -65,3 +65,4 @@ pub enum AtomToken {
         hydrogens: u8,
     },
 }
+
