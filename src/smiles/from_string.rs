@@ -7,7 +7,7 @@ impl FromStr for Smiles {
     type Err = SmilesError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let token_iter = TokenIter::from(s);
-        let tokens = token_iter.collect::<Result<Vec<_>, _>>()?;
+        let _tokens = token_iter.collect::<Result<Vec<_>, _>>()?;
         todo!()
     }
 }

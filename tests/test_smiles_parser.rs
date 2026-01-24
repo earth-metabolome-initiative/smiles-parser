@@ -1,6 +1,6 @@
 //! Tests of the parser module for several corner cases.
 
-use smiles_parser::{parser::token_iter::TokenIter, prelude::Smiles};
+use smiles_parser::parser::token_iter::TokenIter;
 const SMILES_STR: &[&str] = &[
     "C1=CC=CC=C1",
     "[OH2]",
@@ -40,6 +40,6 @@ fn test_tokenizer() {
     for &s in SMILES_STR {
         let _tokens = TokenIter::from(s)
             .collect::<Result<Vec<_>, _>>()
-            .expect(&format!("Failed to parse {s}"));
+            .unwrap_or_else(|_| panic!("Failed to tokenize {s}"));
     }
 }

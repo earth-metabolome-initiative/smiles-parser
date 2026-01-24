@@ -20,8 +20,6 @@ pub enum Token {
     BackSlash,
     /// A colon ':' character
     Colon,
-    /// A dash '-' character
-    Dash,
     /// A dollar '$' character i.e. a quadruple bond
     Dollar,
     /// A dot

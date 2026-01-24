@@ -1,3 +1,7 @@
+//! Test for tokenizing square brackets
+use smiles_parser::parser::token_iter::TokenIter;
+
+/// const for testing square brackets
 const SMILES_WITH_BRACKETS: &[&str] = &[
     "[OH2]",
     "[OH3+]",
@@ -25,6 +29,6 @@ fn test_valid_square_brackets() {
     for &s in SMILES_WITH_BRACKETS {
         let _tokens = TokenIter::from(s)
             .collect::<Result<Vec<_>, _>>()
-            .expect(&format!("Failed to parse {s}"));
+            .unwrap_or_else(|_| panic!("Failed to parse {s}"));
     }
 }
