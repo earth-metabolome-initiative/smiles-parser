@@ -1,6 +1,6 @@
 //! Tests of the parser module for several corner cases.
 
-use smiles_parser::parser::token_iter::TokenIter;
+use smiles_parser::{parser::token_iter::TokenIter, token::Token};
 const SMILES_STR: &[&str] = &[
     "C1=CC=CC=C1",
     "[OH2]",
@@ -42,4 +42,28 @@ fn test_tokenizer() {
             .collect::<Result<Vec<_>, _>>()
             .unwrap_or_else(|_| panic!("Failed to tokenize {s}"));
     }
+}
+
+
+#[test]
+fn test_smiles_tokens_benzene() {
+    // C1=CC=CC=C1
+    let benzene_tokens = vec![
+        Token::Atom { element: elements_rs::Element::C, aromatic: false },
+        Token::Label(1),
+        Token::Equal,
+        Token::Atom { element: elements_rs::Element::C, aromatic: false },
+        Token::Atom { element: elements_rs::Element::C, aromatic: false },
+        Token::Equal,
+        Token::Atom { element: elements_rs::Element::C, aromatic: false },
+        Token::Atom { element: elements_rs::Element::C, aromatic: false },
+        Token::Equal,
+        Token::Atom { element: elements_rs::Element::C, aromatic: false },
+        Token::Label(1),
+    ];
+    let benzene_line = SMILES_STR[0];
+    let tokens = TokenIter::from(benzene_line)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap_or_else(|_| panic!("Failed to parse {benzene_line}"));
+    assert_eq!(benzene_tokens, tokens);
 }
