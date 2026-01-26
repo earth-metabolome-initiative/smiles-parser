@@ -44,7 +44,6 @@ fn test_tokenizer() {
     }
 }
 
-
 #[test]
 fn test_smiles_tokens_benzene() {
     // C1=CC=CC=C1
@@ -63,7 +62,7 @@ fn test_smiles_tokens_benzene() {
     ];
     let benzene_line = SMILES_STR[0];
     let tokens = TokenIter::from(benzene_line)
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap_or_else(|_| panic!("Failed to parse {benzene_line}"));
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_else(|_| panic!("Failed to parse {benzene_line}"));
     assert_eq!(benzene_tokens, tokens);
 }

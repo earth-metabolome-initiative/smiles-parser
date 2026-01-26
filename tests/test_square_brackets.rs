@@ -36,16 +36,16 @@ fn test_valid_square_brackets() {
 #[test]
 fn test_smiles_tokens_water() {
     // "[OH2]"
-    let water_tokens= vec![
+    let water_tokens = vec![
         Token::LeftSquareBracket,
         Token::Atom { element: elements_rs::Element::O, aromatic: false },
         Token::Atom { element: elements_rs::Element::H, aromatic: false },
         Token::Label(2),
-        Token::RightSquareBracket
+        Token::RightSquareBracket,
     ];
     let water_line = SMILES_WITH_BRACKETS[0];
     let tokens = TokenIter::from(water_line)
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap_or_else(|_| panic!("Failed to parse {water_line}"));
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_else(|_| panic!("Failed to parse {water_line}"));
     assert_eq!(water_tokens, tokens);
 }
