@@ -49,4 +49,3 @@ fn test_smiles_tokens_water() {
         .unwrap_or_else(|_| panic!("Failed to parse {water_line}"));
     assert_eq!(water_tokens, tokens);
 }
-
