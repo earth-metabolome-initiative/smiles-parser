@@ -22,6 +22,7 @@ impl<'a> From<&'a str> for TokenIter<'a> {
 impl TokenIter<'_> {
     fn parse_token(&mut self, current_char: char) -> Result<Token, SmilesError> {
         Ok(match current_char {
+            '*' => Token::Asterisk,
             '&' => Token::Ampersand,
             atom_char if atom_char.is_ascii_alphabetic() => {
                 if atom_char.is_ascii_uppercase() {

@@ -7,6 +7,8 @@ use elements_rs::Element;
 pub enum Token {
     /// the ampersand `&`
     Ampersand,
+    /// An unknown/wild card atom
+    Asterisk,
     /// An Atom with associated properties
     Atom {
         /// The Element found

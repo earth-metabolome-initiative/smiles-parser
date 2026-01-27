@@ -33,6 +33,7 @@ const SMILES_STR: &[&str] = &[
     "C[C@@H]1C[C@@]2(O[C@H]2C)C(=O)O[C@@H]2CCN(C)C/C=C(/COC(=O)[C@]1(C)O)C2=O",
     "CC=C(C)C1=C(Cl)C(O)=C(C)C2=C1OC1=CC(O)=C(Cl)C(C)=C1C(=O)O2",
     "CC1=C[C@H](O)CC(C)(C)[C@H]1/C=C/C(C)=C/C=C/C(C)=C/C=C/C=C(C)/C=C/C=C(\\C)CO",
+    "c1ccccc1*",
 ];
 
 #[test]
@@ -62,6 +63,27 @@ fn test_smiles_tokens_benzene() {
         Token::Label(1),
     ];
     let benzene_line = SMILES_STR[0];
+    let tokens = TokenIter::from(benzene_line)
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_else(|_| panic!("Failed to parse {benzene_line}"));
+    assert_eq!(benzene_tokens, tokens);
+}
+
+#[test]
+fn test_smiles_tokens_benzene_with_wildcard() {
+    // c1ccccc1*
+    let benzene_tokens = vec![
+        Token::Atom { element: elements_rs::Element::C, aromatic: true },
+        Token::Label(1),
+        Token::Atom { element: elements_rs::Element::C, aromatic: true },
+        Token::Atom { element: elements_rs::Element::C, aromatic: true },
+        Token::Atom { element: elements_rs::Element::C, aromatic: true },
+        Token::Atom { element: elements_rs::Element::C, aromatic: true },
+        Token::Atom { element: elements_rs::Element::C, aromatic: true },
+        Token::Label(1),
+        Token::Asterisk,
+    ];
+    let benzene_line = SMILES_STR[31];
     let tokens = TokenIter::from(benzene_line)
         .collect::<Result<Vec<_>, _>>()
         .unwrap_or_else(|_| panic!("Failed to parse {benzene_line}"));
