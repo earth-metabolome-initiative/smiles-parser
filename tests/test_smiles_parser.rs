@@ -48,6 +48,7 @@ fn test_tokenizer() {
 fn test_smiles_tokens_benzene() {
     // C1=CC=CC=C1
     let benzene_tokens = vec![
+        // Aromatic not parsed yet for benzene using capital 'C'
         Token::Atom { element: elements_rs::Element::C, aromatic: false },
         Token::Label(1),
         Token::Equal,
