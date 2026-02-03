@@ -22,6 +22,8 @@ pub enum Token {
     BackSlash,
     /// A colon ':' character
     Colon,
+    /// A digit that can only go from 0 to 9
+    Digit(u8),
     /// A dollar '$' character i.e. a quadruple bond
     Dollar,
     /// A dot
@@ -32,8 +34,6 @@ pub enum Token {
     ForwardSlash,
     /// A hash '#' character i.e. a triple bond
     Hashtag,
-    /// A label that can only go from 0 to 9
-    Label(u8),
     /// A left parentheses `(`
     LeftParentheses,
     /// A left square bracket `[`

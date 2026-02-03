@@ -23,13 +23,13 @@ fn test_aromatic_benzene_from_tokenization() {
     //  c1ccccc1
     let benzene_tokens = vec![
         Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Label(1),
+        Token::Digit(1),
         Token::Atom { element: elements_rs::Element::C, aromatic: true },
         Token::Atom { element: elements_rs::Element::C, aromatic: true },
         Token::Atom { element: elements_rs::Element::C, aromatic: true },
         Token::Atom { element: elements_rs::Element::C, aromatic: true },
         Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Label(1),
+        Token::Digit(1),
     ];
     let benzene_line = SMILES_STR[0];
     let tokens = TokenIter::from(benzene_line)
@@ -43,7 +43,7 @@ fn test_aromatic_imidazole_from_tokenization() {
     //  n1cc[nH]c1
     let imidazole_tokens = vec![
         Token::Atom { element: elements_rs::Element::N, aromatic: true },
-        Token::Label(1),
+        Token::Digit(1),
         Token::Atom { element: elements_rs::Element::C, aromatic: true },
         Token::Atom { element: elements_rs::Element::C, aromatic: true },
         Token::LeftSquareBracket,
@@ -51,7 +51,7 @@ fn test_aromatic_imidazole_from_tokenization() {
         Token::Atom { element: elements_rs::Element::H, aromatic: false },
         Token::RightSquareBracket,
         Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Label(1),
+        Token::Digit(1),
     ];
     let imidazole_line = SMILES_STR[4];
     let tokens = TokenIter::from(imidazole_line)

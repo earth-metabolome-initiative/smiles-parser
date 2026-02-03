@@ -40,7 +40,7 @@ fn test_smiles_tokens_water() {
         Token::LeftSquareBracket,
         Token::Atom { element: elements_rs::Element::O, aromatic: false },
         Token::Atom { element: elements_rs::Element::H, aromatic: false },
-        Token::Label(2),
+        Token::Digit(2),
         Token::RightSquareBracket,
     ];
     let water_line = SMILES_WITH_BRACKETS[0];

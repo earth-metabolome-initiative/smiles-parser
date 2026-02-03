@@ -51,7 +51,7 @@ fn test_smiles_tokens_benzene() {
     let benzene_tokens = vec![
         // Aromatic not parsed yet for benzene using capital 'C'
         Token::Atom { element: elements_rs::Element::C, aromatic: false },
-        Token::Label(1),
+        Token::Digit(1),
         Token::Equal,
         Token::Atom { element: elements_rs::Element::C, aromatic: false },
         Token::Atom { element: elements_rs::Element::C, aromatic: false },
@@ -60,7 +60,7 @@ fn test_smiles_tokens_benzene() {
         Token::Atom { element: elements_rs::Element::C, aromatic: false },
         Token::Equal,
         Token::Atom { element: elements_rs::Element::C, aromatic: false },
-        Token::Label(1),
+        Token::Digit(1),
     ];
     let benzene_line = SMILES_STR[0];
     let tokens = TokenIter::from(benzene_line)
@@ -74,13 +74,13 @@ fn test_smiles_tokens_benzene_with_wildcard() {
     // c1ccccc1*
     let benzene_tokens = vec![
         Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Label(1),
+        Token::Digit(1),
         Token::Atom { element: elements_rs::Element::C, aromatic: true },
         Token::Atom { element: elements_rs::Element::C, aromatic: true },
         Token::Atom { element: elements_rs::Element::C, aromatic: true },
         Token::Atom { element: elements_rs::Element::C, aromatic: true },
         Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Label(1),
+        Token::Digit(1),
         Token::Asterisk,
     ];
     let benzene_line = SMILES_STR[31];

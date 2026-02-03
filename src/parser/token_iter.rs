@@ -21,7 +21,7 @@ impl<'a> From<&'a str> for TokenIter<'a> {
 
 impl TokenIter<'_> {
     fn parse_token(&mut self, current_char: char) -> Result<Token, SmilesError> {
-        Ok(match current_char {
+        let token = match current_char {
             '*' => Token::Asterisk,
             '&' => Token::Ampersand,
             atom_char if atom_char.is_ascii_alphabetic() => {
@@ -81,7 +81,7 @@ impl TokenIter<'_> {
             '#' => Token::Hashtag,
             label if label.is_ascii_digit() => {
                 // safe to get value by casting to ascii value and offset.
-                Token::Label(label as u8 - b'0')
+                Token::Digit(label as u8 - b'0')
             }
             '(' => Token::LeftParentheses,
             '[' => {
@@ -104,7 +104,11 @@ impl TokenIter<'_> {
                 Token::RightSquareBracket
             }
             c => return Err(SmilesError::UnexpectedCharacter { character: c }),
-        })
+        };
+        if self.chars.peek().is_none() && self.in_bracket {
+            return Err(SmilesError::UnclosedBracket);
+        }
+        Ok(token)
     }
 
     /// determines whether an aromatic is valid for a given [`Token::Atom`]
