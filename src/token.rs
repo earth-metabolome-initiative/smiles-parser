@@ -1,29 +1,20 @@
 //! Represents tokens used in parsing SMILES strings.
 
-use elements_rs::Element;
+use elements_rs::Isotope;
 
-#[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 /// Represents a token in a molecular formula.
 pub enum Token {
     /// the ampersand `&`
     Ampersand,
     /// An unknown/wild card atom
     Asterisk,
-    /// An Atom with associated properties
-    Atom {
-        /// The Element found
-        element: Element,
-        /// Whether the element is aromatic
-        aromatic: bool,
-    },
-    /// The at sign `@`
-    AtSign,
     /// A back slash '\' character
     BackSlash,
+    /// An atom inside brackets
+    BracketAtom(BracketAtom),
     /// A colon ':' character
     Colon,
-    /// A digit that can only go from 0 to 9
-    Digit(u8),
     /// A dollar '$' character i.e. a quadruple bond
     Dollar,
     /// A dot
@@ -36,16 +27,44 @@ pub enum Token {
     Hashtag,
     /// A left parentheses `(`
     LeftParentheses,
-    /// A left square bracket `[`
-    LeftSquareBracket,
-    /// The minus sign `-`
-    Minus,
-    /// The percent sign `%`
+    /// An Organic Atom outside of brackets
+    OrganicAtom(Aromatic<OrganicAtom>),
+    /// An percent sign `%`
     Percent,
-    /// The plus sign `+`
-    Plus,
     /// A right parentheses `)`
     RightParentheses,
-    /// A right square bracket `]`
-    RightSquareBracket,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct BracketAtom {
+    atoms: Aromatic<Isotope>,
+    chirality: Option<Chirality>, 
+    hydrogen_count: u8,
+    charge: i8,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum OrganicAtom {
+    B,
+    C,
+    N,
+    O,
+    S,
+    P,
+    F,
+    Cl,
+    Br,
+    I,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Chirality {
+    Clockwise,
+    CounterClockwise,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Aromatic<A> {
+    atom: A, 
+    aromatic: bool, 
 }

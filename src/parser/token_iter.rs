@@ -81,7 +81,7 @@ impl TokenIter<'_> {
             '#' => Token::Hashtag,
             label if label.is_ascii_digit() => {
                 // safe to get value by casting to ascii value and offset.
-                Token::Digit(label as u8 - b'0')
+                Token::Number(label as u8 - b'0')
             }
             '(' => Token::LeftParentheses,
             '[' => {
