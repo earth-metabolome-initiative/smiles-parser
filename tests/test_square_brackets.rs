@@ -1,5 +1,5 @@
 //! Test for tokenizing square brackets
-use smiles_parser::{parser::token_iter::TokenIter, token::Token};
+use smiles_parser::{errors::SmilesError, parser::token_iter::TokenIter, token::Token};
 
 /// const for testing square brackets
 const SMILES_WITH_BRACKETS: &[&str] = &[
@@ -31,6 +31,27 @@ fn test_valid_square_brackets() {
             .collect::<Result<Vec<_>, _>>()
             .unwrap_or_else(|_| panic!("Failed to parse {s}"));
     }
+}
+
+#[test]
+fn test_unexpected_right_brackets() {
+    let error = TokenIter::from("[Co+3]]").collect::<Result<Vec<_>, SmilesError>>();
+    assert!(error.is_err());
+    assert_eq!(error, Err(SmilesError::UnexpectedRightBracket));
+}
+
+#[test]
+fn test_unexpected_left_brackets() {
+    let error = TokenIter::from("[[Co+3]").collect::<Result<Vec<_>, SmilesError>>();
+    assert!(error.is_err());
+    assert_eq!(error, Err(SmilesError::UnexpectedLeftBracket));
+}
+
+#[test]
+fn test_unclosed_brackets() {
+    let error = TokenIter::from("[Co+3").collect::<Result<Vec<_>, SmilesError>>();
+    assert!(error.is_err());
+    assert_eq!(error, Err(SmilesError::UnclosedBracket));
 }
 
 #[test]
