@@ -33,6 +33,8 @@ pub enum SmilesError {
         /// The forbidden aromatic element
         element: Element,
     },
+    /// Integer Overflow
+    IntegerOverflow,
 }
 
 impl From<TryFromIntError> for SmilesError {

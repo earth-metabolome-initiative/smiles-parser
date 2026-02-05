@@ -1,6 +1,6 @@
 //! Represents tokens used in parsing SMILES strings.
 
-use elements_rs::Isotope;
+use elements_rs::{Isotope, isotopes::HydrogenIsotope};
 
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 /// Represents a token in a molecular formula.
@@ -35,14 +35,23 @@ pub enum Token {
     RightParentheses,
 }
 
+
+/// A `BracketAtom` is any atom that is contained within a `[]` in SMILES
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct BracketAtom {
+    /// Contains the atom 
     atoms: Aromatic<Isotope>,
     chirality: Option<Chirality>, 
     hydrogen_count: u8,
     charge: i8,
 }
 
+impl Token {
+    fn ikd() {
+        let mut test = Isotope::H(HydrogenIsotope::T);
+    }
+}
+/// Organic Atoms are differentiated as not being inside of brackets
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OrganicAtom {
     B,

@@ -1,4 +1,6 @@
 //! Test for tokenizing square brackets
+use std::ops::{Add, Mul};
+
 use smiles_parser::{errors::SmilesError, parser::token_iter::TokenIter, token::Token};
 
 /// const for testing square brackets

@@ -11,11 +11,13 @@ pub struct TokenIter<'a> {
     chars: std::iter::Peekable<std::str::Chars<'a>>,
     /// Denotes whether currently inside brackets
     in_bracket: bool,
+    /// the previous char
+    prev_char: Option<char>,
 }
 
 impl<'a> From<&'a str> for TokenIter<'a> {
     fn from(s: &'a str) -> Self {
-        TokenIter { chars: s.chars().peekable(), in_bracket: false }
+        TokenIter { chars: s.chars().peekable(), in_bracket: false, prev_char: None }
     }
 }
 
@@ -71,7 +73,7 @@ impl TokenIter<'_> {
                     }
                 }
             }
-            '@' => Token::AtSign,
+            '@' => todo!(),
             '\\' => Token::BackSlash,
             ':' => Token::Colon,
             '$' => Token::Dollar,
@@ -79,9 +81,8 @@ impl TokenIter<'_> {
             '=' => Token::Equal,
             '/' => Token::ForwardSlash,
             '#' => Token::Hashtag,
-            label if label.is_ascii_digit() => {
-                // safe to get value by casting to ascii value and offset.
-                Token::Number(label as u8 - b'0')
+            num if num.is_ascii_digit() => {
+                let amount = try_fold_number(self);
             }
             '(' => Token::LeftParentheses,
             '[' => {
@@ -90,24 +91,22 @@ impl TokenIter<'_> {
                     return Err(SmilesError::UnexpectedLeftBracket);
                 }
                 self.in_bracket = true;
-                Token::LeftSquareBracket
             }
-            '-' => Token::Minus,
+            '-' => todo!(),
             '%' => Token::Percent,
-            '+' => Token::Plus,
+            '+' => todo!(),
             ')' => Token::RightParentheses,
             ']' => {
                 if !self.in_bracket {
                     return Err(SmilesError::UnexpectedRightBracket);
                 }
-                self.in_bracket = false;
-                Token::RightSquareBracket
             }
             c => return Err(SmilesError::UnexpectedCharacter { character: c }),
         };
         if self.chars.peek().is_none() && self.in_bracket {
             return Err(SmilesError::UnclosedBracket);
         }
+        self.prev_char = Some(current_char);
         Ok(token)
     }
 
@@ -145,4 +144,30 @@ impl Iterator for TokenIter<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         self.chars.next().map(|current_char| self.parse_token(current_char))
     }
+}
+
+
+fn try_fold_number<A,B>(stream: &mut TokenIter<'_>) -> Option<Result<B, SmilesError>> where A: Iterator<Item = char>, B: TryFrom<u32> {
+    let mut seen_any = false;
+    let mut amount: u32 = 0;
+    
+    
+    while let Some(char) = stream.chars.peek() {
+        let digit = match char.to_digit(10) {
+            Some(d) => d,
+            None => break,
+        };
+        stream.chars.next();
+        seen_any = true;
+        match amount.checked_mul(10).and_then(|x| x.checked_add(digit)) {
+            Some(val) => amount = val,
+            None => return Some(Err(SmilesError::IntegerOverflow)),
+        }
+    } 
+
+    if !seen_any {
+        return  None;
+    }
+
+    Some(B::try_from(amount).map_err(|_| SmilesError::IntegerOverflow))
 }
