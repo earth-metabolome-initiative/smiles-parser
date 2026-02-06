@@ -146,12 +146,14 @@ impl Iterator for TokenIter<'_> {
     }
 }
 
-
-fn try_fold_number<A,B>(stream: &mut TokenIter<'_>) -> Option<Result<B, SmilesError>> where A: Iterator<Item = char>, B: TryFrom<u32> {
+fn try_fold_number<A, B>(stream: &mut TokenIter<'_>) -> Option<Result<B, SmilesError>>
+where
+    A: Iterator<Item = char>,
+    B: TryFrom<u32>,
+{
     let mut seen_any = false;
     let mut amount: u32 = 0;
-    
-    
+
     while let Some(char) = stream.chars.peek() {
         let digit = match char.to_digit(10) {
             Some(d) => d,
@@ -163,10 +165,10 @@ fn try_fold_number<A,B>(stream: &mut TokenIter<'_>) -> Option<Result<B, SmilesEr
             Some(val) => amount = val,
             None => return Some(Err(SmilesError::IntegerOverflow)),
         }
-    } 
+    }
 
     if !seen_any {
-        return  None;
+        return None;
     }
 
     Some(B::try_from(amount).map_err(|_| SmilesError::IntegerOverflow))
