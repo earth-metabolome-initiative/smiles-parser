@@ -88,6 +88,24 @@ pub struct UnbracketedAtom {
     aromatic: bool,
 }
 
+impl UnbracketedAtom {
+    pub const fn new(symbol: AtomSymbol, aromatic: bool) -> Self {
+        Self { symbol, aromatic }
+    }
+    pub fn symbol(&self) -> AtomSymbol {
+        self.symbol
+    }
+    pub fn element(&self) -> Option<&Element> {
+        self.symbol.element()
+    }
+    pub fn aromatic(&self) -> bool {
+        self.aromatic
+    }
+    pub fn is_wildcard(&self) -> bool {
+        self.symbol.is_wildcard()
+    }
+}
+
 #[derive(Copy, Debug, PartialEq, Clone, Eq, Hash)]
 pub struct BracketedAtom {
     /// Bracketed elements as [`Element`]
@@ -104,14 +122,80 @@ pub struct BracketedAtom {
     chiral: Option<Chirality>,
 }
 
+impl BracketedAtom {
+    pub fn builder(symbol: AtomSymbol, aromatic: bool) -> BracketedAtomBuilder {
+        BracketedAtomBuilder {
+            symbol,
+            aromatic,
+            isotope_mass_number: None,
+            hydrogens: HydrogenCount::Unspecified,
+            charge: Charge::default(), 
+            class: 0,
+            chiral: None,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct BracketedAtomBuilder {
+    symbol: AtomSymbol,
+    aromatic: bool,
+    isotope_mass_number: Option<u16>,
+    hydrogens: HydrogenCount,
+    charge: Charge,
+    class: u16,
+    chiral: Option<Chirality>,
+}
+
+impl BracketedAtomBuilder {
+    pub fn isotope(mut self, iso: u16) -> Self {
+        self.isotope_mass_number = Some(iso);
+        self
+    }
+
+    pub fn hydrogens(mut self, h: HydrogenCount) -> Self {
+        self.hydrogens = h;
+        self
+    }
+
+    pub fn charge(mut self, charge: Charge) -> Self {
+        self.charge = charge;
+        self
+    }
+
+    pub fn class(mut self, class: u16) -> Self {
+        self.class = class;
+        self
+    }
+
+    pub fn chiral(mut self, chiral: Chirality) -> Self {
+        self.chiral = Some(chiral);
+        self
+    }
+
+    pub fn build(self) -> BracketedAtom {
+        BracketedAtom {
+            symbol: self.symbol,
+            aromatic: self.aromatic,
+            isotope_mass_number: self.isotope_mass_number,
+            hydrogens: self.hydrogens,
+            charge: self.charge,
+            class: self.class,
+            chiral: self.chiral,
+        }
+    }
+}
+
+
 #[derive(Copy, Debug, PartialEq, Clone, Eq, Hash)]
 pub enum Chirality {
     Clockwise,
     AntiClockwise,
 }
 
-#[derive(Copy, Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Copy, Default, Debug, PartialEq, Clone, Eq, Hash)]
 pub enum HydrogenCount {
+    #[default]
     Unspecified,
     Explicit(u8),
 }
@@ -125,14 +209,9 @@ impl HydrogenCount {
     }
 }
 
-impl Default for HydrogenCount {
-    fn default() -> Self {
-        Self::Unspecified
-    }
-}
-
 #[derive(Copy, Debug, PartialEq, Clone, Eq, Hash)]
 pub struct Charge(i8);
+
 impl Charge {
     pub const MIN: i8 = -15;
     pub const MAX: i8 = 15;
@@ -147,6 +226,10 @@ impl Charge {
                 Err(SmilesError::ChargeOverflow(n))
             }
         }
+    }
+    
+    pub fn get(&self) -> i8 {
+        self.0
     }
 }
 
