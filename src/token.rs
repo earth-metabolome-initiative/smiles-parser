@@ -9,6 +9,8 @@ use crate::errors::SmilesError;
 #[derive(Copy, Debug, PartialEq, Clone, Eq, Hash)]
 /// Represents a token in a molecular formula.
 pub enum Token {
+    /// Represented with a `.`
+    NonBond,
     BracketedAtom(BracketedAtom),
     UnbracketedAtom(UnbracketedAtom),
     Bond(Bond),
@@ -256,6 +258,4 @@ pub enum Bond {
     Up,
     /// Represents a stereochemical single bond `\` (down)
     Down,
-    /// Represented with a `.`
-    NonBond,
 }
