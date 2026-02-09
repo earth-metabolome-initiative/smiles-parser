@@ -35,6 +35,12 @@ pub enum SmilesError {
     },
     /// Integer Overflow
     IntegerOverflow,
+    /// Ring Number Overflow (greater than 99)
+    RingNumberOverflow(u8),
+    /// A charge is below allowed minimum (-15)
+    ChargeUnderflow(i8),
+    /// A charge is over the allowed maximum (15)
+    ChargeOverflow(i8),
 }
 
 impl From<TryFromIntError> for SmilesError {
@@ -48,3 +54,23 @@ impl From<elements_rs::errors::Error> for SmilesError {
         SmilesError::Element(value)
     }
 }
+
+// impl fmt::Display for SmilesError {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             Self::Element(element_err) => write!(f, "Element error:
+// {element_err}"),             Self::IncompleteElementName(c) => write!(f,
+// "Element name incomplete, found: "),             Self::Element(error) =>
+// todo!(),             Self::InvalidNumber => todo!(),
+//             Self::UnexpectedCharacter { character } => todo!(),
+//             Self::UnexpectedLeftBracket => todo!(),
+//             Self::UnexpectedRightBracket => todo!(),
+//             Self::UnclosedBracket => todo!(),
+//             Self::ElementRequiresBrackets => todo!(),
+//             Self::MissingBracketElement => todo!(),
+//             Self::InvalidAromaticElement { element } => todo!(),
+//             Self::IntegerOverflow => todo!(),
+//             Self::RingNumberOverFlow(_) => todo!(),
+//         }
+//     }
+// }
