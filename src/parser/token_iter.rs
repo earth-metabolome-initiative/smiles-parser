@@ -7,7 +7,7 @@ use elements_rs::Element;
 
 use crate::{
     errors::SmilesError,
-    token::{AtomSymbol, BracketedAtom, Token, UnbracketedAtom},
+    token::{AtomSymbol, BracketedAtom, Chirality, Token, UnbracketedAtom},
 };
 
 /// An iterator over the tokens found in a SMILES string.
@@ -143,6 +143,18 @@ fn try_element(stream: &mut TokenIter<'_>) -> Result<(AtomSymbol, bool), SmilesE
         return Ok((AtomSymbol::Element(element), aromatic));
     }
     Err(SmilesError::InvalidElementName(char_1))
+}
+
+fn try_chirality(stream: &mut TokenIter<'_>) -> Option<Chirality> {
+    let Some(at) = stream.chars.peek();
+    if matches!(at, '@') {
+        stream.chars.next();
+        let Some(at_next) = stream.chars.peek().copied();
+        if matches!(at_next, '@') {
+            return Some(Chirality::AtAt);
+        }
+    }
+    None
 }
 
 fn try_fold_number<B>(stream: &mut TokenIter<'_>) -> Option<Result<B, SmilesError>>

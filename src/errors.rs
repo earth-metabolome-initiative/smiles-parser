@@ -51,6 +51,8 @@ pub enum SmilesError {
     NonBondInBracket,
     /// Wrapper for `element_rs` errors
     ElementsRs(elements_rs::errors::Error),
+    /// Specified Chirality is not a valid form
+    InvalidChirality,
 }
 
 impl From<elements_rs::errors::Error> for SmilesError {

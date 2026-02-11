@@ -306,10 +306,38 @@ impl BracketedAtomBuilder {
 #[derive(Copy, Debug, PartialEq, Clone, Eq, Hash)]
 /// Specifies the chirality if present
 pub enum Chirality {
-    /// Clockwise as represented by `@@`
-    Clockwise,
-    /// Counterclockwise as represented by `@`
-    AntiClockwise,
+    /// `@`
+    At,
+    /// `@@`
+    AtAt,
+    /// `@TH` variants (1-2)
+    TH(u8),
+    /// `@AL` variants (1-2)
+    AL(u8),
+    /// `@SP` variants (1-3)
+    SP(u8),
+    /// `@TB` variants (1-20)
+    TB(u8),
+    /// `@OH` variants (1-30)
+    OH(u8),
+}
+
+impl Chirality {
+    pub fn try_th(n: u8) -> Result<Self, SmilesError> {
+        (1..=2).contains(&n).then_some(Self::TH(n)).ok_or(SmilesError::InvalidChirality)
+    }
+    pub fn try_al(n: u8) -> Result<Self, SmilesError> {
+        (1..=2).contains(&n).then_some(Self::AL(n)).ok_or(SmilesError::InvalidChirality)
+    }
+    pub fn try_sp(n: u8) -> Result<Self, SmilesError> {
+        (1..=3).contains(&n).then_some(Self::SP(n)).ok_or(SmilesError::InvalidChirality)
+    }
+    pub fn try_tb(n: u8) -> Result<Self, SmilesError> {
+        (1..=20).contains(&n).then_some(Self::TB(n)).ok_or(SmilesError::InvalidChirality)
+    }
+    pub fn try_oh(n: u8) -> Result<Self, SmilesError> {
+        (1..=30).contains(&n).then_some(Self::OH(n)).ok_or(SmilesError::InvalidChirality)
+    }
 }
 
 #[derive(Copy, Default, Debug, PartialEq, Clone, Eq, Hash)]
