@@ -11,10 +11,10 @@ use crate::token::Bond;
 pub enum SmilesError {
     /// Missing Element
     MissingElement,
+    /// Invalid Isotope value passed
+    InvalidIsotope,
     /// Error indicating invalid Element name
     InvalidElementName(char),
-    /// Error indicating that an unknown element was encountered.
-    Element(elements_rs::errors::Error),
     /// Error indicating that an invalid number was encountered.
     InvalidNumber,
     /// Error indicating that an unexpected character was encountered.
@@ -49,6 +49,14 @@ pub enum SmilesError {
     BondInBracket(Bond),
     /// Non Bond in Bracket
     NonBondInBracket,
+    /// Wrapper for `element_rs` errors
+    ElementsRs(elements_rs::errors::Error),
+}
+
+impl From<elements_rs::errors::Error> for SmilesError {
+    fn from(e: elements_rs::errors::Error) -> Self {
+        SmilesError::ElementsRs(e)
+    }
 }
 
 impl From<TryFromIntError> for SmilesError {
@@ -57,28 +65,3 @@ impl From<TryFromIntError> for SmilesError {
     }
 }
 
-impl From<elements_rs::errors::Error> for SmilesError {
-    fn from(value: elements_rs::errors::Error) -> Self {
-        SmilesError::Element(value)
-    }
-}
-
-// impl fmt::Display for SmilesError {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self {
-//             Self::Element(element_err) => write!(f, "Element error:
-// {element_err}"),             Self::IncompleteElementName(c) => write!(f,
-// "Element name incomplete, found: "),             Self::Element(error) =>
-// todo!(),             Self::InvalidNumber => todo!(),
-//             Self::UnexpectedCharacter { character } => todo!(),
-//             Self::UnexpectedLeftBracket => todo!(),
-//             Self::UnexpectedRightBracket => todo!(),
-//             Self::UnclosedBracket => todo!(),
-//             Self::ElementRequiresBrackets => todo!(),
-//             Self::MissingBracketElement => todo!(),
-//             Self::InvalidAromaticElement { element } => todo!(),
-//             Self::IntegerOverflow => todo!(),
-//             Self::RingNumberOverFlow(_) => todo!(),
-//         }
-//     }
-// }

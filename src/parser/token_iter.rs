@@ -1,10 +1,9 @@
 //! Submodule creating the `TokenIter` struct, which is an iterator over
 //! the `Token`s found in a provided string.
 
-use std::{default, str::FromStr};
+use std::str::FromStr;
 
 use elements_rs::Element;
-use geometric_traits::traits::Symbol;
 
 use crate::{
     errors::SmilesError,
@@ -95,20 +94,6 @@ fn aromatic_from_element(in_bracket: bool, element: Element) -> Result<bool, Smi
     if allowed { Ok(true) } else { Err(SmilesError::InvalidAromaticElement { element }) }
 }
 
-// fn check_element(in_bracket: bool, chars: &[char]) -> Result<Element,
-// SmilesError> {     let element = match chars.len() {
-//         0 => SmilesError::MissingElement,
-//         1 => {
-
-//         }
-
-//     };
-
-//     let element_str:String = chars.iter().copied().collect();
-//     let element = Element::from_str(&element_str)?;
-//     Ok(element)
-// }
-
 fn try_element(stream: &mut TokenIter<'_>) -> Result<AtomSymbol, SmilesError> {
     if matches!(stream.chars.peek(), Some('*')) {
         stream.chars.next();
@@ -120,7 +105,7 @@ fn try_element(stream: &mut TokenIter<'_>) -> Result<AtomSymbol, SmilesError> {
     if !char_1.is_alphabetic() {
         return Err(SmilesError::MissingElement);
     }
-    let mut try_candidate = |val: &str| -> Option<Element> { Element::from_str(val).ok() };
+    let try_candidate = |val: &str| -> Option<Element> { Element::from_str(val).ok() };
     stream.chars.next();
     let first_char = char_1.to_string();
     if let Some(&char_2) = stream.chars.peek() {

@@ -2,7 +2,7 @@
 
 use std::{default, ops::Range};
 
-use elements_rs::Element;
+use elements_rs::{Element, Isotope};
 
 use crate::errors::SmilesError;
 
@@ -189,6 +189,62 @@ impl BracketedAtom {
             },
         }
     }
+    /// Returns the the [`Element`] of the bracket atom or `None` for `WildCard`
+    pub fn element(&self) -> Option<Element> {
+        match self.symbol {
+            AtomSymbol::WildCard => None,
+            AtomSymbol::Element(element) => Some(element)
+        }
+    }
+    /// Returns the [`AtomSymbol`]
+    pub fn symbol(&self) -> AtomSymbol {
+        self.symbol
+    }
+    /// Returns the isotope mass number
+    pub fn isotope_mass_number(&self) -> Option<u16> {
+        self.isotope_mass_number
+    }
+    /// Returns the [`Isotope`] for the [`Element`] for the atom
+    pub fn isotope(&self) -> Result<Isotope, SmilesError> {
+        let element = self.element().ok_or(SmilesError::InvalidIsotope)?;
+        let isotope = match self.isotope_mass_number() {
+            None => element.most_abundant_isotope(),
+            Some(mass) => Isotope::try_from((element, mass))?,
+        };
+        Ok(isotope)
+    }
+    /// Returns aromatic status
+    pub fn aromatic(&self) -> bool {
+        self.aromatic
+    }
+    /// Returns the [`HydrogenCount`]
+    pub fn hydrogens(&self) -> HydrogenCount {
+        self.hydrogens
+    }
+    /// Returns the hydrogens attached or `None`
+    pub fn hydrogen_count(&self) -> Option<u8> {
+        match self.hydrogens {
+            HydrogenCount::Unspecified => None,
+            HydrogenCount::Explicit(i) => Some(i)
+        }
+    }
+    /// Returns the [`Charge`] of the atom
+    pub fn charge(&self) -> Charge {
+        self.charge
+    }
+    /// Returns the charge as `i8`
+    pub fn charge_value(&self) -> i8 {
+        self.charge.get()
+    }
+    /// Returns the class (default is 0)
+    pub fn class(&self) -> u16 {
+        self.class
+    }
+    /// Returns the [`Chirality`] of the atom
+    pub fn chiral(&self) -> Option<Chirality> {
+        self.chiral
+    }
+
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
