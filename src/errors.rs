@@ -64,4 +64,3 @@ impl From<TryFromIntError> for SmilesError {
         SmilesError::InvalidNumber
     }
 }
-

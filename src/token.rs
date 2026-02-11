@@ -106,9 +106,9 @@ impl AtomSymbol {
         matches!(self, AtomSymbol::WildCard)
     }
     /// Returns either the [`Element`] or `None` if wildcard
-    pub fn element(&self) -> Option<&Element> {
+    pub fn element(&self) -> Option<Element> {
         match self {
-            AtomSymbol::Element(e) => Some(e),
+            AtomSymbol::Element(e) => Some(*e),
             AtomSymbol::WildCard => None,
         }
     }
@@ -141,7 +141,7 @@ impl UnbracketedAtom {
         self.symbol
     }
     /// Returns the [`Element`] or `None` if `WildCard`
-    pub fn element(&self) -> Option<&Element> {
+    pub fn element(&self) -> Option<Element> {
         self.symbol.element()
     }
     /// Returns true of aromatic
@@ -193,7 +193,7 @@ impl BracketedAtom {
     pub fn element(&self) -> Option<Element> {
         match self.symbol {
             AtomSymbol::WildCard => None,
-            AtomSymbol::Element(element) => Some(element)
+            AtomSymbol::Element(element) => Some(element),
         }
     }
     /// Returns the [`AtomSymbol`]
@@ -225,7 +225,7 @@ impl BracketedAtom {
     pub fn hydrogen_count(&self) -> Option<u8> {
         match self.hydrogens {
             HydrogenCount::Unspecified => None,
-            HydrogenCount::Explicit(i) => Some(i)
+            HydrogenCount::Explicit(i) => Some(i),
         }
     }
     /// Returns the [`Charge`] of the atom
@@ -244,7 +244,6 @@ impl BracketedAtom {
     pub fn chiral(&self) -> Option<Chirality> {
         self.chiral
     }
-
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -255,14 +254,19 @@ pub struct BracketedAtomBuilder {
 }
 
 impl BracketedAtomBuilder {
+        /// Adds an isotope value
+    pub fn with_isotope(mut self, iso: u16) -> Self {
+        self.bracket_atom.isotope_mass_number = Some(iso);
+        self
+    }
     /// Adds the element
     pub fn with_element(mut self, possible_element: Option<Element>) -> Self {
         self.bracket_atom.symbol = AtomSymbol::new(possible_element);
         self
     }
-    /// Adds an isotope value
-    pub fn with_isotope(mut self, iso: u16) -> Self {
-        self.bracket_atom.isotope_mass_number = Some(iso);
+    /// Adds the aromatic value
+    pub fn with_aromatic(mut self, aromatic: bool) -> Self {
+        self.bracket_atom.aromatic = aromatic;
         self
     }
     /// Adds a specified [`HydrogenCount`]

@@ -42,12 +42,12 @@ impl TokenIter<'_> {
                 } else {
                     self.in_bracket = true;
                     let possible_bracket_atom = BracketedAtom::builder();
-                    let try_isotope = try_fold_number(self);
-                    if let Some(isotope) = try_isotope {
-                        let val = isotope?;
-                        possible_bracket_atom.with_isotope(val);
+                    if let Some(isotope) = try_fold_number(self) {
+                        possible_bracket_atom.with_isotope(isotope?);
                     }
-
+                    let (atom, aromatic) = try_element(self)?;
+                    possible_bracket_atom.with_element(atom.element()).with_aromatic(aromatic);
+                    todo!("add chirality method, hydrogen count, charge, and class");
                     let bracket_atom = possible_bracket_atom.build();
                     Token::BracketedAtom(bracket_atom)
                 }
@@ -94,10 +94,10 @@ fn aromatic_from_element(in_bracket: bool, element: Element) -> Result<bool, Smi
     if allowed { Ok(true) } else { Err(SmilesError::InvalidAromaticElement { element }) }
 }
 
-fn try_element(stream: &mut TokenIter<'_>) -> Result<AtomSymbol, SmilesError> {
+fn try_element(stream: &mut TokenIter<'_>) -> Result<(AtomSymbol, bool), SmilesError> {
     if matches!(stream.chars.peek(), Some('*')) {
         stream.chars.next();
-        return Ok(AtomSymbol::default());
+        return Ok((AtomSymbol::WildCard, false));
     }
     let Some(&char_1) = stream.chars.peek() else {
         return Err(SmilesError::MissingElement);
@@ -105,20 +105,42 @@ fn try_element(stream: &mut TokenIter<'_>) -> Result<AtomSymbol, SmilesError> {
     if !char_1.is_alphabetic() {
         return Err(SmilesError::MissingElement);
     }
-    let try_candidate = |val: &str| -> Option<Element> { Element::from_str(val).ok() };
+    let is_aromatic_candidate = char_1.is_ascii_lowercase();
     stream.chars.next();
-    let first_char = char_1.to_string();
+
+    let try_candidate = |val: &str| -> Option<Element> { Element::from_str(val).ok() };
+
     if let Some(&char_2) = stream.chars.peek() {
         if char_2.is_alphabetic() {
-            let two_chars = format!("{char_1}{char_2}");
-            if let Some(element) = try_candidate(&two_chars) {
-                stream.chars.next();
-                return Ok(AtomSymbol::Element(element));
+            if is_aromatic_candidate && char_2.is_ascii_lowercase() {
+                let candidate = format!("{}{}", char_1.to_ascii_uppercase(), char_2);
+                if let Some(element) = try_candidate(&candidate) {
+                    stream.chars.next();
+                    let aromatic = aromatic_from_element(stream.in_bracket, element)?;
+                    return Ok((AtomSymbol::Element(element), aromatic));
+                }
+            }
+            if !is_aromatic_candidate && char_2.is_ascii_lowercase() {
+                let candidate = format!("{}{}", char_1, char_2);
+                if let Some(element) = try_candidate(&candidate) {
+                    stream.chars.next();
+                    return Ok((AtomSymbol::Element(element), false));
+                }
             }
         }
     }
-    if let Some(element) = try_candidate(&first_char) {
-        return Ok(AtomSymbol::Element(element));
+    let one = if is_aromatic_candidate {
+        char_1.to_ascii_uppercase().to_string()
+    } else {
+        char_1.to_string()
+    };
+    if let Some(element) = try_candidate(&one) {
+        let aromatic = if is_aromatic_candidate {
+            aromatic_from_element(stream.in_bracket, element)?
+        } else {
+            false
+        };
+        return Ok((AtomSymbol::Element(element), aromatic));
     }
     Err(SmilesError::InvalidElementName(char_1))
 }
