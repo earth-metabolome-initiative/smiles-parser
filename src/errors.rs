@@ -4,11 +4,15 @@ use std::num::TryFromIntError;
 
 use elements_rs::Element;
 
+use crate::token::Bond;
+
 /// The errors that could occur during SMILES parsing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SmilesError {
-    /// Error indicating incomplete Element name
-    IncompleteElementName(char),
+    /// Missing Element
+    MissingElement,
+    /// Error indicating invalid Element name
+    InvalidElementName(char),
     /// Error indicating that an unknown element was encountered.
     Element(elements_rs::errors::Error),
     /// Error indicating that an invalid number was encountered.
@@ -41,6 +45,10 @@ pub enum SmilesError {
     ChargeUnderflow(i8),
     /// A charge is over the allowed maximum (15)
     ChargeOverflow(i8),
+    /// Bond Inside Bracket
+    BondInBracket(Bond),
+    /// Non Bond in Bracket
+    NonBondInBracket,
 }
 
 impl From<TryFromIntError> for SmilesError {
