@@ -53,6 +53,8 @@ pub enum SmilesError {
     ElementsRs(elements_rs::errors::Error),
     /// Specified Chirality is not a valid form
     InvalidChirality,
+    /// Unexpected end of string
+    UnexpectedEndOfString
 }
 
 impl From<elements_rs::errors::Error> for SmilesError {

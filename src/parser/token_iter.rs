@@ -145,16 +145,49 @@ fn try_element(stream: &mut TokenIter<'_>) -> Result<(AtomSymbol, bool), SmilesE
     Err(SmilesError::InvalidElementName(char_1))
 }
 
-fn try_chirality(stream: &mut TokenIter<'_>) -> Option<Chirality> {
-    let Some(at) = stream.chars.peek();
-    if matches!(at, '@') {
+fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>,SmilesError> {
+    let chirality = if let Some(char_1) = stream.chars.peek() {
         stream.chars.next();
-        let Some(at_next) = stream.chars.peek().copied();
-        if matches!(at_next, '@') {
-            return Some(Chirality::AtAt);
+        if let Some(char_2) = stream.chars.peek() {
+            match (char_1, char_2) {
+                ('@','@') => {
+                    stream.chars.next();
+                    Ok(Some(Chirality::AtAt))
+                },
+                ('@', 'T') => {
+                    stream.chars.next();
+                    if let Some(char_3) = stream.chars.peek() {
+                        match char_3 {
+                            'H' => {
+                                stream.chars.next();
+                                let possible_num = try_fold_number(stream);
+                                match possible_num {
+                                    None => Err(SmilesError::InvalidChirality),
+                                    Some(num) => Chirality::try_th(num?)
+                                }
+                            },
+                            'B' => {
+                                stream.chars.next();
+                                let possible_num = try_fold_number(stream);
+                                match possible_num {
+                                    None => Err(SmilesError::InvalidChirality),
+                                    Some(num) => Chirality::try_tb(num?)
+                                }
+                            },
+                            _ => Err(SmilesError::InvalidChirality)
+                        }
+                    } else {
+                        Err(SmilesError::InvalidChirality)
+                    }
+                }
+            }
+        } else {
+            Err(SmilesError::UnexpectedEndOfString)            
         }
-    }
-    None
+    } else {
+        Err(SmilesError::UnexpectedEndOfString)
+    };
+    chirality
 }
 
 fn try_fold_number<B>(stream: &mut TokenIter<'_>) -> Option<Result<B, SmilesError>>

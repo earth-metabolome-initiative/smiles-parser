@@ -323,18 +323,23 @@ pub enum Chirality {
 }
 
 impl Chirality {
+    /// Convert `u8` to `TH`+`U8`
     pub fn try_th(n: u8) -> Result<Self, SmilesError> {
         (1..=2).contains(&n).then_some(Self::TH(n)).ok_or(SmilesError::InvalidChirality)
     }
+    /// Convert `u8` to `AL`+`U8
     pub fn try_al(n: u8) -> Result<Self, SmilesError> {
         (1..=2).contains(&n).then_some(Self::AL(n)).ok_or(SmilesError::InvalidChirality)
     }
+    /// Convert `u8` to `SP`+`U8
     pub fn try_sp(n: u8) -> Result<Self, SmilesError> {
         (1..=3).contains(&n).then_some(Self::SP(n)).ok_or(SmilesError::InvalidChirality)
     }
+    /// Convert `u8` to `TB`+`U8
     pub fn try_tb(n: u8) -> Result<Self, SmilesError> {
         (1..=20).contains(&n).then_some(Self::TB(n)).ok_or(SmilesError::InvalidChirality)
     }
+    /// Convert `u8` to `OH`+`U8
     pub fn try_oh(n: u8) -> Result<Self, SmilesError> {
         (1..=30).contains(&n).then_some(Self::OH(n)).ok_or(SmilesError::InvalidChirality)
     }
