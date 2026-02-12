@@ -7,6 +7,7 @@ use elements_rs::Element;
 
 use crate::{
     errors::SmilesError,
+    smiles::Smiles,
     token::{AtomSymbol, BracketedAtom, Chirality, Token, UnbracketedAtom},
 };
 
@@ -145,16 +146,82 @@ fn try_element(stream: &mut TokenIter<'_>) -> Result<(AtomSymbol, bool), SmilesE
     Err(SmilesError::InvalidElementName(char_1))
 }
 
-fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>,SmilesError> {
-    let chirality = if let Some(char_1) = stream.chars.peek() {
+fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, SmilesError> {
+    if stream.chars.peek().copied() != Some('@') {
+        return Ok(None);
+    }
+
+    let chirality = if let Some(char_1) = stream.chars.peek().copied() {
         stream.chars.next();
-        if let Some(char_2) = stream.chars.peek() {
+        if let Some(char_2) = stream.chars.peek().copied() {
             match (char_1, char_2) {
-                ('@','@') => {
+                ('@', '@') => {
                     stream.chars.next();
                     Ok(Some(Chirality::AtAt))
-                },
+                }
                 ('@', 'T') => {
+                    stream.chars.next();
+                    if let Some(char_3) = stream.chars.peek().copied() {
+                        match char_3 {
+                            'H' => {
+                                stream.chars.next();
+                                let possible_num = try_fold_number(stream);
+                                match possible_num {
+                                    None => Err(SmilesError::InvalidChirality),
+                                    Some(num) => Ok(Some((Chirality::try_th(num?)?))),
+                                }
+                            }
+                            'B' => {
+                                stream.chars.next();
+                                let possible_num = try_fold_number(stream);
+                                match possible_num {
+                                    None => Err(SmilesError::InvalidChirality),
+                                    Some(num) => Ok(Some(Chirality::try_tb(num?)?)),
+                                }
+                            }
+                            _ => Err(SmilesError::InvalidChirality),
+                        }
+                    } else {
+                        Err(SmilesError::InvalidChirality)
+                    }
+                }
+                ('@', 'A') => {
+                    stream.chars.next();
+                    if let Some(char_3) = stream.chars.peek() {
+                        match char_3 {
+                            'L' => {
+                                stream.chars.next();
+                                let possible_num = try_fold_number(stream);
+                                match possible_num {
+                                    None => Err(SmilesError::InvalidChirality),
+                                    Some(num) => Ok(Some(Chirality::try_al(num?)?)),
+                                }
+                            }
+                            _ => Err(SmilesError::InvalidChirality),
+                        }
+                    } else {
+                        Err(SmilesError::InvalidChirality)
+                    }
+                }
+                ('@', 'S') => {
+                    stream.chars.next();
+                    if let Some(char_3) = stream.chars.peek() {
+                        match char_3 {
+                            'P' => {
+                                stream.chars.next();
+                                let possible_num = try_fold_number(stream);
+                                match possible_num {
+                                    None => Err(SmilesError::InvalidChirality),
+                                    Some(num) => Ok(Some(Chirality::try_sp(num?)?)),
+                                }
+                            }
+                            _ => Err(SmilesError::InvalidChirality),
+                        }
+                    } else {
+                        Err(SmilesError::InvalidChirality)
+                    }
+                }
+                ('@', 'O') => {
                     stream.chars.next();
                     if let Some(char_3) = stream.chars.peek() {
                         match char_3 {
@@ -163,26 +230,21 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>,SmilesE
                                 let possible_num = try_fold_number(stream);
                                 match possible_num {
                                     None => Err(SmilesError::InvalidChirality),
-                                    Some(num) => Chirality::try_th(num?)
+                                    Some(num) => Ok(Some(Chirality::try_oh(num?)?)),
                                 }
-                            },
-                            'B' => {
-                                stream.chars.next();
-                                let possible_num = try_fold_number(stream);
-                                match possible_num {
-                                    None => Err(SmilesError::InvalidChirality),
-                                    Some(num) => Chirality::try_tb(num?)
-                                }
-                            },
-                            _ => Err(SmilesError::InvalidChirality)
+                            }
+                            _ => Err(SmilesError::InvalidChirality),
                         }
                     } else {
                         Err(SmilesError::InvalidChirality)
                     }
                 }
+                ('@', n) if n.is_numeric() => Ok(Some(Chirality::At)),
+                ('@', 'H' | '-' | '+' | ':') => Ok(Some(Chirality::At)),
+                _ => Err(SmilesError::InvalidChirality),
             }
         } else {
-            Err(SmilesError::UnexpectedEndOfString)            
+            Err(SmilesError::UnexpectedEndOfString)
         }
     } else {
         Err(SmilesError::UnexpectedEndOfString)

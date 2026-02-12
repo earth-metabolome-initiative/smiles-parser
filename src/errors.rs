@@ -54,7 +54,7 @@ pub enum SmilesError {
     /// Specified Chirality is not a valid form
     InvalidChirality,
     /// Unexpected end of string
-    UnexpectedEndOfString
+    UnexpectedEndOfString,
 }
 
 impl From<elements_rs::errors::Error> for SmilesError {

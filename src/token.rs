@@ -254,7 +254,7 @@ pub struct BracketedAtomBuilder {
 }
 
 impl BracketedAtomBuilder {
-        /// Adds an isotope value
+    /// Adds an isotope value
     pub fn with_isotope(mut self, iso: u16) -> Self {
         self.bracket_atom.isotope_mass_number = Some(iso);
         self
@@ -270,8 +270,8 @@ impl BracketedAtomBuilder {
         self
     }
     /// Adds a specified [`HydrogenCount`]
-    pub fn with_hydrogens(mut self, h: HydrogenCount) -> Self {
-        self.bracket_atom.hydrogens = h;
+    pub fn with_hydrogens(mut self, h_count: HydrogenCount) -> Self {
+        self.bracket_atom.hydrogens = h_count;
         self
     }
     /// Adds a specified [`Charge`]
@@ -324,24 +324,24 @@ pub enum Chirality {
 
 impl Chirality {
     /// Convert `u8` to `TH`+`U8`
-    pub fn try_th(n: u8) -> Result<Self, SmilesError> {
-        (1..=2).contains(&n).then_some(Self::TH(n)).ok_or(SmilesError::InvalidChirality)
+    pub fn try_th(num: u8) -> Result<Self, SmilesError> {
+        (1..=2).contains(&num).then_some(Self::TH(num)).ok_or(SmilesError::InvalidChirality)
     }
     /// Convert `u8` to `AL`+`U8
-    pub fn try_al(n: u8) -> Result<Self, SmilesError> {
-        (1..=2).contains(&n).then_some(Self::AL(n)).ok_or(SmilesError::InvalidChirality)
+    pub fn try_al(num: u8) -> Result<Self, SmilesError> {
+        (1..=2).contains(&num).then_some(Self::AL(num)).ok_or(SmilesError::InvalidChirality)
     }
     /// Convert `u8` to `SP`+`U8
-    pub fn try_sp(n: u8) -> Result<Self, SmilesError> {
-        (1..=3).contains(&n).then_some(Self::SP(n)).ok_or(SmilesError::InvalidChirality)
+    pub fn try_sp(num: u8) -> Result<Self, SmilesError> {
+        (1..=3).contains(&num).then_some(Self::SP(num)).ok_or(SmilesError::InvalidChirality)
     }
     /// Convert `u8` to `TB`+`U8
-    pub fn try_tb(n: u8) -> Result<Self, SmilesError> {
-        (1..=20).contains(&n).then_some(Self::TB(n)).ok_or(SmilesError::InvalidChirality)
+    pub fn try_tb(num: u8) -> Result<Self, SmilesError> {
+        (1..=20).contains(&num).then_some(Self::TB(num)).ok_or(SmilesError::InvalidChirality)
     }
     /// Convert `u8` to `OH`+`U8
-    pub fn try_oh(n: u8) -> Result<Self, SmilesError> {
-        (1..=30).contains(&n).then_some(Self::OH(n)).ok_or(SmilesError::InvalidChirality)
+    pub fn try_oh(num: u8) -> Result<Self, SmilesError> {
+        (1..=30).contains(&num).then_some(Self::OH(num)).ok_or(SmilesError::InvalidChirality)
     }
 }
 
@@ -419,4 +419,15 @@ pub enum Bond {
     Up,
     /// Represents a stereochemical single bond `\` (down)
     Down,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::token::Chirality;
+
+    #[test]
+    fn test_chiral_range_bounds() {
+        let th_err = Chirality::try_th(3);
+        assert_eq!(th_err, Err(crate::errors::SmilesError::InvalidChirality));
+    }
 }
