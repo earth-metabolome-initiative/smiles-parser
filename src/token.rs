@@ -1,6 +1,6 @@
 //! Represents tokens used in parsing SMILES strings.
 
-use std::{default, ops::Range};
+use std::ops::Range;
 
 use elements_rs::{Element, Isotope};
 
@@ -64,16 +64,14 @@ impl TokenWithSpan {
 /// maximal value a ring marker can be
 pub struct RingNum(u8);
 impl RingNum {
-    /// Maximum value for a ring marker
-    pub const MAX: u8 = 99;
 
     /// Attempts to generate a [`RingNum`] form a [`u8`],
     ///
     /// # Errors
     /// - Returns a [`SmilesError::RingNumberOverflow`] if the value is above
     ///   `99`
-    pub fn try_new(n: u8) -> Result<Self, SmilesError> {
-        if n <= Self::MAX { Ok(Self(n)) } else { Err(SmilesError::RingNumberOverflow(n)) }
+    pub fn try_new(num: u8) -> Result<Self, SmilesError> {
+        (0..=99).contains(&num).then_some(Self(num)).ok_or(SmilesError::RingNumberOverflow(num))
     }
 
     /// Returns the value for the [`RingNum`]
@@ -371,22 +369,13 @@ impl HydrogenCount {
 pub struct Charge(i8);
 
 impl Charge {
-    /// SMILES specification has lowest charge of -15
-    pub const MIN: i8 = -15;
-    /// SMILES specification has highest charge of 15
-    pub const MAX: i8 = 15;
     /// Attempts to set the `Charge`, if outside of bounds returns
     /// [`SmilesError::ChargeUnderflow`] or [`SmilesError::ChargeOverflow`]
-    pub fn try_new(n: i8) -> Result<Self, SmilesError> {
-        if n >= Self::MIN && n <= Self::MAX {
-            Ok(Self(n))
-        } else {
-            if n.is_negative() {
-                Err(SmilesError::ChargeUnderflow(n))
-            } else {
-                Err(SmilesError::ChargeOverflow(n))
-            }
-        }
+    pub fn try_new(num: i8) -> Result<Self, SmilesError> {
+        (-15..=15).contains(&num).then_some(Self(num)).ok_or(match num.is_negative() {
+            true => SmilesError::ChargeUnderflow(num),
+            false => SmilesError::ChargeOverflow(num)
+        })
     }
 
     /// Returns the `Charge` value as `i8`
