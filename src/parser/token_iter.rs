@@ -7,8 +7,7 @@ use elements_rs::Element;
 
 use crate::{
     errors::SmilesError,
-    smiles::Smiles,
-    token::{AtomSymbol, BracketedAtom, Chirality, Token, UnbracketedAtom},
+    token::{AtomSymbol, BracketedAtom, Chirality, HydrogenCount, Token},
 };
 
 /// An iterator over the tokens found in a SMILES string.
@@ -42,9 +41,14 @@ impl TokenIter<'_> {
                     possible_bracket_atom.with_isotope(isotope?);
                 }
                 let (atom, aromatic) = try_element(self)?;
-                possible_bracket_atom.with_element(atom.element()).with_aromatic(aromatic);
+                possible_bracket_atom.with_symbol(atom).with_aromatic(aromatic);
                 if let Some(chiral) = try_chirality(self)? {
                     possible_bracket_atom.with_chiral(chiral);
+                }
+                match possible_bracket_atom.symbol() {
+                    AtomSymbol::Unspecified => {
+
+                    }
                 }
                 todo!("add hydrogen count, charge, and class");
                 let bracket_atom = possible_bracket_atom.build();
@@ -274,4 +278,16 @@ where
     }
 
     Some(B::try_from(amount).map_err(|_| SmilesError::IntegerOverflow))
+}
+
+fn try_hydrogen_count(stream: &mut TokenIter<'_>, symbol: AtomSymbol) -> Result<Option<HydrogenCount>, SmilesError> {
+    if stream.chars.peek().copied() != Some('H') {
+        
+    return Ok(Some(HydrogenCount::Unspecified))    ;
+    }
+    match symbol {
+        AtomSymbol::Unspecified => 
+    }
+
+    
 }

@@ -86,8 +86,10 @@ pub enum AtomSymbol {
     /// The explicitly named [`Element`]
     Element(Element),
     /// WildCard variant, described [here](http://opensmiles.org/opensmiles.html#inatoms)
-    #[default]
     WildCard,
+    /// unspecified Atom Symbol
+    #[default]
+    Unspecified,
 }
 
 impl AtomSymbol {
@@ -106,7 +108,7 @@ impl AtomSymbol {
     pub fn element(&self) -> Option<Element> {
         match self {
             AtomSymbol::Element(e) => Some(*e),
-            AtomSymbol::WildCard => None,
+            AtomSymbol::WildCard | AtomSymbol::Unspecified => None,
         }
     }
     /// Consumes the `AtomSymbol` and returns the [`Element`] or `None` if
@@ -114,7 +116,7 @@ impl AtomSymbol {
     pub fn into_element(self) -> Option<Element> {
         match self {
             AtomSymbol::Element(e) => Some(e),
-            AtomSymbol::WildCard => None,
+            AtomSymbol::WildCard | AtomSymbol::Unspecified=> None,
         }
     }
 }
@@ -189,7 +191,7 @@ impl BracketedAtom {
     /// Returns the the [`Element`] of the bracket atom or `None` for `WildCard`
     pub fn element(&self) -> Option<Element> {
         match self.symbol {
-            AtomSymbol::WildCard => None,
+            AtomSymbol::WildCard | AtomSymbol::Unspecified => None,
             AtomSymbol::Element(element) => Some(element),
         }
     }
@@ -256,9 +258,9 @@ impl BracketedAtomBuilder {
         self.bracket_atom.isotope_mass_number = Some(iso);
         self
     }
-    /// Adds the element
-    pub fn with_element(mut self, possible_element: Option<Element>) -> Self {
-        self.bracket_atom.symbol = AtomSymbol::new(possible_element);
+    /// Adds the Atom Symbol
+    pub fn with_symbol(mut self, symbol: AtomSymbol) -> Self {
+        self.bracket_atom.symbol = symbol;
         self
     }
     /// Adds the aromatic value
@@ -289,6 +291,10 @@ impl BracketedAtomBuilder {
     /// Returns the [`Element`] contained in builder
     pub fn element(&self) -> Option<Element> {
         self.bracket_atom.element()
+    }
+    /// Returns the [`AtomSymbol`] 
+    pub fn symbol(&self) -> AtomSymbol {
+        self.bracket_atom.symbol
     }
     /// Consumes the builder and returns the completed [`BracketedAtom`]
     pub fn build(self) -> BracketedAtom {
