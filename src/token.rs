@@ -64,7 +64,6 @@ impl TokenWithSpan {
 /// maximal value a ring marker can be
 pub struct RingNum(u8);
 impl RingNum {
-
     /// Attempts to generate a [`RingNum`] form a [`u8`],
     ///
     /// # Errors
@@ -287,6 +286,10 @@ impl BracketedAtomBuilder {
         self.bracket_atom.chiral = Some(chiral);
         self
     }
+    /// Returns the [`Element`] contained in builder
+    pub fn element(&self) -> Option<Element> {
+        self.bracket_atom.element()
+    }
     /// Consumes the builder and returns the completed [`BracketedAtom`]
     pub fn build(self) -> BracketedAtom {
         BracketedAtom {
@@ -374,7 +377,7 @@ impl Charge {
     pub fn try_new(num: i8) -> Result<Self, SmilesError> {
         (-15..=15).contains(&num).then_some(Self(num)).ok_or(match num.is_negative() {
             true => SmilesError::ChargeUnderflow(num),
-            false => SmilesError::ChargeOverflow(num)
+            false => SmilesError::ChargeOverflow(num),
         })
     }
 

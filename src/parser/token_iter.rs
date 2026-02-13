@@ -30,28 +30,25 @@ impl<'a> From<&'a str> for TokenIter<'a> {
 impl TokenIter<'_> {
     fn parse_token(&mut self, current_char: char) -> Result<Token, SmilesError> {
         let token = match current_char {
-            '.' => {
-                if !self.in_bracket {
-                    Token::NonBond
-                } else {
-                    return Err(SmilesError::NonBondInBracket);
-                }
-            }
+            '.' if !self.in_bracket => Token::NonBond,
+            '.' => return Err(SmilesError::NonBondInBracket),
             '[' => {
                 if self.in_bracket {
                     return Err(SmilesError::UnexpectedLeftBracket);
-                } else {
-                    self.in_bracket = true;
-                    let possible_bracket_atom = BracketedAtom::builder();
-                    if let Some(isotope) = try_fold_number(self) {
-                        possible_bracket_atom.with_isotope(isotope?);
-                    }
-                    let (atom, aromatic) = try_element(self)?;
-                    possible_bracket_atom.with_element(atom.element()).with_aromatic(aromatic);
-                    todo!("add chirality method, hydrogen count, charge, and class");
-                    let bracket_atom = possible_bracket_atom.build();
-                    Token::BracketedAtom(bracket_atom)
                 }
+                self.in_bracket = true;
+                let possible_bracket_atom = BracketedAtom::builder();
+                if let Some(isotope) = try_fold_number(self) {
+                    possible_bracket_atom.with_isotope(isotope?);
+                }
+                let (atom, aromatic) = try_element(self)?;
+                possible_bracket_atom.with_element(atom.element()).with_aromatic(aromatic);
+                if let Some(chiral) = try_chirality(self)? {
+                    possible_bracket_atom.with_chiral(chiral);
+                }
+                todo!("add hydrogen count, charge, and class");
+                let bracket_atom = possible_bracket_atom.build();
+                Token::BracketedAtom(bracket_atom)
             }
             _ => return Err(SmilesError::UnexpectedCharacter { character: current_char }),
         };
