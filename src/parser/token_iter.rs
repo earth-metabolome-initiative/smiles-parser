@@ -3,7 +3,7 @@
 
 use std::str::FromStr;
 
-use elements_rs::Element;
+use elements_rs::{Element, isotopes::hydrogen};
 
 use crate::{
     errors::SmilesError,
@@ -45,11 +45,12 @@ impl TokenIter<'_> {
                 if let Some(chiral) = try_chirality(self)? {
                     possible_bracket_atom.with_chiral(chiral);
                 }
-                match possible_bracket_atom.symbol() {
-                    AtomSymbol::Unspecified => {
 
-                    }
+                // If element is unspecified at this step there is an error
+                if possible_bracket_atom.symbol() == AtomSymbol::Unspecified {
+                    return Err(SmilesError::MissingBracketElement);
                 }
+
                 todo!("add hydrogen count, charge, and class");
                 let bracket_atom = possible_bracket_atom.build();
                 Token::BracketedAtom(bracket_atom)
@@ -280,14 +281,14 @@ where
     Some(B::try_from(amount).map_err(|_| SmilesError::IntegerOverflow))
 }
 
-fn try_hydrogen_count(stream: &mut TokenIter<'_>, symbol: AtomSymbol) -> Result<Option<HydrogenCount>, SmilesError> {
-    if stream.chars.peek().copied() != Some('H') {
-        
-    return Ok(Some(HydrogenCount::Unspecified))    ;
+fn try_hydrogen_count(stream: &mut TokenIter<'_>) -> Result<HydrogenCount, SmilesError> {
+    let possible_hydrogen = stream.chars.peek().copied();
+    if matches!(possible_hydrogen, Some('H')) {
+        match try_fold_number::<u8>(stream) {
+            Some(h) => Ok(HydrogenCount::new(Some(h?))),
+            None => Ok(HydrogenCount::new(Some(1))),
+        }
+    } else {
+        return Ok(HydrogenCount::Unspecified);
     }
-    match symbol {
-        AtomSymbol::Unspecified => 
-    }
-
-    
 }

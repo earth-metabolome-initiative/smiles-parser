@@ -116,7 +116,7 @@ impl AtomSymbol {
     pub fn into_element(self) -> Option<Element> {
         match self {
             AtomSymbol::Element(e) => Some(e),
-            AtomSymbol::WildCard | AtomSymbol::Unspecified=> None,
+            AtomSymbol::WildCard | AtomSymbol::Unspecified => None,
         }
     }
 }
@@ -292,7 +292,7 @@ impl BracketedAtomBuilder {
     pub fn element(&self) -> Option<Element> {
         self.bracket_atom.element()
     }
-    /// Returns the [`AtomSymbol`] 
+    /// Returns the [`AtomSymbol`]
     pub fn symbol(&self) -> AtomSymbol {
         self.bracket_atom.symbol
     }
