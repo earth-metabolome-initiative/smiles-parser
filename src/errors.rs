@@ -4,7 +4,7 @@ use std::num::TryFromIntError;
 
 use elements_rs::Element;
 
-use crate::token::Bond;
+use crate::bond::Bond;
 
 /// The errors that could occur during SMILES parsing.
 #[derive(Debug, Clone, PartialEq, Eq)]

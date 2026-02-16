@@ -6,8 +6,13 @@ use std::str::FromStr;
 use elements_rs::Element;
 
 use crate::{
+    atom_symbol::AtomSymbol,
+    bracketed::{
+        bracket_atom::BracketAtom, charge::Charge, chirality::Chirality,
+        hydrogen_count::HydrogenCount,
+    },
     errors::SmilesError,
-    token::{AtomSymbol, BracketedAtom, Charge, Chirality, HydrogenCount, Token},
+    token::Token,
 };
 
 /// An iterator over the tokens found in a SMILES string.
@@ -36,7 +41,7 @@ impl TokenIter<'_> {
                     return Err(SmilesError::UnexpectedLeftBracket);
                 }
                 self.in_bracket = true;
-                let possible_bracket_atom = BracketedAtom::builder();
+                let possible_bracket_atom = BracketAtom::builder();
                 if let Some(isotope) = try_fold_number(self) {
                     possible_bracket_atom.with_isotope(isotope?);
                 }
