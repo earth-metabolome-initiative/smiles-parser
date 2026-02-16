@@ -19,4 +19,31 @@ impl HydrogenCount {
             None => Self::Unspecified,
         }
     }
+    /// Retrieves the hydrogen count if explicit
+    pub fn get_count(&self) -> Option<u8> {
+        match self {
+            Self::Unspecified => None,
+            Self::Explicit(n) => Some(*n)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::bracketed::hydrogen_count::HydrogenCount;
+
+    #[test]
+    fn test_hydro_variants() {
+        let count = HydrogenCount::new(Some(10));
+        assert_eq!(count.get_count(), Some(10));
+
+        let no_count = HydrogenCount::default();
+        assert_eq!(no_count.get_count(), None);
+
+        let no_count = HydrogenCount::new(None);
+        assert_eq!(no_count.get_count(), None);
+        assert_eq!(no_count, HydrogenCount::Unspecified);
+        assert_eq!(no_count, HydrogenCount::default());
+    }
+
 }

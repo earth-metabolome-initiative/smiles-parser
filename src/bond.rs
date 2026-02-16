@@ -18,3 +18,13 @@ pub enum Bond {
     /// Represents a stereochemical single bond `\` (down)
     Down,
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::bond::Bond;
+
+    #[test]
+    fn test_default() {
+        assert_eq!(Bond::default(), Bond::Single);
+    }
+}

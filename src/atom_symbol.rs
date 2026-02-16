@@ -22,6 +22,10 @@ impl AtomSymbol {
             None => AtomSymbol::default(),
         }
     }
+    /// creates an `AtomSymbol` set as `WildCard`
+    pub fn new_wildcard() -> Self {
+        Self::WildCard
+    }
     /// Verifies whether the symbol present is a wildcard
     pub fn is_wildcard(&self) -> bool {
         matches!(self, AtomSymbol::WildCard)
@@ -40,5 +44,28 @@ impl AtomSymbol {
             AtomSymbol::Element(e) => Some(e),
             AtomSymbol::WildCard | AtomSymbol::Unspecified => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use elements_rs::Element;
+
+    use crate::atom_symbol::AtomSymbol;
+
+    #[test]
+    fn test_atom_symbols_all() {
+        let hydrogen = Element::H;
+        let hydro_symbol = AtomSymbol::new(Some(hydrogen));
+        assert!(!hydro_symbol.is_wildcard());
+        assert_eq!(hydro_symbol.element(), Some(hydrogen));
+        let into_hydro = hydro_symbol.into_element();
+        assert_eq!(into_hydro, Some(hydrogen));
+
+        let default = AtomSymbol::default();
+        assert_eq!(default, AtomSymbol::Unspecified);
+
+        let wild = AtomSymbol::new_wildcard();
+        assert!(wild.is_wildcard());
     }
 }
