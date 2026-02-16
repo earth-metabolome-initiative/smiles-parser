@@ -3,11 +3,11 @@
 
 use std::str::FromStr;
 
-use elements_rs::{Element, isotopes::hydrogen};
+use elements_rs::Element;
 
 use crate::{
     errors::SmilesError,
-    token::{AtomSymbol, BracketedAtom, Chirality, HydrogenCount, Token},
+    token::{AtomSymbol, BracketedAtom, Charge, Chirality, HydrogenCount, Token},
 };
 
 /// An iterator over the tokens found in a SMILES string.
@@ -50,10 +50,17 @@ impl TokenIter<'_> {
                 if possible_bracket_atom.symbol() == AtomSymbol::Unspecified {
                     return Err(SmilesError::MissingBracketElement);
                 }
-
-                todo!("add hydrogen count, charge, and class");
+                possible_bracket_atom.with_hydrogens(hydrogen_count(self)?);
+                possible_bracket_atom.with_charge(try_charge(self)?);
+                possible_bracket_atom.with_class(try_class(self)?);
                 let bracket_atom = possible_bracket_atom.build();
-                Token::BracketedAtom(bracket_atom)
+                if matches!(self.chars.peek().copied(), Some(']')) {
+                    self.in_bracket = false;
+                    self.chars.next();
+                    Token::BracketedAtom(bracket_atom)
+                } else {
+                    return Err(SmilesError::UnclosedBracket);
+                }
             }
             _ => return Err(SmilesError::UnexpectedCharacter { character: current_char }),
         };
@@ -281,14 +288,68 @@ where
     Some(B::try_from(amount).map_err(|_| SmilesError::IntegerOverflow))
 }
 
-fn try_hydrogen_count(stream: &mut TokenIter<'_>) -> Result<HydrogenCount, SmilesError> {
+fn hydrogen_count(stream: &mut TokenIter<'_>) -> Result<HydrogenCount, SmilesError> {
     let possible_hydrogen = stream.chars.peek().copied();
     if matches!(possible_hydrogen, Some('H')) {
+        stream.next();
         match try_fold_number::<u8>(stream) {
             Some(h) => Ok(HydrogenCount::new(Some(h?))),
             None => Ok(HydrogenCount::new(Some(1))),
         }
     } else {
         return Ok(HydrogenCount::Unspecified);
+    }
+}
+
+fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
+    let possible_charge = stream.chars.peek().copied();
+    match possible_charge {
+        Some('-') => {
+            stream.next();
+            match stream.chars.peek().copied() {
+                Some('-') => {
+                    stream.next();
+                    Charge::try_new(-2)
+                }
+                _ => {
+                    if let Some(possible_num) = try_fold_number::<i8>(stream) {
+                        Charge::try_new(possible_num? * -1)
+                    } else {
+                        Charge::try_new(-1)
+                    }
+                }
+            }
+        }
+        Some('+') => {
+            stream.next();
+            match stream.chars.peek().copied() {
+                Some('+') => {
+                    stream.next();
+                    Charge::try_new(2)
+                }
+                _ => {
+                    if let Some(possible_num) = try_fold_number::<i8>(stream) {
+                        Charge::try_new(possible_num?)
+                    } else {
+                        Charge::try_new(1)
+                    }
+                }
+            }
+        }
+        _ => Ok(Charge::default()),
+    }
+}
+
+fn try_class(stream: &mut TokenIter<'_>) -> Result<u16, SmilesError> {
+    match stream.chars.peek().copied() {
+        Some(':') => {
+            stream.next();
+            if let Some(possible_num) = try_fold_number(stream) {
+                possible_num
+            } else {
+                Err(SmilesError::InvalidClass)
+            }
+        }
+        _ => Ok(0),
     }
 }

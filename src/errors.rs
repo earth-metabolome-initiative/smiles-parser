@@ -55,6 +55,8 @@ pub enum SmilesError {
     InvalidChirality,
     /// Unexpected end of string
     UnexpectedEndOfString,
+    /// The class is not valid
+    InvalidClass,
 }
 
 impl From<elements_rs::errors::Error> for SmilesError {
