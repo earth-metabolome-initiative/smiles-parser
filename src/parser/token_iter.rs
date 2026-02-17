@@ -68,13 +68,12 @@ impl TokenIter<'_> {
                 }
             }
             c if c.is_ascii_alphabetic() || c == '*' => {
-                let (symbol, aromatic) = try_element(self)?;
+                let (symbol, aromatic) = try_element_from_first(self, c)?;
                 if !valid_unbracketed(symbol) {
                     return Err(SmilesError::InvalidUnbracketedAtom(symbol));
                 }
                 if !self.in_bracket {
-                    let unbracketed = UnbracketedAtom::new(symbol, aromatic);
-                    Token::UnbracketedAtom(unbracketed)
+                    Token::UnbracketedAtom(UnbracketedAtom::new(symbol, aromatic))
                 } else {
                     return Err(SmilesError::UnexpectedBracketedState);
                 }
@@ -99,16 +98,46 @@ impl TokenIter<'_> {
             '/' => Token::Bond(crate::bond::Bond::Up),
             '\\' => Token::Bond(crate::bond::Bond::Down),
             n if n.is_numeric() || n == '%' => {
-                if n == '%' && self.in_bracket {
-                    return Err(SmilesError::UnexpectedPercent);
-                } else if n == '%' {
-                    self.next();
-                }
-                let possible_num = try_fold_number(self);
-                if let Some(num) = possible_num {
-                    Token::RingClosure(RingNum::try_new(num?)?)
+                if n == '%' {
+                    if self.in_bracket {
+                        return Err(SmilesError::UnexpectedPercent);
+                    }
+
+                    // DO NOT consume a digit here; try_fold_number reads from peek()
+                    if let Some(num) = try_fold_number::<u8>(self) {
+                        let ring_num = RingNum::try_new(num?)?;
+                        if ring_num.get() < 10 {
+                            return Err(SmilesError::InvalidRingNumber);
+                        }
+                        Token::RingClosure(ring_num)
+                    } else {
+                        return Err(SmilesError::InvalidRingNumber);
+                    }
                 } else {
-                    return Err(SmilesError::InvalidRingNumber);
+                    // n is the first digit already consumed -> seed the fold with it
+                    let first = n.to_digit(10).unwrap();
+                    let num: u8 = try_fold_number_seeded(self, first)?;
+
+                    // single-digit ring closure must be 0..=9
+                    if num >= 10 {
+                        return Err(SmilesError::InvalidRingNumber);
+                    }
+
+                    Token::RingClosure(RingNum::try_new(num)?)
+                }
+            }
+            '(' => {
+                if !self.in_bracket {
+                    Token::LeftParentheses
+                } else {
+                    return Err(SmilesError::UnexpectedBracketedState);
+                }
+            }
+            ')' => {
+                if !self.in_bracket {
+                    Token::RightParentheses
+                } else {
+                    return Err(SmilesError::UnexpectedBracketedState);
                 }
             }
             _ => return Err(SmilesError::UnexpectedCharacter { character: current_char }),
@@ -154,19 +183,22 @@ fn aromatic_from_element(in_bracket: bool, element: Element) -> Result<bool, Smi
 }
 
 fn try_element(stream: &mut TokenIter<'_>) -> Result<(AtomSymbol, bool), SmilesError> {
-    if matches!(stream.chars.peek(), Some('*')) {
-        stream.chars.next();
+    let first = stream.chars.next().ok_or(SmilesError::MissingElement)?;
+    try_element_from_first(stream, first)
+}
+
+fn try_element_from_first(
+    stream: &mut TokenIter<'_>,
+    char_1: char,
+) -> Result<(AtomSymbol, bool), SmilesError> {
+    if char_1 == '*' {
         return Ok((AtomSymbol::WildCard, false));
     }
-    let Some(&char_1) = stream.chars.peek() else {
-        return Err(SmilesError::MissingElement);
-    };
     if !char_1.is_alphabetic() {
         return Err(SmilesError::MissingElement);
     }
-    let is_aromatic_candidate = char_1.is_ascii_lowercase();
-    stream.chars.next();
 
+    let is_aromatic_candidate = char_1.is_ascii_lowercase();
     let try_candidate = |val: &str| -> Option<Element> { Element::from_str(val).ok() };
 
     if let Some(&char_2) = stream.chars.peek() {
@@ -188,11 +220,13 @@ fn try_element(stream: &mut TokenIter<'_>) -> Result<(AtomSymbol, bool), SmilesE
             }
         }
     }
+
     let one = if is_aromatic_candidate {
         char_1.to_ascii_uppercase().to_string()
     } else {
         char_1.to_string()
     };
+
     if let Some(element) = try_candidate(&one) {
         let aromatic = if is_aromatic_candidate {
             aromatic_from_element(stream.in_bracket, element)?
@@ -201,6 +235,7 @@ fn try_element(stream: &mut TokenIter<'_>) -> Result<(AtomSymbol, bool), SmilesE
         };
         return Ok((AtomSymbol::Element(element), aromatic));
     }
+
     Err(SmilesError::InvalidElementName(char_1))
 }
 
@@ -358,6 +393,24 @@ where
     }
 
     Some(B::try_from(amount).map_err(|_| SmilesError::IntegerOverflow))
+}
+
+fn try_fold_number_seeded<B>(stream: &mut TokenIter<'_>, first_digit: u32) -> Result<B, SmilesError>
+where
+    B: TryFrom<u32>,
+{
+    let mut amount: u32 = first_digit;
+
+    while let Some(ch) = stream.chars.peek() {
+        let Some(digit) = ch.to_digit(10) else { break };
+        stream.chars.next();
+        amount = amount
+            .checked_mul(10)
+            .and_then(|x| x.checked_add(digit))
+            .ok_or(SmilesError::IntegerOverflow)?;
+    }
+
+    B::try_from(amount).map_err(|_| SmilesError::IntegerOverflow)
 }
 
 fn hydrogen_count(stream: &mut TokenIter<'_>) -> Result<HydrogenCount, SmilesError> {
