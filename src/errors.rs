@@ -68,7 +68,7 @@ pub enum SmilesError {
     /// An unexpected `%` has been found
     UnexpectedPercent,
     /// An invalid ring number has been found
-    InvalidRingNumber
+    InvalidRingNumber,
 }
 
 impl From<elements_rs::errors::Error> for SmilesError {

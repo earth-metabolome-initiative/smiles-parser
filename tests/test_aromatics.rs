@@ -1,6 +1,10 @@
 //! Tests on Elements that should or should not be parsed as aromatic
 
-use smiles_parser::{parser::token_iter::TokenIter, token::Token};
+use elements_rs::Element;
+use smiles_parser::{
+    atom_symbol::AtomSymbol, parser::token_iter::TokenIter, ring_num::RingNum, token::Token,
+    unbracketed::UnbracketedAtom,
+};
 const SMILES_STR: &[&str] = &[
     "c1ccccc1",          // benzene
     "n1ccccc1",          // pyridine
@@ -20,42 +24,51 @@ const SMILES_STR: &[&str] = &[
 
 #[test]
 fn test_aromatic_benzene_from_tokenization() {
-    //  c1ccccc1
-    let benzene_tokens = vec![
-        Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Digit(1),
-        Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Digit(1),
+    // c1ccccc1
+    let aromatic_c = UnbracketedAtom::new(AtomSymbol::Element(Element::C), true);
+
+    let expected = vec![
+        Token::UnbracketedAtom(aromatic_c),
+        Token::RingClosure(RingNum::try_new(1).unwrap()),
+        Token::UnbracketedAtom(aromatic_c),
+        Token::UnbracketedAtom(aromatic_c),
+        Token::UnbracketedAtom(aromatic_c),
+        Token::UnbracketedAtom(aromatic_c),
+        Token::UnbracketedAtom(aromatic_c),
+        Token::RingClosure(RingNum::try_new(1).unwrap()),
     ];
-    let benzene_line = SMILES_STR[0];
-    let tokens = TokenIter::from(benzene_line)
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap_or_else(|_| panic!("Failed to parse {benzene_line}"));
-    assert_eq!(benzene_tokens, tokens);
+
+    let line = SMILES_STR[0];
+    let got = TokenIter::from(line).collect::<Result<Vec<_>, _>>().unwrap();
+    assert_eq!(expected, got);
 }
 
 #[test]
 fn test_aromatic_imidazole_from_tokenization() {
-    //  n1cc[nH]c1
-    let imidazole_tokens = vec![
-        Token::Atom { element: elements_rs::Element::N, aromatic: true },
-        Token::Digit(1),
-        Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::LeftSquareBracket,
-        Token::Atom { element: elements_rs::Element::N, aromatic: true },
-        Token::Atom { element: elements_rs::Element::H, aromatic: false },
-        Token::RightSquareBracket,
-        Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Digit(1),
+    // n1cc[nH]c1
+    let aromatic_n = UnbracketedAtom::new(AtomSymbol::Element(Element::N), true);
+    let aromatic_c = UnbracketedAtom::new(AtomSymbol::Element(Element::C), true);
+
+    let expected = vec![
+        Token::UnbracketedAtom(aromatic_n),
+        Token::RingClosure(RingNum::try_new(1).unwrap()),
+        Token::UnbracketedAtom(aromatic_c),
+        Token::UnbracketedAtom(aromatic_c),
+        // [nH] becomes ONE bracketed token now, not '[' Atom Atom ']'
+        Token::BracketedAtom(
+            smiles_parser::bracketed::bracket_atom::BracketAtom::builder()
+                .with_symbol(AtomSymbol::Element(Element::N))
+                .with_aromatic(true)
+                .with_hydrogens(smiles_parser::bracketed::hydrogen_count::HydrogenCount::new(Some(
+                    1,
+                )))
+                .build(),
+        ),
+        Token::UnbracketedAtom(aromatic_c),
+        Token::RingClosure(RingNum::try_new(1).unwrap()),
     ];
-    let imidazole_line = SMILES_STR[4];
-    let tokens = TokenIter::from(imidazole_line)
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap_or_else(|_| panic!("Failed to parse {imidazole_line}"));
-    assert_eq!(imidazole_tokens, tokens);
+
+    let line = SMILES_STR[4];
+    let got = TokenIter::from(line).collect::<Result<Vec<_>, _>>().unwrap();
+    assert_eq!(expected, got);
 }

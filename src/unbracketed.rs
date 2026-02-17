@@ -1,4 +1,5 @@
-//! Module for containing an organic element that occurs outside of brackets `[]`: `B, C, N, O, P, S, F, Cl, Br, I, *`.
+//! Module for containing an organic element that occurs outside of brackets
+//! `[]`: `B, C, N, O, P, S, F, Cl, Br, I, *`.
 use elements_rs::Element;
 
 use crate::atom_symbol::AtomSymbol;

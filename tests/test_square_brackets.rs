@@ -1,5 +1,4 @@
 //! Test for tokenizing square brackets
-use std::ops::{Add, Mul};
 
 use smiles_parser::{errors::SmilesError, parser::token_iter::TokenIter, token::Token};
 
@@ -25,7 +24,6 @@ const SMILES_WITH_BRACKETS: &[&str] = &[
     "C[C@@H]1C[C@@]2(O[C@H]2C)C(=O)O[C@@H]2CCN(C)C/C=C(/COC(=O)[C@]1(C)O)C2=O",
     "CC1=C[C@H](O)CC(C)(C)[C@H]1/C=C/C(C)=C/C=C/C(C)=C/C=C/C=C(C)/C=C/C=C(\\C)CO",
 ];
-
 #[test]
 fn test_valid_square_brackets() {
     for &s in SMILES_WITH_BRACKETS {
@@ -37,9 +35,11 @@ fn test_valid_square_brackets() {
 
 #[test]
 fn test_unexpected_right_brackets() {
+    // New tokenizer does not have a dedicated "UnexpectedRightBracket" error:
+    // stray ']' becomes an UnexpectedCharacter.
     let error = TokenIter::from("[Co+3]]").collect::<Result<Vec<_>, SmilesError>>();
     assert!(error.is_err());
-    assert_eq!(error, Err(SmilesError::UnexpectedRightBracket));
+    assert_eq!(error, Err(SmilesError::UnexpectedCharacter { character: ']' }));
 }
 
 #[test]
@@ -58,17 +58,25 @@ fn test_unclosed_brackets() {
 
 #[test]
 fn test_smiles_tokens_water() {
-    // "[OH2]"
-    let water_tokens = vec![
-        Token::LeftSquareBracket,
-        Token::Atom { element: elements_rs::Element::O, aromatic: false },
-        Token::Atom { element: elements_rs::Element::H, aromatic: false },
-        Token::Digit(2),
-        Token::RightSquareBracket,
-    ];
+    // "[OH2]" now produces ONE Token::BracketedAtom(...)
     let water_line = SMILES_WITH_BRACKETS[0];
     let tokens = TokenIter::from(water_line)
         .collect::<Result<Vec<_>, _>>()
         .unwrap_or_else(|_| panic!("Failed to parse {water_line}"));
-    assert_eq!(water_tokens, tokens);
+
+    assert_eq!(tokens.len(), 1);
+
+    match &tokens[0] {
+        Token::BracketedAtom(b) => {
+            // validate the important semantics
+            assert_eq!(b.element(), Some(elements_rs::Element::O));
+            assert!(!b.aromatic());
+            assert_eq!(b.hydrogen_count(), Some(2));
+            assert_eq!(b.charge_value(), 0);
+            assert_eq!(b.class(), 0);
+            assert_eq!(b.chiral(), None);
+            assert_eq!(b.isotope_mass_number(), None);
+        }
+        other => panic!("Expected Token::BracketedAtom, got {other:?}"),
+    }
 }

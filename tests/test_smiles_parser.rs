@@ -1,6 +1,10 @@
 //! Tests of the parser module for several corner cases.
 
-use smiles_parser::{parser::token_iter::TokenIter, token::Token};
+use elements_rs::Element;
+use smiles_parser::{
+    atom_symbol::AtomSymbol, parser::token_iter::TokenIter, ring_num::RingNum, token::Token,
+    unbracketed::UnbracketedAtom,
+};
 const SMILES_STR: &[&str] = &[
     "C1=CC=CC=C1",
     "[OH2]",
@@ -48,44 +52,47 @@ fn test_tokenizer() {
 #[test]
 fn test_smiles_tokens_benzene() {
     // C1=CC=CC=C1
-    let benzene_tokens = vec![
-        // Aromatic not parsed yet for benzene using capital 'C'
-        Token::Atom { element: elements_rs::Element::C, aromatic: false },
-        Token::Digit(1),
-        Token::Equal,
-        Token::Atom { element: elements_rs::Element::C, aromatic: false },
-        Token::Atom { element: elements_rs::Element::C, aromatic: false },
-        Token::Equal,
-        Token::Atom { element: elements_rs::Element::C, aromatic: false },
-        Token::Atom { element: elements_rs::Element::C, aromatic: false },
-        Token::Equal,
-        Token::Atom { element: elements_rs::Element::C, aromatic: false },
-        Token::Digit(1),
+    // (not aromatic because uppercase C)
+    let c = UnbracketedAtom::new(AtomSymbol::Element(Element::C), false);
+
+    let expected = vec![
+        Token::UnbracketedAtom(c),
+        Token::RingClosure(RingNum::try_new(1).unwrap()),
+        Token::Bond(smiles_parser::bond::Bond::Double),
+        Token::UnbracketedAtom(c),
+        Token::UnbracketedAtom(c),
+        Token::Bond(smiles_parser::bond::Bond::Double),
+        Token::UnbracketedAtom(c),
+        Token::UnbracketedAtom(c),
+        Token::Bond(smiles_parser::bond::Bond::Double),
+        Token::UnbracketedAtom(c),
+        Token::RingClosure(RingNum::try_new(1).unwrap()),
     ];
-    let benzene_line = SMILES_STR[0];
-    let tokens = TokenIter::from(benzene_line)
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap_or_else(|_| panic!("Failed to parse {benzene_line}"));
-    assert_eq!(benzene_tokens, tokens);
+
+    let line = SMILES_STR[0];
+    let got = TokenIter::from(line).collect::<Result<Vec<_>, _>>().unwrap();
+    assert_eq!(expected, got);
 }
 
 #[test]
 fn test_smiles_tokens_benzene_with_wildcard() {
     // c1ccccc1*
-    let benzene_tokens = vec![
-        Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Digit(1),
-        Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Atom { element: elements_rs::Element::C, aromatic: true },
-        Token::Digit(1),
-        Token::Asterisk,
+    let aromatic_c = UnbracketedAtom::new(AtomSymbol::Element(Element::C), true);
+    let star = UnbracketedAtom::new(AtomSymbol::WildCard, false);
+
+    let expected = vec![
+        Token::UnbracketedAtom(aromatic_c),
+        Token::RingClosure(RingNum::try_new(1).unwrap()),
+        Token::UnbracketedAtom(aromatic_c),
+        Token::UnbracketedAtom(aromatic_c),
+        Token::UnbracketedAtom(aromatic_c),
+        Token::UnbracketedAtom(aromatic_c),
+        Token::UnbracketedAtom(aromatic_c),
+        Token::RingClosure(RingNum::try_new(1).unwrap()),
+        Token::UnbracketedAtom(star),
     ];
-    let benzene_line = SMILES_STR[31];
-    let tokens = TokenIter::from(benzene_line)
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap_or_else(|_| panic!("Failed to parse {benzene_line}"));
-    assert_eq!(benzene_tokens, tokens);
+
+    let line = SMILES_STR[31];
+    let got = TokenIter::from(line).collect::<Result<Vec<_>, _>>().unwrap();
+    assert_eq!(expected, got);
 }

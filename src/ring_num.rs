@@ -1,7 +1,6 @@
 //! Module for mapping and validating a ring marker
 use crate::errors::SmilesError;
 
-
 #[derive(Copy, Debug, PartialEq, Clone, Eq, Hash)]
 /// Represents a ring marker and implements tighter bounds for the minimal and
 /// maximal value a ring marker can be

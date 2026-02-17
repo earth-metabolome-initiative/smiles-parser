@@ -6,10 +6,15 @@ use std::str::FromStr;
 use elements_rs::Element;
 
 use crate::{
-    atom_symbol::AtomSymbol, bracketed::{
+    atom_symbol::AtomSymbol,
+    bracketed::{
         bracket_atom::BracketAtom, charge::Charge, chirality::Chirality,
         hydrogen_count::HydrogenCount,
-    }, errors::SmilesError, ring_num::RingNum, token::Token, unbracketed::UnbracketedAtom
+    },
+    errors::SmilesError,
+    ring_num::RingNum,
+    token::Token,
+    unbracketed::UnbracketedAtom,
 };
 
 /// An iterator over the tokens found in a SMILES string.
@@ -22,7 +27,7 @@ pub struct TokenIter<'a> {
 
 impl<'a> From<&'a str> for TokenIter<'a> {
     fn from(s: &'a str) -> Self {
-        TokenIter { chars: s.chars().peekable(), in_bracket: false}
+        TokenIter { chars: s.chars().peekable(), in_bracket: false }
     }
 }
 
@@ -71,9 +76,9 @@ impl TokenIter<'_> {
                     let unbracketed = UnbracketedAtom::new(symbol, aromatic);
                     Token::UnbracketedAtom(unbracketed)
                 } else {
-                    return Err(SmilesError::UnexpectedBracketedState)
+                    return Err(SmilesError::UnexpectedBracketedState);
                 }
-            },
+            }
             '-' => {
                 if !self.in_bracket {
                     Token::Bond(crate::bond::Bond::Single)
@@ -88,14 +93,14 @@ impl TokenIter<'_> {
                 if !self.in_bracket {
                     Token::Bond(crate::bond::Bond::Aromatic)
                 } else {
-                    return Err(SmilesError::UnexpectedColon)
+                    return Err(SmilesError::UnexpectedColon);
                 }
-            },
+            }
             '/' => Token::Bond(crate::bond::Bond::Up),
             '\\' => Token::Bond(crate::bond::Bond::Down),
             n if n.is_numeric() || n == '%' => {
                 if n == '%' && self.in_bracket {
-                    return Err(SmilesError::UnexpectedPercent)
+                    return Err(SmilesError::UnexpectedPercent);
                 } else if n == '%' {
                     self.next();
                 }
@@ -105,7 +110,7 @@ impl TokenIter<'_> {
                 } else {
                     return Err(SmilesError::InvalidRingNumber);
                 }
-            },
+            }
             _ => return Err(SmilesError::UnexpectedCharacter { character: current_char }),
         };
         Ok(token)
