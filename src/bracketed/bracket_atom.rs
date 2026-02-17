@@ -167,24 +167,21 @@ impl BracketAtomBuilder {
 
 #[cfg(test)]
 mod tests {
+    use elements_rs::Element;
+
     use super::BracketAtom;
     use crate::{
         atom_symbol::AtomSymbol,
-        bracketed::{
-            charge::Charge,
-            chirality::Chirality,
-            hydrogen_count::HydrogenCount,
-        },
+        bracketed::{charge::Charge, chirality::Chirality, hydrogen_count::HydrogenCount},
         errors::SmilesError,
     };
-    use elements_rs::Element;
 
     #[test]
     fn builder_defaults_are_correct() {
         let a = BracketAtom::builder().build();
 
         assert_eq!(a.symbol(), AtomSymbol::default());
-        assert_eq!(a.element(), None); 
+        assert_eq!(a.element(), None);
         assert_eq!(a.isotope_mass_number(), None);
         assert_eq!(a.aromatic(), false);
         assert_eq!(a.hydrogens(), HydrogenCount::Unspecified);
@@ -241,9 +238,7 @@ mod tests {
 
     #[test]
     fn isotope_returns_most_abundant_when_mass_is_none() {
-        let a = BracketAtom::builder()
-            .with_symbol(AtomSymbol::Element(Element::C))
-            .build();
+        let a = BracketAtom::builder().with_symbol(AtomSymbol::Element(Element::C)).build();
 
         let iso = a.isotope().unwrap();
         assert_eq!(iso, Element::C.most_abundant_isotope());
@@ -271,19 +266,13 @@ mod tests {
 
     #[test]
     fn hydrogen_count_matches_hydrogens_enum() {
-        let a = BracketAtom::builder()
-            .with_hydrogens(HydrogenCount::Unspecified)
-            .build();
+        let a = BracketAtom::builder().with_hydrogens(HydrogenCount::Unspecified).build();
         assert_eq!(a.hydrogen_count(), None);
 
-        let b = BracketAtom::builder()
-            .with_hydrogens(HydrogenCount::Explicit(0))
-            .build();
+        let b = BracketAtom::builder().with_hydrogens(HydrogenCount::Explicit(0)).build();
         assert_eq!(b.hydrogen_count(), Some(0));
 
-        let c = BracketAtom::builder()
-            .with_hydrogens(HydrogenCount::Explicit(4))
-            .build();
+        let c = BracketAtom::builder().with_hydrogens(HydrogenCount::Explicit(4)).build();
         assert_eq!(c.hydrogen_count(), Some(4));
     }
 
@@ -292,9 +281,7 @@ mod tests {
         let a = BracketAtom::builder().build();
         assert_eq!(a.charge_value(), 0);
 
-        let b = BracketAtom::builder()
-            .with_charge(Charge::try_new(5).unwrap())
-            .build();
+        let b = BracketAtom::builder().with_charge(Charge::try_new(5).unwrap()).build();
         assert_eq!(b.charge_value(), 5);
     }
 
@@ -326,5 +313,4 @@ mod tests {
         assert_eq!(a.class(), 7);
         assert_eq!(a.chiral(), Some(Chirality::AtAt));
     }
-
 }

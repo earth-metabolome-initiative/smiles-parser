@@ -6,13 +6,10 @@ use std::str::FromStr;
 use elements_rs::Element;
 
 use crate::{
-    atom_symbol::AtomSymbol,
-    bracketed::{
+    atom_symbol::AtomSymbol, bracketed::{
         bracket_atom::BracketAtom, charge::Charge, chirality::Chirality,
         hydrogen_count::HydrogenCount,
-    },
-    errors::SmilesError,
-    token::Token,
+    }, errors::SmilesError, ring_num::RingNum, token::Token, unbracketed::UnbracketedAtom
 };
 
 /// An iterator over the tokens found in a SMILES string.
@@ -21,13 +18,11 @@ pub struct TokenIter<'a> {
     chars: std::iter::Peekable<std::str::Chars<'a>>,
     /// Denotes whether currently inside brackets
     in_bracket: bool,
-    /// the previous char
-    prev_char: Option<char>,
 }
 
 impl<'a> From<&'a str> for TokenIter<'a> {
     fn from(s: &'a str) -> Self {
-        TokenIter { chars: s.chars().peekable(), in_bracket: false, prev_char: None }
+        TokenIter { chars: s.chars().peekable(), in_bracket: false}
     }
 }
 
@@ -67,6 +62,50 @@ impl TokenIter<'_> {
                     return Err(SmilesError::UnclosedBracket);
                 }
             }
+            c if c.is_ascii_alphabetic() || c == '*' => {
+                let (symbol, aromatic) = try_element(self)?;
+                if !valid_unbracketed(symbol) {
+                    return Err(SmilesError::InvalidUnbracketedAtom(symbol));
+                }
+                if !self.in_bracket {
+                    let unbracketed = UnbracketedAtom::new(symbol, aromatic);
+                    Token::UnbracketedAtom(unbracketed)
+                } else {
+                    return Err(SmilesError::UnexpectedBracketedState)
+                }
+            },
+            '-' => {
+                if !self.in_bracket {
+                    Token::Bond(crate::bond::Bond::Single)
+                } else {
+                    return Err(SmilesError::UnexpectedDash);
+                }
+            }
+            '=' => Token::Bond(crate::bond::Bond::Double),
+            '#' => Token::Bond(crate::bond::Bond::Triple),
+            '$' => Token::Bond(crate::bond::Bond::Quadruple),
+            ':' => {
+                if !self.in_bracket {
+                    Token::Bond(crate::bond::Bond::Aromatic)
+                } else {
+                    return Err(SmilesError::UnexpectedColon)
+                }
+            },
+            '/' => Token::Bond(crate::bond::Bond::Up),
+            '\\' => Token::Bond(crate::bond::Bond::Down),
+            n if n.is_numeric() || n == '%' => {
+                if n == '%' && self.in_bracket {
+                    return Err(SmilesError::UnexpectedPercent)
+                } else if n == '%' {
+                    self.next();
+                }
+                let possible_num = try_fold_number(self);
+                if let Some(num) = possible_num {
+                    Token::RingClosure(RingNum::try_new(num?)?)
+                } else {
+                    return Err(SmilesError::InvalidRingNumber);
+                }
+            },
             _ => return Err(SmilesError::UnexpectedCharacter { character: current_char }),
         };
         Ok(token)
@@ -160,6 +199,29 @@ fn try_element(stream: &mut TokenIter<'_>) -> Result<(AtomSymbol, bool), SmilesE
     Err(SmilesError::InvalidElementName(char_1))
 }
 
+// B, C, N, O, P, S, F, Cl, Br, I,
+fn valid_unbracketed(symbol: AtomSymbol) -> bool {
+    match symbol {
+        AtomSymbol::Element(element) => {
+            match element {
+                Element::B
+                | Element::C
+                | Element::N
+                | Element::O
+                | Element::P
+                | Element::S
+                | Element::F
+                | Element::Cl
+                | Element::Br
+                | Element::I => true,
+                _ => false,
+            }
+        }
+        AtomSymbol::WildCard => true,
+        _ => false,
+    }
+}
+
 fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, SmilesError> {
     if stream.chars.peek().copied() != Some('@') {
         return Ok(None);
@@ -182,7 +244,7 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
                                 let possible_num = try_fold_number(stream);
                                 match possible_num {
                                     None => Err(SmilesError::InvalidChirality),
-                                    Some(num) => Ok(Some((Chirality::try_th(num?)?))),
+                                    Some(num) => Ok(Some(Chirality::try_th(num?)?)),
                                 }
                             }
                             'B' => {

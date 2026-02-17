@@ -23,7 +23,7 @@ impl HydrogenCount {
     pub fn get_count(&self) -> Option<u8> {
         match self {
             Self::Unspecified => None,
-            Self::Explicit(n) => Some(*n)
+            Self::Explicit(n) => Some(*n),
         }
     }
 }
@@ -45,5 +45,4 @@ mod tests {
         assert_eq!(no_count, HydrogenCount::Unspecified);
         assert_eq!(no_count, HydrogenCount::default());
     }
-
 }

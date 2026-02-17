@@ -2,10 +2,8 @@
 
 use std::ops::Range;
 
-use elements_rs::Element;
-
 use crate::{
-    atom_symbol::AtomSymbol, bond::Bond, bracketed::bracket_atom::BracketAtom, errors::SmilesError,
+    bond::Bond, bracketed::bracket_atom::BracketAtom, ring_num::RingNum, unbracketed::UnbracketedAtom
 };
 
 #[derive(Copy, Debug, PartialEq, Clone, Eq, Hash)]
@@ -58,57 +56,5 @@ impl TokenWithSpan {
     /// Returns the end of the span as [`usize`]
     pub fn end(&self) -> usize {
         self.span.end
-    }
-}
-
-#[derive(Copy, Debug, PartialEq, Clone, Eq, Hash)]
-/// Represents a ring marker and implements tighter bounds for the minimal and
-/// maximal value a ring marker can be
-pub struct RingNum(u8);
-impl RingNum {
-    /// Attempts to generate a [`RingNum`] form a [`u8`],
-    ///
-    /// # Errors
-    /// - Returns a [`SmilesError::RingNumberOverflow`] if the value is above
-    ///   `99`
-    pub fn try_new(num: u8) -> Result<Self, SmilesError> {
-        (0..=99).contains(&num).then_some(Self(num)).ok_or(SmilesError::RingNumberOverflow(num))
-    }
-
-    /// Returns the value for the [`RingNum`]
-    pub fn get(&self) -> u8 {
-        self.0
-    }
-}
-
-#[derive(Copy, Debug, PartialEq, Clone, Eq, Hash)]
-/// Structure for aliphatic atoms, aromatic or non aromatic
-pub struct UnbracketedAtom {
-    /// Unbracketed elements as [`Element`]
-    symbol: AtomSymbol,
-    /// Whether the atom is aromatic
-    aromatic: bool,
-}
-
-impl UnbracketedAtom {
-    /// Creates a new `UnbracketedAtom`
-    pub const fn new(symbol: AtomSymbol, aromatic: bool) -> Self {
-        Self { symbol, aromatic }
-    }
-    /// Returns the [`AtomSymbol`] of the atom
-    pub fn symbol(&self) -> AtomSymbol {
-        self.symbol
-    }
-    /// Returns the [`Element`] or `None` if `WildCard`
-    pub fn element(&self) -> Option<Element> {
-        self.symbol.element()
-    }
-    /// Returns true of aromatic
-    pub fn aromatic(&self) -> bool {
-        self.aromatic
-    }
-    /// Returns true if `AtomSymbol` is [`AtomSymbol::WildCard`]
-    pub fn is_wildcard(&self) -> bool {
-        self.symbol.is_wildcard()
     }
 }

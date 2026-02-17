@@ -4,7 +4,7 @@ use std::num::TryFromIntError;
 
 use elements_rs::Element;
 
-use crate::bond::Bond;
+use crate::{atom_symbol::AtomSymbol, bond::Bond};
 
 /// The errors that could occur during SMILES parsing.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,6 +57,18 @@ pub enum SmilesError {
     UnexpectedEndOfString,
     /// The class is not valid
     InvalidClass,
+    /// Non organic element found out of bracket
+    InvalidUnbracketedAtom(AtomSymbol),
+    /// Unexpectedly inside of brackets
+    UnexpectedBracketedState,
+    /// An unexpected `-` has been found
+    UnexpectedDash,
+    /// An unexpected `:` has been found
+    UnexpectedColon,
+    /// An unexpected `%` has been found
+    UnexpectedPercent,
+    /// An invalid ring number has been found
+    InvalidRingNumber
 }
 
 impl From<elements_rs::errors::Error> for SmilesError {
