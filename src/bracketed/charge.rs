@@ -26,3 +26,50 @@ impl Default for Charge {
         Self(0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Charge;
+    use crate::errors::SmilesError;
+
+    #[test]
+    fn default_is_zero() {
+        assert_eq!(Charge::default().get(), 0);
+    }
+
+    #[test]
+    fn try_new_accepts_in_range_values() {
+        assert_eq!(Charge::try_new(-15).map(|c| c.get()), Ok(-15));
+        assert_eq!(Charge::try_new(15).map(|c| c.get()), Ok(15));
+        assert_eq!(Charge::try_new(-1).map(|c| c.get()), Ok(-1));
+        assert_eq!(Charge::try_new(0).map(|c| c.get()), Ok(0));
+        assert_eq!(Charge::try_new(1).map(|c| c.get()), Ok(1));
+        assert_eq!(Charge::try_new(7).map(|c| c.get()), Ok(7));
+        assert_eq!(Charge::try_new(-7).map(|c| c.get()), Ok(-7));
+    }
+
+    #[test]
+    fn try_new_rejects_negative_underflow() {
+        assert_eq!(Charge::try_new(-16), Err(SmilesError::ChargeUnderflow(-16)));
+        assert_eq!(Charge::try_new(i8::MIN), Err(SmilesError::ChargeUnderflow(i8::MIN)));
+    }
+
+    #[test]
+    fn try_new_rejects_positive_overflow() {
+        assert_eq!(Charge::try_new(16), Err(SmilesError::ChargeOverflow(16)));
+        assert_eq!(Charge::try_new(i8::MAX), Err(SmilesError::ChargeOverflow(i8::MAX)));
+    }
+
+    #[test]
+    fn try_new_error_type_depends_on_sign() {
+        match Charge::try_new(-16) {
+            Err(SmilesError::ChargeUnderflow(-16)) => {}
+            other => panic!("expected ChargeUnderflow(-16), got {other:?}"),
+        }
+
+        match Charge::try_new(16) {
+            Err(SmilesError::ChargeOverflow(16)) => {}
+            other => panic!("expected ChargeOverflow(16), got {other:?}"),
+        }
+    }
+}

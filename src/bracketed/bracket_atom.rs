@@ -164,3 +164,167 @@ impl BracketAtomBuilder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::BracketAtom;
+    use crate::{
+        atom_symbol::AtomSymbol,
+        bracketed::{
+            charge::Charge,
+            chirality::Chirality,
+            hydrogen_count::HydrogenCount,
+        },
+        errors::SmilesError,
+    };
+    use elements_rs::Element;
+
+    #[test]
+    fn builder_defaults_are_correct() {
+        let a = BracketAtom::builder().build();
+
+        assert_eq!(a.symbol(), AtomSymbol::default());
+        assert_eq!(a.element(), None); 
+        assert_eq!(a.isotope_mass_number(), None);
+        assert_eq!(a.aromatic(), false);
+        assert_eq!(a.hydrogens(), HydrogenCount::Unspecified);
+        assert_eq!(a.hydrogen_count(), None);
+        assert_eq!(a.charge_value(), 0);
+        assert_eq!(a.class(), 0);
+        assert_eq!(a.chiral(), None);
+    }
+
+    #[test]
+    fn builder_setters_roundtrip_into_built_atom() {
+        let sym = AtomSymbol::Element(Element::C);
+        let charge = Charge::try_new(-3).unwrap();
+        let chiral = Chirality::AtAt;
+
+        let a = BracketAtom::builder()
+            .with_symbol(sym)
+            .with_isotope(13)
+            .with_aromatic(true)
+            .with_hydrogens(HydrogenCount::Explicit(2))
+            .with_charge(charge)
+            .with_class(42)
+            .with_chiral(chiral)
+            .build();
+
+        assert_eq!(a.symbol(), sym);
+        assert_eq!(a.element(), Some(Element::C));
+        assert_eq!(a.isotope_mass_number(), Some(13));
+        assert_eq!(a.aromatic(), true);
+        assert_eq!(a.hydrogens(), HydrogenCount::Explicit(2));
+        assert_eq!(a.hydrogen_count(), Some(2));
+        assert_eq!(a.charge(), charge);
+        assert_eq!(a.charge_value(), -3);
+        assert_eq!(a.class(), 42);
+        assert_eq!(a.chiral(), Some(chiral));
+    }
+
+    #[test]
+    fn builder_element_and_symbol_accessors_reflect_current_state() {
+        let b = BracketAtom::builder().with_symbol(AtomSymbol::Element(Element::N));
+
+        assert_eq!(b.symbol(), AtomSymbol::Element(Element::N));
+        assert_eq!(b.element(), Some(Element::N));
+    }
+
+    #[test]
+    fn element_is_none_for_wildcard_and_unspecified() {
+        let a = BracketAtom::builder().with_symbol(AtomSymbol::WildCard).build();
+        assert_eq!(a.element(), None);
+
+        let b = BracketAtom::builder().with_symbol(AtomSymbol::Unspecified).build();
+        assert_eq!(b.element(), None);
+    }
+
+    #[test]
+    fn isotope_returns_most_abundant_when_mass_is_none() {
+        let a = BracketAtom::builder()
+            .with_symbol(AtomSymbol::Element(Element::C))
+            .build();
+
+        let iso = a.isotope().unwrap();
+        assert_eq!(iso, Element::C.most_abundant_isotope());
+    }
+
+    #[test]
+    fn isotope_returns_specific_when_mass_is_set() {
+        let a = BracketAtom::builder()
+            .with_symbol(AtomSymbol::Element(Element::C))
+            .with_isotope(13)
+            .build();
+
+        let iso = a.isotope().unwrap();
+        assert_eq!(iso, elements_rs::Isotope::try_from((Element::C, 13u16)).unwrap());
+    }
+
+    #[test]
+    fn isotope_errors_when_symbol_has_no_element() {
+        let a = BracketAtom::builder().with_symbol(AtomSymbol::WildCard).with_isotope(13).build();
+        assert_eq!(a.isotope(), Err(SmilesError::InvalidIsotope));
+
+        let b = BracketAtom::builder().with_symbol(AtomSymbol::Unspecified).build();
+        assert_eq!(b.isotope(), Err(SmilesError::InvalidIsotope));
+    }
+
+    #[test]
+    fn hydrogen_count_matches_hydrogens_enum() {
+        let a = BracketAtom::builder()
+            .with_hydrogens(HydrogenCount::Unspecified)
+            .build();
+        assert_eq!(a.hydrogen_count(), None);
+
+        let b = BracketAtom::builder()
+            .with_hydrogens(HydrogenCount::Explicit(0))
+            .build();
+        assert_eq!(b.hydrogen_count(), Some(0));
+
+        let c = BracketAtom::builder()
+            .with_hydrogens(HydrogenCount::Explicit(4))
+            .build();
+        assert_eq!(c.hydrogen_count(), Some(4));
+    }
+
+    #[test]
+    fn charge_roundtrips_and_defaults_to_zero() {
+        let a = BracketAtom::builder().build();
+        assert_eq!(a.charge_value(), 0);
+
+        let b = BracketAtom::builder()
+            .with_charge(Charge::try_new(5).unwrap())
+            .build();
+        assert_eq!(b.charge_value(), 5);
+    }
+
+    #[test]
+    fn chiral_is_none_by_default_and_some_when_set() {
+        let a = BracketAtom::builder().build();
+        assert_eq!(a.chiral(), None);
+
+        let b = BracketAtom::builder().with_chiral(Chirality::At).build();
+        assert_eq!(b.chiral(), Some(Chirality::At));
+    }
+
+    #[test]
+    fn build_consumes_builder_and_preserves_all_fields() {
+        let a = BracketAtom::builder()
+            .with_symbol(AtomSymbol::Element(Element::O))
+            .with_isotope(18)
+            .with_aromatic(false)
+            .with_hydrogens(HydrogenCount::Explicit(1))
+            .with_charge(Charge::try_new(-1).unwrap())
+            .with_class(7)
+            .with_chiral(Chirality::AtAt)
+            .build();
+
+        assert_eq!(a.element(), Some(Element::O));
+        assert_eq!(a.isotope_mass_number(), Some(18));
+        assert_eq!(a.hydrogen_count(), Some(1));
+        assert_eq!(a.charge_value(), -1);
+        assert_eq!(a.class(), 7);
+        assert_eq!(a.chiral(), Some(Chirality::AtAt));
+    }
+
+}

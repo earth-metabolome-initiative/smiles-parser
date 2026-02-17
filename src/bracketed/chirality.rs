@@ -45,11 +45,101 @@ impl Chirality {
 
 #[cfg(test)]
 mod tests {
-    use crate::bracketed::chirality::Chirality;
+    use super::Chirality;
+    use crate::errors::SmilesError;
 
     #[test]
-    fn test_chiral_range_bounds() {
-        let th_err = Chirality::try_th(3);
-        assert_eq!(th_err, Err(crate::errors::SmilesError::InvalidChirality));
+    fn try_th_accepts_valid_values() {
+        assert_eq!(Chirality::try_th(1), Ok(Chirality::TH(1)));
+        assert_eq!(Chirality::try_th(2), Ok(Chirality::TH(2)));
+    }
+
+    #[test]
+    fn try_th_rejects_out_of_range_values() {
+        assert_eq!(Chirality::try_th(0), Err(SmilesError::InvalidChirality));
+        assert_eq!(Chirality::try_th(3), Err(SmilesError::InvalidChirality));
+        assert_eq!(Chirality::try_th(u8::MAX), Err(SmilesError::InvalidChirality));
+    }
+
+    #[test]
+    fn try_al_accepts_valid_values() {
+        assert_eq!(Chirality::try_al(1), Ok(Chirality::AL(1)));
+        assert_eq!(Chirality::try_al(2), Ok(Chirality::AL(2)));
+    }
+
+    #[test]
+    fn try_al_rejects_out_of_range_values() {
+        assert_eq!(Chirality::try_al(0), Err(SmilesError::InvalidChirality));
+        assert_eq!(Chirality::try_al(3), Err(SmilesError::InvalidChirality));
+        assert_eq!(Chirality::try_al(u8::MAX), Err(SmilesError::InvalidChirality));
+    }
+
+    #[test]
+    fn try_sp_accepts_valid_values() {
+        assert_eq!(Chirality::try_sp(1), Ok(Chirality::SP(1)));
+        assert_eq!(Chirality::try_sp(2), Ok(Chirality::SP(2)));
+        assert_eq!(Chirality::try_sp(3), Ok(Chirality::SP(3)));
+    }
+
+    #[test]
+    fn try_sp_rejects_out_of_range_values() {
+        assert_eq!(Chirality::try_sp(0), Err(SmilesError::InvalidChirality));
+        assert_eq!(Chirality::try_sp(4), Err(SmilesError::InvalidChirality));
+        assert_eq!(Chirality::try_sp(u8::MAX), Err(SmilesError::InvalidChirality));
+    }
+
+    #[test]
+    fn try_tb_accepts_lower_and_upper_bounds() {
+        assert_eq!(Chirality::try_tb(1), Ok(Chirality::TB(1)));
+        assert_eq!(Chirality::try_tb(20), Ok(Chirality::TB(20)));
+    }
+
+    #[test]
+    fn try_tb_accepts_some_mid_values() {
+        assert_eq!(Chirality::try_tb(2), Ok(Chirality::TB(2)));
+        assert_eq!(Chirality::try_tb(10), Ok(Chirality::TB(10)));
+        assert_eq!(Chirality::try_tb(19), Ok(Chirality::TB(19)));
+    }
+
+    #[test]
+    fn try_tb_rejects_out_of_range_values() {
+        assert_eq!(Chirality::try_tb(0), Err(SmilesError::InvalidChirality));
+        assert_eq!(Chirality::try_tb(21), Err(SmilesError::InvalidChirality));
+        assert_eq!(Chirality::try_tb(u8::MAX), Err(SmilesError::InvalidChirality));
+    }
+
+    #[test]
+    fn try_oh_accepts_lower_and_upper_bounds() {
+        assert_eq!(Chirality::try_oh(1), Ok(Chirality::OH(1)));
+        assert_eq!(Chirality::try_oh(30), Ok(Chirality::OH(30)));
+    }
+
+    #[test]
+    fn try_oh_accepts_some_mid_values() {
+        assert_eq!(Chirality::try_oh(2), Ok(Chirality::OH(2)));
+        assert_eq!(Chirality::try_oh(15), Ok(Chirality::OH(15)));
+        assert_eq!(Chirality::try_oh(29), Ok(Chirality::OH(29)));
+    }
+
+    #[test]
+    fn try_oh_rejects_out_of_range_values() {
+        assert_eq!(Chirality::try_oh(0), Err(SmilesError::InvalidChirality));
+        assert_eq!(Chirality::try_oh(31), Err(SmilesError::InvalidChirality));
+        assert_eq!(Chirality::try_oh(u8::MAX), Err(SmilesError::InvalidChirality));
+    }
+
+    #[test]
+    fn simple_variants_are_distinct() {
+        assert_ne!(Chirality::At, Chirality::AtAt);
+        assert_ne!(Chirality::At, Chirality::TH(1));
+        assert_ne!(Chirality::AtAt, Chirality::TH(1));
+    }
+
+    #[test]
+    fn variants_with_same_tag_but_different_numbers_are_distinct() {
+        assert_ne!(Chirality::TH(1), Chirality::TH(2));
+        assert_ne!(Chirality::SP(1), Chirality::SP(2));
+        assert_ne!(Chirality::TB(1), Chirality::TB(2));
+        assert_ne!(Chirality::OH(1), Chirality::OH(2));
     }
 }
