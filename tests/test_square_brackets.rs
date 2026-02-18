@@ -66,7 +66,7 @@ fn test_smiles_tokens_water() {
 
     assert_eq!(tokens.len(), 1);
 
-    match &tokens[0] {
+    match &tokens[0].token() {
         Token::BracketedAtom(b) => {
             // validate the important semantics
             assert_eq!(b.element(), Some(elements_rs::Element::O));
@@ -79,4 +79,6 @@ fn test_smiles_tokens_water() {
         }
         other => panic!("Expected Token::BracketedAtom, got {other:?}"),
     }
+    assert_eq!(tokens[0].start(), 0);
+    assert_eq!(tokens[0].end(), 4);
 }

@@ -3,7 +3,7 @@
 use elements_rs::Element;
 use smiles_parser::{
     atom_symbol::AtomSymbol, errors::SmilesError, parser::token_iter::TokenIter, ring_num::RingNum,
-    token::Token, unbracketed::UnbracketedAtom,
+    token::{Token, TokenWithSpan}, unbracketed::UnbracketedAtom,
 };
 const SMILES_STR: &[&str] = &[
     "c1ccccc1",          // benzene
@@ -28,14 +28,14 @@ fn test_aromatic_benzene_from_tokenization() -> Result<(), SmilesError> {
     let aromatic_c = UnbracketedAtom::new(AtomSymbol::Element(Element::C), true);
 
     let expected = vec![
-        Token::UnbracketedAtom(aromatic_c),
-        Token::RingClosure(RingNum::try_new(1)?),
-        Token::UnbracketedAtom(aromatic_c),
-        Token::UnbracketedAtom(aromatic_c),
-        Token::UnbracketedAtom(aromatic_c),
-        Token::UnbracketedAtom(aromatic_c),
-        Token::UnbracketedAtom(aromatic_c),
-        Token::RingClosure(RingNum::try_new(1)?),
+        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c),0,1),
+        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?),1,2),
+        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c),2,3),
+        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c),3,4),
+        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c),4,5),
+        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c),5,6),
+        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c),6,7),
+        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?),7,8),
     ];
 
     let line = SMILES_STR[0];
@@ -52,11 +52,11 @@ fn test_aromatic_imidazole_from_tokenization() -> Result<(), SmilesError> {
     let aromatic_c = UnbracketedAtom::new(AtomSymbol::Element(Element::C), true);
 
     let expected = vec![
-        Token::UnbracketedAtom(aromatic_n),
-        Token::RingClosure(RingNum::try_new(1)?),
-        Token::UnbracketedAtom(aromatic_c),
-        Token::UnbracketedAtom(aromatic_c),
-        Token::BracketedAtom(
+        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_n),0,1),
+        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?),1,2),
+        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c),2,3),
+        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c),3,4),
+        TokenWithSpan::new(Token::BracketedAtom(
             smiles_parser::bracketed::bracket_atom::BracketAtom::builder()
                 .with_symbol(AtomSymbol::Element(Element::N))
                 .with_aromatic(true)
@@ -64,9 +64,9 @@ fn test_aromatic_imidazole_from_tokenization() -> Result<(), SmilesError> {
                     1,
                 )))
                 .build(),
-        ),
-        Token::UnbracketedAtom(aromatic_c),
-        Token::RingClosure(RingNum::try_new(1)?),
+        ),4,8),
+        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c),8,9),
+        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?),9,10),
     ];
 
     let line = SMILES_STR[4];
