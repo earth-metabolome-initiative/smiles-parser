@@ -114,7 +114,9 @@ impl SmilesErrorWithSpan {
 impl fmt::Display for SmilesErrorWithSpan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.smiles_error() {
-            SmilesError::MissingElement => todo!(),
+            SmilesError::MissingElement => write!(
+                f, "Missing Element: Expected element at position start: {}", self.start()
+            ),
             SmilesError::InvalidIsotope => todo!(),
             SmilesError::InvalidElementName(_) => todo!(),
             SmilesError::InvalidNumber => todo!(),
