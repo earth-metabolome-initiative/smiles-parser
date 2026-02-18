@@ -41,23 +41,23 @@ impl TokenIter<'_> {
                     return Err(SmilesError::UnexpectedLeftBracket);
                 }
                 self.in_bracket = true;
-                let possible_bracket_atom = BracketAtom::builder();
+                let mut possible_bracket_atom = BracketAtom::builder();
                 if let Some(isotope) = try_fold_number(self) {
-                    possible_bracket_atom.with_isotope(isotope?);
+                    possible_bracket_atom = possible_bracket_atom.with_isotope(isotope?);
                 }
                 let (atom, aromatic) = try_element(self)?;
-                possible_bracket_atom.with_symbol(atom).with_aromatic(aromatic);
+                possible_bracket_atom = possible_bracket_atom.with_symbol(atom).with_aromatic(aromatic);
                 if let Some(chiral) = try_chirality(self)? {
-                    possible_bracket_atom.with_chiral(chiral);
+                    possible_bracket_atom = possible_bracket_atom.with_chiral(chiral);
                 }
 
                 // If element is unspecified at this step there is an error
                 if possible_bracket_atom.symbol() == AtomSymbol::Unspecified {
                     return Err(SmilesError::MissingBracketElement);
                 }
-                possible_bracket_atom.with_hydrogens(hydrogen_count(self)?);
-                possible_bracket_atom.with_charge(try_charge(self)?);
-                possible_bracket_atom.with_class(try_class(self)?);
+                possible_bracket_atom = possible_bracket_atom.with_hydrogens(hydrogen_count(self)?);
+                possible_bracket_atom = possible_bracket_atom.with_charge(try_charge(self)?);
+                possible_bracket_atom = possible_bracket_atom.with_class(try_class(self)?);
                 let bracket_atom = possible_bracket_atom.build();
                 if matches!(self.chars.peek().copied(), Some(']')) {
                     self.in_bracket = false;

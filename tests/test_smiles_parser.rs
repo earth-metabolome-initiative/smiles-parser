@@ -2,8 +2,7 @@
 
 use elements_rs::Element;
 use smiles_parser::{
-    atom_symbol::AtomSymbol, parser::token_iter::TokenIter, ring_num::RingNum, token::Token,
-    unbracketed::UnbracketedAtom,
+    atom_symbol::AtomSymbol, errors::SmilesError, parser::token_iter::TokenIter, ring_num::RingNum, token::Token, unbracketed::UnbracketedAtom
 };
 const SMILES_STR: &[&str] = &[
     "C1=CC=CC=C1",
@@ -32,7 +31,7 @@ const SMILES_STR: &[&str] = &[
     "C[C@H](N)C(=O)O",
     "OC(=O)[C@@H](N)C",
     "[K+].C=C.Cl[Pt-](Cl)Cl.O",
-    "[Ti++++]",
+    "[Ti+4]",
     "CCN1C[C@]2(COC)CC[C@H](O)[C@@]34[C@@H]5C[C@H]6[C@H](OC)[C@@H]5[C@](O)(C[C@@H]6OC)[C@@](O)([C@@H](OC)[C@H]23)[C@@H]14",
     "C[C@@H]1C[C@@]2(O[C@H]2C)C(=O)O[C@@H]2CCN(C)C/C=C(/COC(=O)[C@]1(C)O)C2=O",
     "CC=C(C)C1=C(Cl)C(O)=C(C)C2=C1OC1=CC(O)=C(Cl)C(C)=C1C(=O)O2",
@@ -41,23 +40,24 @@ const SMILES_STR: &[&str] = &[
 ];
 
 #[test]
-fn test_tokenizer() {
+fn test_tokenizer() -> Result<(), SmilesError> {
     for &s in SMILES_STR {
         let _tokens = TokenIter::from(s)
             .collect::<Result<Vec<_>, _>>()
-            .unwrap_or_else(|_| panic!("Failed to tokenize {s}"));
+            ?;
     }
+    Ok(())
 }
 
 #[test]
-fn test_smiles_tokens_benzene() {
+fn test_smiles_tokens_benzene() -> Result<(), SmilesError>{
     // C1=CC=CC=C1
     // (not aromatic because uppercase C)
     let c = UnbracketedAtom::new(AtomSymbol::Element(Element::C), false);
 
     let expected = vec![
         Token::UnbracketedAtom(c),
-        Token::RingClosure(RingNum::try_new(1).unwrap()),
+        Token::RingClosure(RingNum::try_new(1)?),
         Token::Bond(smiles_parser::bond::Bond::Double),
         Token::UnbracketedAtom(c),
         Token::UnbracketedAtom(c),
@@ -66,33 +66,35 @@ fn test_smiles_tokens_benzene() {
         Token::UnbracketedAtom(c),
         Token::Bond(smiles_parser::bond::Bond::Double),
         Token::UnbracketedAtom(c),
-        Token::RingClosure(RingNum::try_new(1).unwrap()),
+        Token::RingClosure(RingNum::try_new(1)?),
     ];
 
     let line = SMILES_STR[0];
-    let got = TokenIter::from(line).collect::<Result<Vec<_>, _>>().unwrap();
+    let got = TokenIter::from(line).collect::<Result<Vec<_>, _>>()?;
     assert_eq!(expected, got);
+    Ok(())
 }
 
 #[test]
-fn test_smiles_tokens_benzene_with_wildcard() {
+fn test_smiles_tokens_benzene_with_wildcard() -> Result<(), SmilesError> {
     // c1ccccc1*
     let aromatic_c = UnbracketedAtom::new(AtomSymbol::Element(Element::C), true);
     let star = UnbracketedAtom::new(AtomSymbol::WildCard, false);
 
     let expected = vec![
         Token::UnbracketedAtom(aromatic_c),
-        Token::RingClosure(RingNum::try_new(1).unwrap()),
+        Token::RingClosure(RingNum::try_new(1)?),
         Token::UnbracketedAtom(aromatic_c),
         Token::UnbracketedAtom(aromatic_c),
         Token::UnbracketedAtom(aromatic_c),
         Token::UnbracketedAtom(aromatic_c),
         Token::UnbracketedAtom(aromatic_c),
-        Token::RingClosure(RingNum::try_new(1).unwrap()),
+        Token::RingClosure(RingNum::try_new(1)?),
         Token::UnbracketedAtom(star),
     ];
 
     let line = SMILES_STR[31];
-    let got = TokenIter::from(line).collect::<Result<Vec<_>, _>>().unwrap();
+    let got = TokenIter::from(line).collect::<Result<Vec<_>, _>>()?;
     assert_eq!(expected, got);
+    Ok(())
 }
