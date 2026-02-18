@@ -13,21 +13,23 @@ use crate::{
     },
     errors::SmilesError,
     ring_num::RingNum,
-    token::Token,
+    token::{Token, TokenWithSpan},
     unbracketed::UnbracketedAtom,
 };
 
 /// An iterator over the tokens found in a SMILES string.
 pub struct TokenIter<'a> {
     /// The peekable chars iterator
-    chars: std::iter::Peekable<std::str::Chars<'a>>,
+    chars: std::iter::Peekable<std::str::CharIndices<'a>>,
     /// Denotes whether currently inside brackets
     in_bracket: bool,
+    /// The length of the input
+    len: usize,
 }
 
 impl<'a> From<&'a str> for TokenIter<'a> {
     fn from(s: &'a str) -> Self {
-        TokenIter { chars: s.chars().peekable(), in_bracket: false }
+        TokenIter { chars: s.char_indices().peekable(), in_bracket: false, len: s.len() }
     }
 }
 
@@ -59,7 +61,7 @@ impl TokenIter<'_> {
                 possible_bracket_atom = possible_bracket_atom.with_charge(try_charge(self)?);
                 possible_bracket_atom = possible_bracket_atom.with_class(try_class(self)?);
                 let bracket_atom = possible_bracket_atom.build();
-                if matches!(self.chars.peek().copied(), Some(']')) {
+                if matches!(self.peek_char(), Some(']')) {
                     self.in_bracket = false;
                     self.chars.next();
                     Token::BracketedAtom(bracket_atom)
@@ -144,13 +146,37 @@ impl TokenIter<'_> {
         };
         Ok(token)
     }
+    
+    fn current_end(&mut self) -> usize {
+        if let Some(&(next_id, _)) = self.chars.peek() {
+            next_id
+        } else {
+            self.len
+        }
+    }
+    fn peek_char(&mut self) -> Option<char> {
+        self.chars.peek().map(|(_,c)| *c)
+    }
+    fn next_char(&mut self) -> Option<char> {
+        self.chars.next().map(|(_,c)| c)
+    }
+    fn peed_id(&mut self) -> Option<usize> {
+        self.chars.peek().map(|(i,_)| *i)
+    }
 }
 
 impl Iterator for TokenIter<'_> {
-    type Item = Result<Token, SmilesError>;
+    type Item = Result<TokenWithSpan, SmilesError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.chars.next().map(|current_char| self.parse_token(current_char))
+        let (start, current_char) = self.chars.next()?;
+        match self.parse_token(current_char) {
+            Ok(token) => {
+                let end = self.current_end();
+                Some(Ok(TokenWithSpan::new(token, start, end)))
+            }
+            Err(e) => Some(Err(e))
+        }
     }
 }
 
@@ -183,7 +209,7 @@ fn aromatic_from_element(in_bracket: bool, element: Element) -> Result<bool, Smi
 }
 
 fn try_element(stream: &mut TokenIter<'_>) -> Result<(AtomSymbol, bool), SmilesError> {
-    let first = stream.chars.next().ok_or(SmilesError::MissingElement)?;
+    let first = stream.next_char().ok_or(SmilesError::MissingElement)?;
     try_element_from_first(stream, first)
 }
 
@@ -201,7 +227,7 @@ fn try_element_from_first(
     let is_aromatic_candidate = char_1.is_ascii_lowercase();
     let try_candidate = |val: &str| -> Option<Element> { Element::from_str(val).ok() };
 
-    if let Some(&char_2) = stream.chars.peek() {
+    if let Some(char_2) = stream.peek_char() {
         if char_2.is_alphabetic() {
             if is_aromatic_candidate && char_2.is_ascii_lowercase() {
                 let candidate = format!("{}{}", char_1.to_ascii_uppercase(), char_2);
@@ -263,13 +289,13 @@ fn valid_unbracketed(symbol: AtomSymbol) -> bool {
 }
 
 fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, SmilesError> {
-    if stream.chars.peek().copied() != Some('@') {
+    if stream.peek_char() != Some('@') {
         return Ok(None);
     }
 
-    let chirality = if let Some(char_1) = stream.chars.peek().copied() {
+    let chirality = if let Some(char_1) = stream.peek_char() {
         stream.chars.next();
-        if let Some(char_2) = stream.chars.peek().copied() {
+        if let Some(char_2) = stream.peek_char() {
             match (char_1, char_2) {
                 ('@', '@') => {
                     stream.chars.next();
@@ -277,7 +303,7 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
                 }
                 ('@', 'T') => {
                     stream.chars.next();
-                    if let Some(char_3) = stream.chars.peek().copied() {
+                    if let Some(char_3) = stream.peek_char() {
                         match char_3 {
                             'H' => {
                                 stream.chars.next();
@@ -303,7 +329,7 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
                 }
                 ('@', 'A') => {
                     stream.chars.next();
-                    if let Some(char_3) = stream.chars.peek() {
+                    if let Some(char_3) = stream.peek_char() {
                         match char_3 {
                             'L' => {
                                 stream.chars.next();
@@ -321,7 +347,7 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
                 }
                 ('@', 'S') => {
                     stream.chars.next();
-                    if let Some(char_3) = stream.chars.peek() {
+                    if let Some(char_3) = stream.peek_char() {
                         match char_3 {
                             'P' => {
                                 stream.chars.next();
@@ -339,7 +365,7 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
                 }
                 ('@', 'O') => {
                     stream.chars.next();
-                    if let Some(char_3) = stream.chars.peek() {
+                    if let Some(char_3) = stream.peek_char() {
                         match char_3 {
                             'H' => {
                                 stream.chars.next();
@@ -375,7 +401,7 @@ where
     let mut seen_any = false;
     let mut amount: u32 = 0;
 
-    while let Some(char) = stream.chars.peek() {
+    while let Some(char) = stream.peek_char() {
         let digit = match char.to_digit(10) {
             Some(d) => d,
             None => break,
@@ -401,7 +427,7 @@ where
 {
     let mut amount: u32 = first_digit;
 
-    while let Some(ch) = stream.chars.peek() {
+    while let Some(ch) = stream.peek_char() {
         let Some(digit) = ch.to_digit(10) else { break };
         stream.chars.next();
         amount = amount
@@ -414,9 +440,9 @@ where
 }
 
 fn hydrogen_count(stream: &mut TokenIter<'_>) -> Result<HydrogenCount, SmilesError> {
-    let possible_hydrogen = stream.chars.peek().copied();
+    let possible_hydrogen = stream.peek_char();
     if matches!(possible_hydrogen, Some('H')) {
-        stream.next();
+        stream.chars.next();
         match try_fold_number::<u8>(stream) {
             Some(h) => Ok(HydrogenCount::new(Some(h?))),
             None => Ok(HydrogenCount::new(Some(1))),
@@ -427,11 +453,11 @@ fn hydrogen_count(stream: &mut TokenIter<'_>) -> Result<HydrogenCount, SmilesErr
 }
 
 fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
-    let possible_charge = stream.chars.peek().copied();
+    let possible_charge = stream.peek_char();
     match possible_charge {
         Some('-') => {
             stream.next();
-            match stream.chars.peek().copied() {
+            match stream.peek_char() {
                 Some('-') => {
                     stream.next();
                     Charge::try_new(-2)
@@ -447,7 +473,7 @@ fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
         }
         Some('+') => {
             stream.next();
-            match stream.chars.peek().copied() {
+            match stream.peek_char() {
                 Some('+') => {
                     stream.next();
                     Charge::try_new(2)
@@ -466,9 +492,9 @@ fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
 }
 
 fn try_class(stream: &mut TokenIter<'_>) -> Result<u16, SmilesError> {
-    match stream.chars.peek().copied() {
+    match stream.peek_char() {
         Some(':') => {
-            stream.next();
+            stream.chars.next();
             if let Some(possible_num) = try_fold_number(stream) {
                 possible_num
             } else {
