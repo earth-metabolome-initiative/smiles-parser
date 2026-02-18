@@ -48,7 +48,8 @@ impl TokenIter<'_> {
                     possible_bracket_atom = possible_bracket_atom.with_isotope(isotope?);
                 }
                 let (atom, aromatic) = try_element(self)?;
-                possible_bracket_atom = possible_bracket_atom.with_symbol(atom).with_aromatic(aromatic);
+                possible_bracket_atom =
+                    possible_bracket_atom.with_symbol(atom).with_aromatic(aromatic);
                 if let Some(chiral) = try_chirality(self)? {
                     possible_bracket_atom = possible_bracket_atom.with_chiral(chiral);
                 }
@@ -146,22 +147,18 @@ impl TokenIter<'_> {
         };
         Ok(token)
     }
-    
+
     fn current_end(&mut self) -> usize {
-        if let Some(&(next_id, _)) = self.chars.peek() {
-            next_id
-        } else {
-            self.len
-        }
+        if let Some(&(next_id, _)) = self.chars.peek() { next_id } else { self.len }
     }
     fn peek_char(&mut self) -> Option<char> {
-        self.chars.peek().map(|(_,c)| *c)
+        self.chars.peek().map(|(_, c)| *c)
     }
     fn next_char(&mut self) -> Option<char> {
-        self.chars.next().map(|(_,c)| c)
+        self.chars.next().map(|(_, c)| c)
     }
     fn peed_id(&mut self) -> Option<usize> {
-        self.chars.peek().map(|(i,_)| *i)
+        self.chars.peek().map(|(i, _)| *i)
     }
 }
 
@@ -175,7 +172,7 @@ impl Iterator for TokenIter<'_> {
                 let end = self.current_end();
                 Some(Ok(TokenWithSpan::new(token, start, end)))
             }
-            Err(e) => Some(Err(e))
+            Err(e) => Some(Err(e)),
         }
     }
 }

@@ -2,7 +2,12 @@
 
 use elements_rs::Element;
 use smiles_parser::{
-    atom_symbol::AtomSymbol, errors::SmilesError, parser::token_iter::TokenIter, ring_num::RingNum, token::{Token, TokenWithSpan}, unbracketed::UnbracketedAtom
+    atom_symbol::AtomSymbol,
+    errors::SmilesError,
+    parser::token_iter::TokenIter,
+    ring_num::RingNum,
+    token::{Token, TokenWithSpan},
+    unbracketed::UnbracketedAtom,
 };
 const SMILES_STR: &[&str] = &[
     "C1=CC=CC=C1",
@@ -42,31 +47,29 @@ const SMILES_STR: &[&str] = &[
 #[test]
 fn test_tokenizer() -> Result<(), SmilesError> {
     for &s in SMILES_STR {
-        let _tokens = TokenIter::from(s)
-            .collect::<Result<Vec<_>, _>>()
-            ?;
+        let _tokens = TokenIter::from(s).collect::<Result<Vec<_>, _>>()?;
     }
     Ok(())
 }
 
 #[test]
-fn test_smiles_tokens_benzene() -> Result<(), SmilesError>{
+fn test_smiles_tokens_benzene() -> Result<(), SmilesError> {
     // C1=CC=CC=C1
     // (not aromatic because uppercase C)
     let c = UnbracketedAtom::new(AtomSymbol::Element(Element::C), false);
 
     let expected = vec![
         TokenWithSpan::new(Token::UnbracketedAtom(c), 0, 1),
-        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?), 1,2),
-        TokenWithSpan::new(Token::Bond(smiles_parser::bond::Bond::Double),2,3),
+        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?), 1, 2),
+        TokenWithSpan::new(Token::Bond(smiles_parser::bond::Bond::Double), 2, 3),
         TokenWithSpan::new(Token::UnbracketedAtom(c), 3, 4),
-        TokenWithSpan::new(Token::UnbracketedAtom(c),4,5),
-        TokenWithSpan::new(Token::Bond(smiles_parser::bond::Bond::Double),5,6),
-        TokenWithSpan::new(Token::UnbracketedAtom(c),6,7),
-        TokenWithSpan::new(Token::UnbracketedAtom(c),7,8),
-        TokenWithSpan::new(Token::Bond(smiles_parser::bond::Bond::Double),8,9),
-        TokenWithSpan::new(Token::UnbracketedAtom(c),9,10),
-        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?),10,11),
+        TokenWithSpan::new(Token::UnbracketedAtom(c), 4, 5),
+        TokenWithSpan::new(Token::Bond(smiles_parser::bond::Bond::Double), 5, 6),
+        TokenWithSpan::new(Token::UnbracketedAtom(c), 6, 7),
+        TokenWithSpan::new(Token::UnbracketedAtom(c), 7, 8),
+        TokenWithSpan::new(Token::Bond(smiles_parser::bond::Bond::Double), 8, 9),
+        TokenWithSpan::new(Token::UnbracketedAtom(c), 9, 10),
+        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?), 10, 11),
     ];
 
     let line = SMILES_STR[0];
@@ -82,15 +85,15 @@ fn test_smiles_tokens_benzene_with_wildcard() -> Result<(), SmilesError> {
     let star = UnbracketedAtom::new(AtomSymbol::WildCard, false);
 
     let expected = vec![
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c),0,1),
-        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?),1,2),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c),2,3),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c),3,4),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c),4,5),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c),5,6),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c),6,7),
-        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?),7,8),
-        TokenWithSpan::new(Token::UnbracketedAtom(star),8,9),
+        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 0, 1),
+        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?), 1, 2),
+        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 2, 3),
+        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 3, 4),
+        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 4, 5),
+        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 5, 6),
+        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 6, 7),
+        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?), 7, 8),
+        TokenWithSpan::new(Token::UnbracketedAtom(star), 8, 9),
     ];
 
     let line = SMILES_STR[31];

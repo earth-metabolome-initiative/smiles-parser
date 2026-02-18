@@ -1,13 +1,14 @@
 //! Defines errors used in the SMILES parser.
 
-use std::num::TryFromIntError;
+use core::fmt;
+use std::{num::TryFromIntError, ops::Range};
 
 use elements_rs::Element;
 
 use crate::{atom_symbol::AtomSymbol, bond::Bond};
 
 /// The errors that could occur during SMILES parsing.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SmilesError {
     /// Missing Element
     MissingElement,
@@ -80,5 +81,66 @@ impl From<elements_rs::errors::Error> for SmilesError {
 impl From<TryFromIntError> for SmilesError {
     fn from(_: TryFromIntError) -> Self {
         SmilesError::InvalidNumber
+    }
+}
+
+/// Wraps the Smiles error adding the location of where the error was found
+pub struct SmilesErrorWithSpan {
+    /// The [`SmilesError`]
+    smiles_error: SmilesError,
+    /// The span as `usize`
+    span: Range<usize>,
+}
+
+impl SmilesErrorWithSpan {
+    /// Creates a new error from the [`SmilesError`] and the `span`
+    pub fn new(smiles_error: SmilesError, start: usize, end: usize) -> Self {
+        Self { smiles_error, span: Range { start: start, end: end } }
+    }
+    /// Returns the [`SmilesError`]
+    pub fn smiles_error(&self) -> SmilesError {
+        self.smiles_error
+    }
+    /// Returns the start of the span
+    pub fn start(&self) -> usize {
+        self.span.start
+    }
+    /// Returns the end of the span
+    pub fn end(&self) -> usize {
+        self.span.end
+    }
+}
+
+impl fmt::Display for SmilesErrorWithSpan {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.smiles_error() {
+            SmilesError::MissingElement => todo!(),
+            SmilesError::InvalidIsotope => todo!(),
+            SmilesError::InvalidElementName(_) => todo!(),
+            SmilesError::InvalidNumber => todo!(),
+            SmilesError::UnexpectedCharacter { character } => todo!(),
+            SmilesError::UnexpectedLeftBracket => todo!(),
+            SmilesError::UnexpectedRightBracket => todo!(),
+            SmilesError::UnclosedBracket => todo!(),
+            SmilesError::ElementRequiresBrackets => todo!(),
+            SmilesError::MissingBracketElement => todo!(),
+            SmilesError::InvalidAromaticElement { element } => todo!(),
+            SmilesError::IntegerOverflow => todo!(),
+            SmilesError::RingNumberOverflow(_) => todo!(),
+            SmilesError::ChargeUnderflow(_) => todo!(),
+            SmilesError::ChargeOverflow(_) => todo!(),
+            SmilesError::BondInBracket(bond) => todo!(),
+            SmilesError::NonBondInBracket => todo!(),
+            SmilesError::ElementsRs(error) => todo!(),
+            SmilesError::InvalidChirality => todo!(),
+            SmilesError::UnexpectedEndOfString => todo!(),
+            SmilesError::InvalidClass => todo!(),
+            SmilesError::InvalidUnbracketedAtom(atom_symbol) => todo!(),
+            SmilesError::UnexpectedBracketedState => todo!(),
+            SmilesError::UnexpectedDash => todo!(),
+            SmilesError::UnexpectedColon => todo!(),
+            SmilesError::UnexpectedPercent => todo!(),
+            SmilesError::InvalidRingNumber => todo!(),
+        }
     }
 }
