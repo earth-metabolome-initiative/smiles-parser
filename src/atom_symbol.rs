@@ -1,4 +1,6 @@
 //! Module for the symbols representing an element in a `SMILES` string
+use core::fmt;
+
 use elements_rs::Element;
 
 #[derive(Copy, Default, Debug, PartialEq, Clone, Eq, Hash)]
@@ -44,6 +46,12 @@ impl AtomSymbol {
             AtomSymbol::Element(e) => Some(e),
             AtomSymbol::WildCard | AtomSymbol::Unspecified => None,
         }
+    }
+}
+
+impl fmt::Display for AtomSymbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
     }
 }
 

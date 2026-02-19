@@ -19,10 +19,7 @@ pub enum SmilesError {
     /// Error indicating that an invalid number was encountered.
     InvalidNumber,
     /// Error indicating that an unexpected character was encountered.
-    UnexpectedCharacter {
-        /// The unexpected character.
-        character: char,
-    },
+    UnexpectedCharacter(char),
     /// An unexpected left bracket `[` was found
     UnexpectedLeftBracket,
     /// An unexpected right bracket `]` was found
@@ -34,10 +31,7 @@ pub enum SmilesError {
     /// found `[..]` that did not contain an element
     MissingBracketElement,
     /// Element forbidden to be written as aromatic here
-    InvalidAromaticElement {
-        /// The forbidden aromatic element
-        element: Element,
-    },
+    InvalidAromaticElement(Element),
     /// Integer Overflow
     IntegerOverflow,
     /// Ring Number Overflow (greater than 99)
@@ -70,6 +64,12 @@ pub enum SmilesError {
     UnexpectedPercent,
     /// An invalid ring number has been found
     InvalidRingNumber,
+}
+
+impl fmt::Display for SmilesError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
 }
 
 impl From<elements_rs::errors::Error> for SmilesError {
@@ -114,35 +114,72 @@ impl SmilesErrorWithSpan {
 impl fmt::Display for SmilesErrorWithSpan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.smiles_error() {
-            SmilesError::MissingElement => write!(
-                f, "Missing Element: Expected element at position start: {}", self.start()
-            ),
-            SmilesError::InvalidIsotope => todo!(),
-            SmilesError::InvalidElementName(_) => todo!(),
-            SmilesError::InvalidNumber => todo!(),
-            SmilesError::UnexpectedCharacter { character } => todo!(),
-            SmilesError::UnexpectedLeftBracket => todo!(),
-            SmilesError::UnexpectedRightBracket => todo!(),
-            SmilesError::UnclosedBracket => todo!(),
-            SmilesError::ElementRequiresBrackets => todo!(),
-            SmilesError::MissingBracketElement => todo!(),
-            SmilesError::InvalidAromaticElement { element } => todo!(),
-            SmilesError::IntegerOverflow => todo!(),
-            SmilesError::RingNumberOverflow(_) => todo!(),
-            SmilesError::ChargeUnderflow(_) => todo!(),
-            SmilesError::ChargeOverflow(_) => todo!(),
-            SmilesError::BondInBracket(bond) => todo!(),
-            SmilesError::NonBondInBracket => todo!(),
-            SmilesError::ElementsRs(error) => todo!(),
-            SmilesError::InvalidChirality => todo!(),
-            SmilesError::UnexpectedEndOfString => todo!(),
-            SmilesError::InvalidClass => todo!(),
-            SmilesError::InvalidUnbracketedAtom(atom_symbol) => todo!(),
-            SmilesError::UnexpectedBracketedState => todo!(),
-            SmilesError::UnexpectedDash => todo!(),
-            SmilesError::UnexpectedColon => todo!(),
-            SmilesError::UnexpectedPercent => todo!(),
-            SmilesError::InvalidRingNumber => todo!(),
+            SmilesError::InvalidRingNumber
+            | SmilesError::UnexpectedPercent
+            | SmilesError::UnexpectedColon
+            | SmilesError::UnexpectedDash
+            | SmilesError::UnexpectedBracketedState
+            | SmilesError::InvalidClass
+            | SmilesError::UnexpectedEndOfString
+            | SmilesError::InvalidChirality
+            | SmilesError::NonBondInBracket
+            | SmilesError::IntegerOverflow
+            | SmilesError::MissingBracketElement
+            | SmilesError::ElementRequiresBrackets
+            | SmilesError::UnclosedBracket
+            | SmilesError::UnexpectedRightBracket
+            | SmilesError::UnexpectedLeftBracket
+            | SmilesError::InvalidNumber
+            | SmilesError::InvalidIsotope
+            | SmilesError::MissingElement => {
+                write!(f, "{} at: {} end: {}", self.smiles_error(), self.start(), self.end())
+            }
+
+            SmilesError::UnexpectedCharacter(e) | SmilesError::InvalidElementName(e) => {
+                write!(f, "{}:{} at: {} end: {}", self.smiles_error(), e, self.start(), self.end())
+            }
+            SmilesError::InvalidAromaticElement(e) => {
+                write!(f, "{}:{} at: {} end: {}", self.smiles_error(), e, self.start(), self.end())
+            }
+
+            SmilesError::RingNumberOverflow(r) => {
+                write!(f, "{}:{} at: {} end: {}", self.smiles_error(), r, self.start(), self.end())
+            }
+            SmilesError::ChargeOverflow(c) | SmilesError::ChargeUnderflow(c) => {
+                write!(f, "{}:{} at: {} end: {}", self.smiles_error(), c, self.start(), self.end())
+            }
+            SmilesError::BondInBracket(bond) => {
+                write!(
+                    f,
+                    "{}:{} at: {} end: {}",
+                    self.smiles_error(),
+                    bond,
+                    self.start(),
+                    self.end()
+                )
+            }
+
+            SmilesError::ElementsRs(error) => {
+                write!(
+                    f,
+                    "{}:{} at: {} end: {}",
+                    self.smiles_error(),
+                    error,
+                    self.start(),
+                    self.end()
+                )
+            }
+
+            SmilesError::InvalidUnbracketedAtom(atom_symbol) => {
+                write!(
+                    f,
+                    "{}:{} at: {} end: {}",
+                    self.smiles_error(),
+                    atom_symbol,
+                    self.start(),
+                    self.end()
+                )
+            }
         }
     }
 }

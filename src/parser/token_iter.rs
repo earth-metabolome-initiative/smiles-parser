@@ -143,7 +143,7 @@ impl TokenIter<'_> {
                     return Err(SmilesError::UnexpectedBracketedState);
                 }
             }
-            _ => return Err(SmilesError::UnexpectedCharacter { character: current_char }),
+            _ => return Err(SmilesError::UnexpectedCharacter(current_char)),
         };
         Ok(token)
     }
@@ -202,7 +202,7 @@ fn aromatic_from_element(in_bracket: bool, element: Element) -> Result<bool, Smi
             Element::B | Element::C | Element::N | Element::O | Element::S | Element::P
         )
     };
-    if allowed { Ok(true) } else { Err(SmilesError::InvalidAromaticElement { element }) }
+    if allowed { Ok(true) } else { Err(SmilesError::InvalidAromaticElement(element)) }
 }
 
 fn try_element(stream: &mut TokenIter<'_>) -> Result<(AtomSymbol, bool), SmilesError> {

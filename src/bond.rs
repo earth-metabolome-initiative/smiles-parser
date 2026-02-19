@@ -1,4 +1,7 @@
 //! Module for specifying the bond between two atoms in a `SMILES` string
+
+use core::fmt;
+
 #[derive(Copy, Debug, Default, PartialEq, Clone, Eq, Hash)]
 /// Enum used to specify the Bond type, based on SMILES specification
 pub enum Bond {
@@ -17,6 +20,12 @@ pub enum Bond {
     Up,
     /// Represents a stereochemical single bond `\` (down)
     Down,
+}
+
+impl fmt::Display for Bond {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
 }
 
 #[cfg(test)]
