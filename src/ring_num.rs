@@ -16,6 +16,7 @@ impl RingNum {
     }
 
     /// Returns the value for the [`RingNum`]
+    #[must_use]
     pub fn get(&self) -> u8 {
         self.0
     }

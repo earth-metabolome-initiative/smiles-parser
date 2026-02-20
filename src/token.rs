@@ -39,22 +39,27 @@ pub struct TokenWithSpan {
 
 impl TokenWithSpan {
     /// Generates a new token with a specified span
+    #[must_use]
     pub fn new(token: Token, start: usize, end: usize) -> Self {
         Self { token, span: Range { start, end } }
     }
     /// Returns the token
+    #[must_use]
     pub fn token(&self) -> Token {
         self.token
     }
     /// Returns the span as [`Range`]
+    #[must_use]
     pub fn span(&self) -> &Range<usize> {
         &self.span
     }
     /// Returns the start of the span as [`usize`]
+    #[must_use]
     pub fn start(&self) -> usize {
         self.span.start
     }
     /// Returns the end of the span as [`usize`]
+    #[must_use]
     pub fn end(&self) -> usize {
         self.span.end
     }

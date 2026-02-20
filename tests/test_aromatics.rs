@@ -43,7 +43,8 @@ fn test_aromatic_benzene_from_tokenization() -> Result<(), SmilesError> {
     ];
 
     let line = SMILES_STR[0];
-    let got = TokenIter::from(line).collect::<Result<Vec<_>, _>>()?;
+    let got = TokenIter::from(line).collect::<Result<Vec<_>, _>>().map_err(|e| e.smiles_error())?;
+
     assert_eq!(expected, got);
 
     Ok(())
@@ -78,7 +79,8 @@ fn test_aromatic_imidazole_from_tokenization() -> Result<(), SmilesError> {
     ];
 
     let line = SMILES_STR[4];
-    let got = TokenIter::from(line).collect::<Result<Vec<_>, _>>()?;
+    let got = TokenIter::from(line).collect::<Result<Vec<_>, _>>().map_err(|e| e.smiles_error())?;
+
     assert_eq!(expected, got);
     Ok(())
 }

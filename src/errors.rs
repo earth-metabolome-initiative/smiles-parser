@@ -67,8 +67,45 @@ pub enum SmilesError {
 }
 
 impl fmt::Display for SmilesError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use SmilesError::{
+            BondInBracket, ChargeOverflow, ChargeUnderflow, ElementRequiresBrackets, ElementsRs,
+            IntegerOverflow, InvalidAromaticElement, InvalidChirality, InvalidClass,
+            InvalidElementName, InvalidIsotope, InvalidNumber, InvalidRingNumber,
+            InvalidUnbracketedAtom, MissingBracketElement, MissingElement, NonBondInBracket,
+            RingNumberOverflow, UnclosedBracket, UnexpectedBracketedState, UnexpectedCharacter,
+            UnexpectedColon, UnexpectedDash, UnexpectedEndOfString, UnexpectedLeftBracket,
+            UnexpectedPercent, UnexpectedRightBracket,
+        };
+        match self {
+            MissingElement => write!(f, "Missing element"),
+            InvalidIsotope => write!(f, "Invalid isotope"),
+            InvalidElementName(c) => write!(f, "Invalid element name: {c}"),
+            InvalidNumber => write!(f, "Invalid number"),
+            UnexpectedCharacter(c) => write!(f, "Unexpected character: {c}"),
+            UnexpectedLeftBracket => write!(f, "Unexpected '['"),
+            UnexpectedRightBracket => write!(f, "Unexpected ']'"),
+            UnclosedBracket => write!(f, "Unclosed '['"),
+            ElementRequiresBrackets => write!(f, "Element requires brackets"),
+            MissingBracketElement => write!(f, "Missing element inside brackets"),
+            InvalidAromaticElement(e) => write!(f, "Invalid aromatic element: {e}"),
+            IntegerOverflow => write!(f, "Integer overflow"),
+            RingNumberOverflow(n) => write!(f, "Ring number overflow: {n}"),
+            ChargeUnderflow(c) => write!(f, "Charge underflow: {c}"),
+            ChargeOverflow(c) => write!(f, "Charge overflow: {c}"),
+            BondInBracket(b) => write!(f, "Bond in bracket: {b}"),
+            NonBondInBracket => write!(f, "Non-bond '.' in bracket"),
+            InvalidChirality => write!(f, "Invalid chirality"),
+            UnexpectedEndOfString => write!(f, "Unexpected end of string"),
+            InvalidClass => write!(f, "Invalid class"),
+            InvalidUnbracketedAtom(a) => write!(f, "Invalid unbracketed atom: {a}"),
+            UnexpectedBracketedState => write!(f, "Unexpected bracketed state"),
+            UnexpectedDash => write!(f, "Unexpected '-'"),
+            UnexpectedColon => write!(f, "Unexpected ':'"),
+            UnexpectedPercent => write!(f, "Unexpected '%'"),
+            InvalidRingNumber => write!(f, "Invalid ring number"),
+            ElementsRs(error) => write!(f, "Error Parsing Element: {error}"),
+        }
     }
 }
 
@@ -85,6 +122,7 @@ impl From<TryFromIntError> for SmilesError {
 }
 
 /// Wraps the Smiles error adding the location of where the error was found
+#[derive(Debug)]
 pub struct SmilesErrorWithSpan {
     /// The [`SmilesError`]
     smiles_error: SmilesError,
@@ -94,92 +132,51 @@ pub struct SmilesErrorWithSpan {
 
 impl SmilesErrorWithSpan {
     /// Creates a new error from the [`SmilesError`] and the `span`
+    #[must_use]
     pub fn new(smiles_error: SmilesError, start: usize, end: usize) -> Self {
-        Self { smiles_error, span: Range { start: start, end: end } }
+        Self { smiles_error, span: Range { start, end } }
     }
+
     /// Returns the [`SmilesError`]
+    #[must_use]
     pub fn smiles_error(&self) -> SmilesError {
         self.smiles_error
     }
+
     /// Returns the start of the span
+    #[must_use]
     pub fn start(&self) -> usize {
         self.span.start
     }
+
     /// Returns the end of the span
+    #[must_use]
     pub fn end(&self) -> usize {
         self.span.end
+    }
+
+    /// Returns the full span for the error
+    #[must_use]
+    pub fn span(&self) -> &Range<usize> {
+        &self.span
+    }
+
+    /// Render the error pointing back to location in the original string
+    #[must_use]
+    pub fn render(&self, input: &str) -> String {
+        let start = self.start().min(input.len());
+        let end = self.end().min(input.len()).max(start + 1).min(input.len());
+
+        let mut underline = String::new();
+        underline.push_str(&" ".repeat(start));
+        underline.push_str(&"^".repeat(end - start));
+
+        format!("{input}\n{underline}\n{}", self.smiles_error)
     }
 }
 
 impl fmt::Display for SmilesErrorWithSpan {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.smiles_error() {
-            SmilesError::InvalidRingNumber
-            | SmilesError::UnexpectedPercent
-            | SmilesError::UnexpectedColon
-            | SmilesError::UnexpectedDash
-            | SmilesError::UnexpectedBracketedState
-            | SmilesError::InvalidClass
-            | SmilesError::UnexpectedEndOfString
-            | SmilesError::InvalidChirality
-            | SmilesError::NonBondInBracket
-            | SmilesError::IntegerOverflow
-            | SmilesError::MissingBracketElement
-            | SmilesError::ElementRequiresBrackets
-            | SmilesError::UnclosedBracket
-            | SmilesError::UnexpectedRightBracket
-            | SmilesError::UnexpectedLeftBracket
-            | SmilesError::InvalidNumber
-            | SmilesError::InvalidIsotope
-            | SmilesError::MissingElement => {
-                write!(f, "{} at: {} end: {}", self.smiles_error(), self.start(), self.end())
-            }
-
-            SmilesError::UnexpectedCharacter(e) | SmilesError::InvalidElementName(e) => {
-                write!(f, "{}:{} at: {} end: {}", self.smiles_error(), e, self.start(), self.end())
-            }
-            SmilesError::InvalidAromaticElement(e) => {
-                write!(f, "{}:{} at: {} end: {}", self.smiles_error(), e, self.start(), self.end())
-            }
-
-            SmilesError::RingNumberOverflow(r) => {
-                write!(f, "{}:{} at: {} end: {}", self.smiles_error(), r, self.start(), self.end())
-            }
-            SmilesError::ChargeOverflow(c) | SmilesError::ChargeUnderflow(c) => {
-                write!(f, "{}:{} at: {} end: {}", self.smiles_error(), c, self.start(), self.end())
-            }
-            SmilesError::BondInBracket(bond) => {
-                write!(
-                    f,
-                    "{}:{} at: {} end: {}",
-                    self.smiles_error(),
-                    bond,
-                    self.start(),
-                    self.end()
-                )
-            }
-
-            SmilesError::ElementsRs(error) => {
-                write!(
-                    f,
-                    "{}:{} at: {} end: {}",
-                    self.smiles_error(),
-                    error,
-                    self.start(),
-                    self.end()
-                )
-            }
-
-            SmilesError::InvalidUnbracketedAtom(atom_symbol) => {
-                write!(
-                    f,
-                    "{}:{} at: {} end: {}",
-                    self.smiles_error(),
-                    atom_symbol,
-                    self.start(),
-                    self.end()
-                )
-            }
-        }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} at {}..{}", self.smiles_error, self.start(), self.end())
     }
 }

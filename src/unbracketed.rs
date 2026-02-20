@@ -15,22 +15,27 @@ pub struct UnbracketedAtom {
 
 impl UnbracketedAtom {
     /// Creates a new `UnbracketedAtom`
+    #[must_use]
     pub const fn new(symbol: AtomSymbol, aromatic: bool) -> Self {
         Self { symbol, aromatic }
     }
     /// Returns the [`AtomSymbol`] of the atom
+    #[must_use]
     pub fn symbol(&self) -> AtomSymbol {
         self.symbol
     }
     /// Returns the [`Element`] or `None` if `WildCard`
+    #[must_use]
     pub fn element(&self) -> Option<Element> {
         self.symbol.element()
     }
     /// Returns true of aromatic
+    #[must_use]
     pub fn aromatic(&self) -> bool {
         self.aromatic
     }
     /// Returns true if `AtomSymbol` is [`AtomSymbol::WildCard`]
+    #[must_use]
     pub fn is_wildcard(&self) -> bool {
         self.symbol.is_wildcard()
     }

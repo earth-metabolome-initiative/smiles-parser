@@ -1,6 +1,10 @@
 //! Test for tokenizing square brackets
 
-use smiles_parser::{errors::SmilesError, parser::token_iter::TokenIter, token::Token};
+use smiles_parser::{
+    errors::{SmilesError, SmilesErrorWithSpan},
+    parser::token_iter::TokenIter,
+    token::Token,
+};
 
 /// const for testing square brackets
 const SMILES_WITH_BRACKETS: &[&str] = &[
@@ -35,30 +39,37 @@ fn test_valid_square_brackets() {
 
 #[test]
 fn test_unexpected_right_brackets() {
-    // New tokenizer does not have a dedicated "UnexpectedRightBracket" error:
-    // stray ']' becomes an UnexpectedCharacter.
-    let error = TokenIter::from("[Co+3]]").collect::<Result<Vec<_>, SmilesError>>();
-    assert!(error.is_err());
-    assert_eq!(error, Err(SmilesError::UnexpectedCharacter { character: ']' }));
+    // stray ']' becomes UnexpectedCharacter(']') with a span
+    let err =
+        TokenIter::from("[Co+3]]").collect::<Result<Vec<_>, SmilesErrorWithSpan>>().unwrap_err();
+
+    assert_eq!(err.smiles_error(), SmilesError::UnexpectedCharacter(']'));
+    assert_eq!(err.start(), 6);
+    assert_eq!(err.end(), 7);
 }
 
 #[test]
 fn test_unexpected_left_brackets() {
-    let error = TokenIter::from("[[Co+3]").collect::<Result<Vec<_>, SmilesError>>();
-    assert!(error.is_err());
-    assert_eq!(error, Err(SmilesError::UnexpectedLeftBracket));
+    let err =
+        TokenIter::from("[[Co+3]").collect::<Result<Vec<_>, SmilesErrorWithSpan>>().unwrap_err();
+
+    assert_eq!(err.smiles_error(), SmilesError::UnexpectedLeftBracket);
+    assert_eq!(err.start(), 1);
+    assert_eq!(err.end(), 2);
 }
 
 #[test]
 fn test_unclosed_brackets() {
-    let error = TokenIter::from("[Co+3").collect::<Result<Vec<_>, SmilesError>>();
-    assert!(error.is_err());
-    assert_eq!(error, Err(SmilesError::UnclosedBracket));
+    let err =
+        TokenIter::from("[Co+3").collect::<Result<Vec<_>, SmilesErrorWithSpan>>().unwrap_err();
+
+    assert_eq!(err.smiles_error(), SmilesError::UnclosedBracket);
+    assert_eq!(err.start(), 0);
+    assert_eq!(err.end(), 5);
 }
 
 #[test]
 fn test_smiles_tokens_water() {
-    // "[OH2]" now produces ONE Token::BracketedAtom(...)
     let water_line = SMILES_WITH_BRACKETS[0];
     let tokens = TokenIter::from(water_line)
         .collect::<Result<Vec<_>, _>>()
@@ -68,7 +79,6 @@ fn test_smiles_tokens_water() {
 
     match &tokens[0].token() {
         Token::BracketedAtom(b) => {
-            // validate the important semantics
             assert_eq!(b.element(), Some(elements_rs::Element::O));
             assert!(!b.aromatic());
             assert_eq!(b.hydrogen_count(), Some(2));
@@ -79,6 +89,7 @@ fn test_smiles_tokens_water() {
         }
         other => panic!("Expected Token::BracketedAtom, got {other:?}"),
     }
+
     assert_eq!(tokens[0].start(), 0);
-    assert_eq!(tokens[0].end(), 4);
+    assert_eq!(tokens[0].end(), 5);
 }

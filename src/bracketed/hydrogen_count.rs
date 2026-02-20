@@ -13,6 +13,7 @@ pub enum HydrogenCount {
 
 impl HydrogenCount {
     /// Returns the hydrogen count based on `Option` input of `u8`
+    #[must_use]
     pub fn new(hydrogens: Option<u8>) -> Self {
         match hydrogens {
             Some(h) => Self::Explicit(h),
@@ -20,6 +21,7 @@ impl HydrogenCount {
         }
     }
     /// Retrieves the hydrogen count if explicit
+    #[must_use]
     pub fn get_count(&self) -> Option<u8> {
         match self {
             Self::Unspecified => None,

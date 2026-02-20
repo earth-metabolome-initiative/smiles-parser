@@ -18,6 +18,7 @@ pub enum AtomSymbol {
 
 impl AtomSymbol {
     /// Creates an atom symbol
+    #[must_use]
     pub fn new(element_type: Option<Element>) -> Self {
         match element_type {
             Some(element) => AtomSymbol::Element(element),
@@ -25,14 +26,17 @@ impl AtomSymbol {
         }
     }
     /// creates an `AtomSymbol` set as `WildCard`
+    #[must_use]
     pub fn new_wildcard() -> Self {
         Self::WildCard
     }
     /// Verifies whether the symbol present is a wildcard
+    #[must_use]
     pub fn is_wildcard(&self) -> bool {
         matches!(self, AtomSymbol::WildCard)
     }
     /// Returns either the [`Element`] or `None` if wildcard
+    #[must_use]
     pub fn element(&self) -> Option<Element> {
         match self {
             AtomSymbol::Element(e) => Some(*e),
@@ -41,6 +45,7 @@ impl AtomSymbol {
     }
     /// Consumes the `AtomSymbol` and returns the [`Element`] or `None` if
     /// `WildCard`
+    #[must_use]
     pub fn into_element(self) -> Option<Element> {
         match self {
             AtomSymbol::Element(e) => Some(e),
@@ -50,8 +55,12 @@ impl AtomSymbol {
 }
 
 impl fmt::Display for AtomSymbol {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AtomSymbol::Element(e) => write!(f, "{e}"),
+            AtomSymbol::WildCard => f.write_str("*"),
+            AtomSymbol::Unspecified => f.write_str("?"),
+        }
     }
 }
 

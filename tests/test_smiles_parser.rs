@@ -3,7 +3,7 @@
 use elements_rs::Element;
 use smiles_parser::{
     atom_symbol::AtomSymbol,
-    errors::SmilesError,
+    errors::{SmilesError, SmilesErrorWithSpan},
     parser::token_iter::TokenIter,
     ring_num::RingNum,
     token::{Token, TokenWithSpan},
@@ -45,9 +45,11 @@ const SMILES_STR: &[&str] = &[
 ];
 
 #[test]
-fn test_tokenizer() -> Result<(), SmilesError> {
+fn test_tokenizer() -> Result<(), SmilesErrorWithSpan> {
     for &s in SMILES_STR {
-        let _tokens = TokenIter::from(s).collect::<Result<Vec<_>, _>>()?;
+        let _tokens = TokenIter::from(s)
+            .collect::<Result<Vec<_>, SmilesErrorWithSpan>>()
+            .unwrap_or_else(|e| panic!("Failed to tokenize:\n{}", e.render(s)));
     }
     Ok(())
 }
@@ -71,9 +73,11 @@ fn test_smiles_tokens_benzene() -> Result<(), SmilesError> {
         TokenWithSpan::new(Token::UnbracketedAtom(c), 9, 10),
         TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?), 10, 11),
     ];
-
     let line = SMILES_STR[0];
-    let got = TokenIter::from(line).collect::<Result<Vec<_>, _>>()?;
+    let got = TokenIter::from(line)
+        .collect::<Result<Vec<_>, SmilesErrorWithSpan>>()
+        .unwrap_or_else(|e| panic!("Failed to tokenize:\n{}", e.render(line)));
+
     assert_eq!(expected, got);
     Ok(())
 }
@@ -97,7 +101,10 @@ fn test_smiles_tokens_benzene_with_wildcard() -> Result<(), SmilesError> {
     ];
 
     let line = SMILES_STR[31];
-    let got = TokenIter::from(line).collect::<Result<Vec<_>, _>>()?;
+    let got = TokenIter::from(line)
+        .collect::<Result<Vec<_>, SmilesErrorWithSpan>>()
+        .unwrap_or_else(|e| panic!("Failed to tokenize:\n{}", e.render(line)));
+
     assert_eq!(expected, got);
     Ok(())
 }

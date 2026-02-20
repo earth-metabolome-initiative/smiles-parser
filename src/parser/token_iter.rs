@@ -11,7 +11,7 @@ use crate::{
         bracket_atom::BracketAtom, charge::Charge, chirality::Chirality,
         hydrogen_count::HydrogenCount,
     },
-    errors::SmilesError,
+    errors::{SmilesError, SmilesErrorWithSpan},
     ring_num::RingNum,
     token::{Token, TokenWithSpan},
     unbracketed::UnbracketedAtom,
@@ -19,7 +19,7 @@ use crate::{
 
 /// An iterator over the tokens found in a SMILES string.
 pub struct TokenIter<'a> {
-    /// The peekable chars iterator
+    /// The peekable `Chars` with `Indices` iterator
     chars: std::iter::Peekable<std::str::CharIndices<'a>>,
     /// Denotes whether currently inside brackets
     in_bracket: bool,
@@ -75,32 +75,29 @@ impl TokenIter<'_> {
                 if !valid_unbracketed(symbol) {
                     return Err(SmilesError::InvalidUnbracketedAtom(symbol));
                 }
-                if !self.in_bracket {
-                    Token::UnbracketedAtom(UnbracketedAtom::new(symbol, aromatic))
-                } else {
+                if self.in_bracket {
                     return Err(SmilesError::UnexpectedBracketedState);
                 }
+                Token::UnbracketedAtom(UnbracketedAtom::new(symbol, aromatic))
             }
             '-' => {
-                if !self.in_bracket {
-                    Token::Bond(crate::bond::Bond::Single)
-                } else {
+                if self.in_bracket {
                     return Err(SmilesError::UnexpectedDash);
                 }
+                Token::Bond(crate::bond::Bond::Single)
             }
             '=' => Token::Bond(crate::bond::Bond::Double),
             '#' => Token::Bond(crate::bond::Bond::Triple),
             '$' => Token::Bond(crate::bond::Bond::Quadruple),
             ':' => {
-                if !self.in_bracket {
-                    Token::Bond(crate::bond::Bond::Aromatic)
-                } else {
+                if self.in_bracket {
                     return Err(SmilesError::UnexpectedColon);
                 }
+                Token::Bond(crate::bond::Bond::Aromatic)
             }
             '/' => Token::Bond(crate::bond::Bond::Up),
             '\\' => Token::Bond(crate::bond::Bond::Down),
-            n if n.is_numeric() || n == '%' => {
+            n if n.is_ascii_digit() || n == '%' => {
                 if n == '%' {
                     if self.in_bracket {
                         return Err(SmilesError::UnexpectedPercent);
@@ -130,18 +127,16 @@ impl TokenIter<'_> {
                 }
             }
             '(' => {
-                if !self.in_bracket {
-                    Token::LeftParentheses
-                } else {
+                if self.in_bracket {
                     return Err(SmilesError::UnexpectedBracketedState);
                 }
+                Token::LeftParentheses
             }
             ')' => {
-                if !self.in_bracket {
-                    Token::RightParentheses
-                } else {
+                if self.in_bracket {
                     return Err(SmilesError::UnexpectedBracketedState);
                 }
+                Token::RightParentheses
             }
             _ => return Err(SmilesError::UnexpectedCharacter(current_char)),
         };
@@ -157,13 +152,10 @@ impl TokenIter<'_> {
     fn next_char(&mut self) -> Option<char> {
         self.chars.next().map(|(_, c)| c)
     }
-    fn peed_id(&mut self) -> Option<usize> {
-        self.chars.peek().map(|(i, _)| *i)
-    }
 }
 
 impl Iterator for TokenIter<'_> {
-    type Item = Result<TokenWithSpan, SmilesError>;
+    type Item = Result<TokenWithSpan, SmilesErrorWithSpan>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let (start, current_char) = self.chars.next()?;
@@ -172,7 +164,13 @@ impl Iterator for TokenIter<'_> {
                 let end = self.current_end();
                 Some(Ok(TokenWithSpan::new(token, start, end)))
             }
-            Err(e) => Some(Err(e)),
+            Err(e) => {
+                let mut end = self.current_end();
+                if end <= start {
+                    end = (start + current_char.len_utf8()).min(self.len);
+                }
+                Some(Err(SmilesErrorWithSpan::new(e, start, end)))
+            }
         }
     }
 }
@@ -217,29 +215,29 @@ fn try_element_from_first(
     if char_1 == '*' {
         return Ok((AtomSymbol::WildCard, false));
     }
-    if !char_1.is_alphabetic() {
+    if !char_1.is_ascii_alphabetic() {
         return Err(SmilesError::MissingElement);
     }
 
     let is_aromatic_candidate = char_1.is_ascii_lowercase();
     let try_candidate = |val: &str| -> Option<Element> { Element::from_str(val).ok() };
 
-    if let Some(char_2) = stream.peek_char() {
-        if char_2.is_alphabetic() {
-            if is_aromatic_candidate && char_2.is_ascii_lowercase() {
-                let candidate = format!("{}{}", char_1.to_ascii_uppercase(), char_2);
-                if let Some(element) = try_candidate(&candidate) {
-                    stream.chars.next();
-                    let aromatic = aromatic_from_element(stream.in_bracket, element)?;
-                    return Ok((AtomSymbol::Element(element), aromatic));
-                }
+    if let Some(char_2) = stream.peek_char()
+        && char_2.is_ascii_alphabetic()
+    {
+        if is_aromatic_candidate && char_2.is_ascii_lowercase() {
+            let candidate = format!("{}{}", char_1.to_ascii_uppercase(), char_2);
+            if let Some(element) = try_candidate(&candidate) {
+                stream.chars.next();
+                let aromatic = aromatic_from_element(stream.in_bracket, element)?;
+                return Ok((AtomSymbol::Element(element), aromatic));
             }
-            if !is_aromatic_candidate && char_2.is_ascii_lowercase() {
-                let candidate = format!("{}{}", char_1, char_2);
-                if let Some(element) = try_candidate(&candidate) {
-                    stream.chars.next();
-                    return Ok((AtomSymbol::Element(element), false));
-                }
+        }
+        if !is_aromatic_candidate && char_2.is_ascii_lowercase() {
+            let candidate = format!("{char_1}{char_2}");
+            if let Some(element) = try_candidate(&candidate) {
+                stream.chars.next();
+                return Ok((AtomSymbol::Element(element), false));
             }
         }
     }
@@ -266,22 +264,22 @@ fn try_element_from_first(
 fn valid_unbracketed(symbol: AtomSymbol) -> bool {
     match symbol {
         AtomSymbol::Element(element) => {
-            match element {
+            matches!(
+                element,
                 Element::B
-                | Element::C
-                | Element::N
-                | Element::O
-                | Element::P
-                | Element::S
-                | Element::F
-                | Element::Cl
-                | Element::Br
-                | Element::I => true,
-                _ => false,
-            }
+                    | Element::C
+                    | Element::N
+                    | Element::O
+                    | Element::P
+                    | Element::S
+                    | Element::F
+                    | Element::Cl
+                    | Element::Br
+                    | Element::I
+            )
         }
         AtomSymbol::WildCard => true,
-        _ => false,
+        AtomSymbol::Unspecified => false,
     }
 }
 
@@ -289,106 +287,58 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
     if stream.peek_char() != Some('@') {
         return Ok(None);
     }
-
-    let chirality = if let Some(char_1) = stream.peek_char() {
-        stream.chars.next();
-        if let Some(char_2) = stream.peek_char() {
-            match (char_1, char_2) {
-                ('@', '@') => {
-                    stream.chars.next();
-                    Ok(Some(Chirality::AtAt))
-                }
-                ('@', 'T') => {
-                    stream.chars.next();
-                    if let Some(char_3) = stream.peek_char() {
-                        match char_3 {
-                            'H' => {
-                                stream.chars.next();
-                                let possible_num = try_fold_number(stream);
-                                match possible_num {
-                                    None => Err(SmilesError::InvalidChirality),
-                                    Some(num) => Ok(Some(Chirality::try_th(num?)?)),
-                                }
-                            }
-                            'B' => {
-                                stream.chars.next();
-                                let possible_num = try_fold_number(stream);
-                                match possible_num {
-                                    None => Err(SmilesError::InvalidChirality),
-                                    Some(num) => Ok(Some(Chirality::try_tb(num?)?)),
-                                }
-                            }
-                            _ => Err(SmilesError::InvalidChirality),
-                        }
-                    } else {
-                        Err(SmilesError::InvalidChirality)
-                    }
-                }
-                ('@', 'A') => {
-                    stream.chars.next();
-                    if let Some(char_3) = stream.peek_char() {
-                        match char_3 {
-                            'L' => {
-                                stream.chars.next();
-                                let possible_num = try_fold_number(stream);
-                                match possible_num {
-                                    None => Err(SmilesError::InvalidChirality),
-                                    Some(num) => Ok(Some(Chirality::try_al(num?)?)),
-                                }
-                            }
-                            _ => Err(SmilesError::InvalidChirality),
-                        }
-                    } else {
-                        Err(SmilesError::InvalidChirality)
-                    }
-                }
-                ('@', 'S') => {
-                    stream.chars.next();
-                    if let Some(char_3) = stream.peek_char() {
-                        match char_3 {
-                            'P' => {
-                                stream.chars.next();
-                                let possible_num = try_fold_number(stream);
-                                match possible_num {
-                                    None => Err(SmilesError::InvalidChirality),
-                                    Some(num) => Ok(Some(Chirality::try_sp(num?)?)),
-                                }
-                            }
-                            _ => Err(SmilesError::InvalidChirality),
-                        }
-                    } else {
-                        Err(SmilesError::InvalidChirality)
-                    }
-                }
-                ('@', 'O') => {
-                    stream.chars.next();
-                    if let Some(char_3) = stream.peek_char() {
-                        match char_3 {
-                            'H' => {
-                                stream.chars.next();
-                                let possible_num = try_fold_number(stream);
-                                match possible_num {
-                                    None => Err(SmilesError::InvalidChirality),
-                                    Some(num) => Ok(Some(Chirality::try_oh(num?)?)),
-                                }
-                            }
-                            _ => Err(SmilesError::InvalidChirality),
-                        }
-                    } else {
-                        Err(SmilesError::InvalidChirality)
-                    }
-                }
-                ('@', n) if n.is_numeric() => Ok(Some(Chirality::At)),
-                ('@', 'H' | '-' | '+' | ':') => Ok(Some(Chirality::At)),
-                _ => Err(SmilesError::InvalidChirality),
-            }
-        } else {
-            Err(SmilesError::UnexpectedEndOfString)
+    stream.chars.next();
+    let char_2 = stream.peek_char().ok_or(SmilesError::UnexpectedEndOfString)?;
+    let chirality = match char_2 {
+        '@' => {
+            stream.chars.next();
+            Chirality::AtAt
         }
-    } else {
-        Err(SmilesError::UnexpectedEndOfString)
+        'T' => {
+            match stream.peek_char().ok_or(SmilesError::UnexpectedEndOfString)? {
+                'H' => {
+                    stream.chars.next();
+                    let num =
+                        try_fold_number::<u8>(stream).ok_or(SmilesError::InvalidChirality)??;
+                    Chirality::try_th(num)?
+                }
+                'B' => {
+                    stream.chars.next();
+                    let num =
+                        try_fold_number::<u8>(stream).ok_or(SmilesError::InvalidChirality)??;
+                    Chirality::try_tb(num)?
+                }
+                _ => return Err(SmilesError::InvalidChirality),
+            }
+        }
+        'A' | 'S' => {
+            stream.chars.next();
+            match stream.peek_char().ok_or(SmilesError::UnexpectedEndOfString)? {
+                'P' => {
+                    stream.chars.next();
+                    let num =
+                        try_fold_number::<u8>(stream).ok_or(SmilesError::InvalidChirality)??;
+                    Chirality::try_sp(num)?
+                }
+                _ => return Err(SmilesError::InvalidChirality),
+            }
+        }
+        'O' => {
+            stream.chars.next();
+            match stream.peek_char().ok_or(SmilesError::UnexpectedEndOfString)? {
+                'H' => {
+                    stream.chars.next();
+                    let num =
+                        try_fold_number::<u8>(stream).ok_or(SmilesError::InvalidChirality)??;
+                    Chirality::try_oh(num)?
+                }
+                _ => return Err(SmilesError::InvalidChirality),
+            }
+        }
+        'H' | '-' | '+' | ':' => Chirality::At,
+        _ => return Err(SmilesError::InvalidChirality),
     };
-    chirality
+    Ok(Some(chirality))
 }
 
 fn try_fold_number<B>(stream: &mut TokenIter<'_>) -> Option<Result<B, SmilesError>>
@@ -399,9 +349,8 @@ where
     let mut amount: u32 = 0;
 
     while let Some(char) = stream.peek_char() {
-        let digit = match char.to_digit(10) {
-            Some(d) => d,
-            None => break,
+        let Some(digit) = char.to_digit(10) else {
+            break;
         };
         stream.chars.next();
         seen_any = true;
@@ -445,23 +394,22 @@ fn hydrogen_count(stream: &mut TokenIter<'_>) -> Result<HydrogenCount, SmilesErr
             None => Ok(HydrogenCount::new(Some(1))),
         }
     } else {
-        return Ok(HydrogenCount::Unspecified);
+        Ok(HydrogenCount::Unspecified)
     }
 }
 
 fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
-    let possible_charge = stream.peek_char();
-    match possible_charge {
+    match stream.peek_char() {
         Some('-') => {
-            stream.next();
+            stream.chars.next();
             match stream.peek_char() {
                 Some('-') => {
-                    stream.next();
+                    stream.chars.next();
                     Charge::try_new(-2)
                 }
                 _ => {
                     if let Some(possible_num) = try_fold_number::<i8>(stream) {
-                        Charge::try_new(possible_num? * -1)
+                        Charge::try_new(-possible_num?)
                     } else {
                         Charge::try_new(-1)
                     }
@@ -469,10 +417,10 @@ fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
             }
         }
         Some('+') => {
-            stream.next();
+            stream.chars.next();
             match stream.peek_char() {
                 Some('+') => {
-                    stream.next();
+                    stream.chars.next();
                     Charge::try_new(2)
                 }
                 _ => {

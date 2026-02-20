@@ -23,8 +23,17 @@ pub enum Bond {
 }
 
 impl fmt::Display for Bond {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Bond::Single => "-",
+            Bond::Double => "=",
+            Bond::Triple => "#",
+            Bond::Quadruple => "$",
+            Bond::Aromatic => ":",
+            Bond::Up => "/",
+            Bond::Down => "\\",
+        };
+        f.write_str(s)
     }
 }
 
