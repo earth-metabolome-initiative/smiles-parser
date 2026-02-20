@@ -45,13 +45,12 @@ const SMILES_STR: &[&str] = &[
 ];
 
 #[test]
-fn test_tokenizer() -> Result<(), SmilesErrorWithSpan> {
+fn test_tokenizer() {
     for &s in SMILES_STR {
         let _tokens = TokenIter::from(s)
             .collect::<Result<Vec<_>, SmilesErrorWithSpan>>()
             .unwrap_or_else(|e| panic!("Failed to tokenize:\n{}", e.render(s)));
     }
-    Ok(())
 }
 
 #[test]

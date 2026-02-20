@@ -54,7 +54,6 @@ impl TokenIter<'_> {
                     possible_bracket_atom = possible_bracket_atom.with_chiral(chiral);
                 }
 
-                // If element is unspecified at this step there is an error
                 if possible_bracket_atom.symbol() == AtomSymbol::Unspecified {
                     return Err(SmilesError::MissingBracketElement);
                 }
@@ -103,7 +102,6 @@ impl TokenIter<'_> {
                         return Err(SmilesError::UnexpectedPercent);
                     }
 
-                    // DO NOT consume a digit here; try_fold_number reads from peek()
                     if let Some(num) = try_fold_number::<u8>(self) {
                         let ring_num = RingNum::try_new(num?)?;
                         if ring_num.get() < 10 {
@@ -114,16 +112,11 @@ impl TokenIter<'_> {
                         return Err(SmilesError::InvalidRingNumber);
                     }
                 } else {
-                    // n is the first digit already consumed -> seed the fold with it
-                    let first = n.to_digit(10).unwrap();
-                    let num: u8 = try_fold_number_seeded(self, first)?;
+                    let Some(first) = n.to_digit(10) else {
+                        return Err(SmilesError::InvalidClass);
+                    };
 
-                    // single-digit ring closure must be 0..=9
-                    if num >= 10 {
-                        return Err(SmilesError::InvalidRingNumber);
-                    }
-
-                    Token::RingClosure(RingNum::try_new(num)?)
+                    Token::RingClosure(RingNum::try_new(u8::try_from(first)?)?)
                 }
             }
             '(' => {
@@ -335,7 +328,7 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
                 _ => return Err(SmilesError::InvalidChirality),
             }
         }
-        'H' | '-' | '+' | ':' => Chirality::At,
+        'H' | '-' | '+' | ':' | ']' => Chirality::At,
         _ => return Err(SmilesError::InvalidChirality),
     };
     Ok(Some(chirality))
@@ -365,24 +358,6 @@ where
     }
 
     Some(B::try_from(amount).map_err(|_| SmilesError::IntegerOverflow))
-}
-
-fn try_fold_number_seeded<B>(stream: &mut TokenIter<'_>, first_digit: u32) -> Result<B, SmilesError>
-where
-    B: TryFrom<u32>,
-{
-    let mut amount: u32 = first_digit;
-
-    while let Some(ch) = stream.peek_char() {
-        let Some(digit) = ch.to_digit(10) else { break };
-        stream.chars.next();
-        amount = amount
-            .checked_mul(10)
-            .and_then(|x| x.checked_add(digit))
-            .ok_or(SmilesError::IntegerOverflow)?;
-    }
-
-    B::try_from(amount).map_err(|_| SmilesError::IntegerOverflow)
 }
 
 fn hydrogen_count(stream: &mut TokenIter<'_>) -> Result<HydrogenCount, SmilesError> {
