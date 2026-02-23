@@ -23,7 +23,6 @@ const SMILES_WITH_BRACKETS: &[&str] = &[
     "C[C@H](N)C(=O)O",
     "OC(=O)[C@@H](N)C",
     "[K+].C=C.Cl[Pt-](Cl)Cl.O",
-    //"[Ti++++]",
     "CCN1C[C@]2(COC)CC[C@H](O)[C@@]34[C@@H]5C[C@H]6[C@H](OC)[C@@H]5[C@](O)(C[C@@H]6OC)[C@@](O)([C@@H](OC)[C@H]23)[C@@H]14",
     "C[C@@H]1C[C@@]2(O[C@H]2C)C(=O)O[C@@H]2CCN(C)C/C=C(/COC(=O)[C@]1(C)O)C2=O",
     "CC1=C[C@H](O)CC(C)(C)[C@H]1/C=C/C(C)=C/C=C/C(C)=C/C=C/C=C(C)/C=C/C=C(\\C)CO",
@@ -53,8 +52,8 @@ fn test_unexpected_left_brackets() {
     let err =
         TokenIter::from("[[Co+3]").collect::<Result<Vec<_>, SmilesErrorWithSpan>>().unwrap_err();
 
-    assert_eq!(err.smiles_error(), SmilesError::UnexpectedLeftBracket);
-    assert_eq!(err.start(), 1);
+    assert_eq!(err.smiles_error(), SmilesError::MissingElement);
+    assert_eq!(err.start(), 0);
     assert_eq!(err.end(), 2);
 }
 

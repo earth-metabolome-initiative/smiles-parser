@@ -36,8 +36,12 @@ impl<'a> From<&'a str> for TokenIter<'a> {
 impl TokenIter<'_> {
     fn parse_token(&mut self, current_char: char) -> Result<Token, SmilesError> {
         let token = match current_char {
-            '.' if !self.in_bracket => Token::NonBond,
-            '.' => return Err(SmilesError::NonBondInBracket),
+            '.' => {
+                if self.in_bracket {
+                    return Err(SmilesError::NonBondInBracket);
+                }
+                Token::NonBond
+            }
             '[' => {
                 if self.in_bracket {
                     return Err(SmilesError::UnexpectedLeftBracket);
@@ -85,17 +89,42 @@ impl TokenIter<'_> {
                 }
                 Token::Bond(crate::bond::Bond::Single)
             }
-            '=' => Token::Bond(crate::bond::Bond::Double),
-            '#' => Token::Bond(crate::bond::Bond::Triple),
-            '$' => Token::Bond(crate::bond::Bond::Quadruple),
+            '=' => {
+                if self.in_bracket {
+                    return Err(SmilesError::BondInBracket(crate::bond::Bond::Double));
+                }
+                Token::Bond(crate::bond::Bond::Double)
+            }
+            '#' => {
+                if self.in_bracket {
+                    return Err(SmilesError::BondInBracket(crate::bond::Bond::Triple));
+                }
+                Token::Bond(crate::bond::Bond::Triple)
+            }
+            '$' => {
+                if self.in_bracket {
+                    return Err(SmilesError::BondInBracket(crate::bond::Bond::Quadruple));
+                }
+                Token::Bond(crate::bond::Bond::Quadruple)
+            }
             ':' => {
                 if self.in_bracket {
                     return Err(SmilesError::UnexpectedColon);
                 }
                 Token::Bond(crate::bond::Bond::Aromatic)
             }
-            '/' => Token::Bond(crate::bond::Bond::Up),
-            '\\' => Token::Bond(crate::bond::Bond::Down),
+            '/' => {
+                if self.in_bracket {
+                    return Err(SmilesError::BondInBracket(crate::bond::Bond::Up));
+                }
+                Token::Bond(crate::bond::Bond::Up)
+            }
+            '\\' => {
+                if self.in_bracket {
+                    return Err(SmilesError::BondInBracket(crate::bond::Bond::Down));
+                }
+                Token::Bond(crate::bond::Bond::Down)
+            }
             n if n.is_ascii_digit() || n == '%' => {
                 if n == '%' {
                     if self.in_bracket {

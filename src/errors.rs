@@ -10,60 +10,60 @@ use crate::{atom_symbol::AtomSymbol, bond::Bond};
 /// The errors that could occur during SMILES parsing.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SmilesError {
-    /// Missing Element
-    MissingElement,
-    /// Invalid Isotope value passed
-    InvalidIsotope,
+    /// Bond Inside Bracket
+    BondInBracket(Bond),
+    /// A charge is over the allowed maximum (15)
+    ChargeOverflow(i8),
+    /// A charge is below allowed minimum (-15)
+    ChargeUnderflow(i8),
+    /// A non bare element found outside of brackets
+    ElementRequiresBrackets,
+    /// Wrapper for `element_rs` errors
+    ElementsRs(elements_rs::errors::Error),
+    /// Element forbidden to be written as aromatic here
+    InvalidAromaticElement(Element),
+    /// Specified Chirality is not a valid form
+    InvalidChirality,
+    /// The class is not valid
+    InvalidClass,
     /// Error indicating invalid Element name
     InvalidElementName(char),
+    /// Invalid Isotope value passed
+    InvalidIsotope,
     /// Error indicating that an invalid number was encountered.
     InvalidNumber,
+    /// Integer Overflow
+    IntegerOverflow,
+    /// Non organic element found out of bracket
+    InvalidUnbracketedAtom(AtomSymbol),
+    /// An invalid ring number has been found
+    InvalidRingNumber,
+    /// found `[..]` that did not contain an element
+    MissingBracketElement,
+    /// Missing Element
+    MissingElement,
+    /// Non Bond in Bracket
+    NonBondInBracket,
+    /// Ring Number Overflow (greater than 99)
+    RingNumberOverflow(u8),
+    /// Unexpectedly inside of brackets
+    UnexpectedBracketedState,
+    /// Unexpected end of string
+    UnexpectedEndOfString,
     /// Error indicating that an unexpected character was encountered.
     UnexpectedCharacter(char),
+    /// An unexpected `:` has been found
+    UnexpectedColon,
+    /// An unexpected `-` has been found
+    UnexpectedDash,
+    /// An unexpected `%` has been found
+    UnexpectedPercent,
     /// An unexpected left bracket `[` was found
     UnexpectedLeftBracket,
     /// An unexpected right bracket `]` was found
     UnexpectedRightBracket,
     /// A closing `]` bracket was not found
     UnclosedBracket,
-    /// A non bare element found outside of brackets
-    ElementRequiresBrackets,
-    /// found `[..]` that did not contain an element
-    MissingBracketElement,
-    /// Element forbidden to be written as aromatic here
-    InvalidAromaticElement(Element),
-    /// Integer Overflow
-    IntegerOverflow,
-    /// Ring Number Overflow (greater than 99)
-    RingNumberOverflow(u8),
-    /// A charge is below allowed minimum (-15)
-    ChargeUnderflow(i8),
-    /// A charge is over the allowed maximum (15)
-    ChargeOverflow(i8),
-    /// Bond Inside Bracket
-    BondInBracket(Bond),
-    /// Non Bond in Bracket
-    NonBondInBracket,
-    /// Wrapper for `element_rs` errors
-    ElementsRs(elements_rs::errors::Error),
-    /// Specified Chirality is not a valid form
-    InvalidChirality,
-    /// Unexpected end of string
-    UnexpectedEndOfString,
-    /// The class is not valid
-    InvalidClass,
-    /// Non organic element found out of bracket
-    InvalidUnbracketedAtom(AtomSymbol),
-    /// Unexpectedly inside of brackets
-    UnexpectedBracketedState,
-    /// An unexpected `-` has been found
-    UnexpectedDash,
-    /// An unexpected `:` has been found
-    UnexpectedColon,
-    /// An unexpected `%` has been found
-    UnexpectedPercent,
-    /// An invalid ring number has been found
-    InvalidRingNumber,
 }
 
 impl fmt::Display for SmilesError {
