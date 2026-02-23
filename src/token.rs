@@ -12,7 +12,7 @@ use crate::{
 pub enum Token {
     /// Represented with a `.`
     NonBond,
-    /// Elements that occur inside of `[]`, structured as [`BracketedAtom`]
+    /// Elements that occur inside of `[]`, structured as [`BracketAtom`]
     BracketedAtom(BracketAtom),
     /// Aliphatic organic elements only as [`UnbracketedAtom`]
     UnbracketedAtom(UnbracketedAtom),

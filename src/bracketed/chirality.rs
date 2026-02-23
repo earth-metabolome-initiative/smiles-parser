@@ -29,7 +29,7 @@ impl Chirality {
     pub fn try_th(num: u8) -> Result<Self, SmilesError> {
         (1..=2).contains(&num).then_some(Self::TH(num)).ok_or(SmilesError::InvalidChirality)
     }
-    /// Convert `u8` to `AL`+`U8
+    /// Convert `u8` to `AL`+`U8`
     ///
     /// # Errors
     /// - Will return [`SmilesError::InvalidChirality`] if attempt to parse
@@ -37,7 +37,7 @@ impl Chirality {
     pub fn try_al(num: u8) -> Result<Self, SmilesError> {
         (1..=2).contains(&num).then_some(Self::AL(num)).ok_or(SmilesError::InvalidChirality)
     }
-    /// Convert `u8` to `SP`+`U8
+    /// Convert `u8` to `SP`+`U8`
     ///
     /// # Errors
     /// - Will return [`SmilesError::InvalidChirality`] if attempt to parse
@@ -45,7 +45,7 @@ impl Chirality {
     pub fn try_sp(num: u8) -> Result<Self, SmilesError> {
         (1..=3).contains(&num).then_some(Self::SP(num)).ok_or(SmilesError::InvalidChirality)
     }
-    /// Convert `u8` to `TB`+`U8
+    /// Convert `u8` to `TB`+`U8`
     ///
     /// # Errors
     /// - Will return [`SmilesError::InvalidChirality`] if attempt to parse
@@ -53,7 +53,7 @@ impl Chirality {
     pub fn try_tb(num: u8) -> Result<Self, SmilesError> {
         (1..=20).contains(&num).then_some(Self::TB(num)).ok_or(SmilesError::InvalidChirality)
     }
-    /// Convert `u8` to `OH`+`U8
+    /// Convert `u8` to `OH`+`U8`
     ///
     /// # Errors
     /// - Will return [`SmilesError::InvalidChirality`] if attempt to parse
