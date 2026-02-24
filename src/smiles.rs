@@ -1,6 +1,7 @@
 //! Represents a SMILES structure.
 
-mod from_string;
+mod from_str;
+
 
 /// Represents a SMILES structure.
 pub struct Smiles {}
