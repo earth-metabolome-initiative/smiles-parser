@@ -1,5 +1,7 @@
 #![doc = include_str!("../README.md")]
 
+pub mod atom;
+pub mod atom_node;
 pub mod atom_symbol;
 pub mod bond;
 pub mod bracketed;

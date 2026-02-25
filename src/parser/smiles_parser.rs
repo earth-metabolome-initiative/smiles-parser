@@ -2,7 +2,8 @@
 
 use crate::token::TokenWithSpan;
 
-/// Contains the vec of tokens being iterated on and tracks the current position in that vec
+/// Contains the vec of tokens being iterated on and tracks the current position
+/// in that vec
 pub struct SmilesParser {
     tokens: Vec<TokenWithSpan>,
     position: usize,
@@ -23,7 +24,5 @@ impl SmilesParser {
     #[must_use]
     pub fn position(&self) -> usize {
         self.position
-    }   
-    
-    
+    }
 }
