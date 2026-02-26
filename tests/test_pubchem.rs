@@ -20,7 +20,7 @@ use csv::ReaderBuilder;
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::Deserialize;
-use smiles_parser::token::{Token, TokenWithSpan};
+use smiles_parser::{smiles::Smiles, token::{Token, TokenWithSpan}};
 
 /// Structure representing a PubChem compound as a SMILES string
 #[derive(Debug, Deserialize)]
@@ -53,7 +53,7 @@ fn validate_pubchem_smiles(file_path: &Path) -> Result<(), Box<dyn std::error::E
         pb.inc(1);
 
         let smiles_str = &result.smiles;
-        match smiles_str.parse::<TokenWithSpan>() {
+        match smiles_str.parse::<Smiles>() {
             Ok(_) => todo!(),
             Err(_) => todo!(),
         }

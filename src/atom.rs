@@ -1,7 +1,9 @@
 //! Wrapper module for both bracketed and unbracketed atoms
 
+use elements_rs::Isotope;
+
 use crate::{
-    atom_symbol::AtomSymbol, bracketed::bracket_atom::BracketAtom, unbracketed::UnbracketedAtom,
+    atom_symbol::AtomSymbol, bracketed::{bracket_atom::BracketAtom, charge::Charge, chirality::Chirality, hydrogen_count::HydrogenCount}, errors::SmilesError, unbracketed::UnbracketedAtom
 };
 
 /// Enum for each variant
@@ -40,6 +42,64 @@ impl Atom {
         match self {
             Atom::Unbracketed(unbracketed_atom) => unbracketed_atom.symbol(),
             Atom::Bracketed(bracket_atom) => bracket_atom.symbol(),
+        }
+    }
+    /// returns the Chirality (if present)
+    #[must_use]
+    pub fn chirality(&self) -> Option<Chirality> {
+        match self {
+            Atom::Unbracketed(_) => None,
+            Atom::Bracketed(atom) => atom.chirality()
+        }
+    }
+    /// returns the class (if present) of the atom
+    #[must_use]
+    pub fn class(&self) -> u16 {
+        match self {
+            Atom::Unbracketed(_) => 0,
+            Atom::Bracketed(bracket_atom) => bracket_atom.class(),
+        }
+    }
+    /// returns the [`Charge`] of the atom
+    #[must_use]
+    pub fn charge(&self) -> Charge {
+        match self {
+            Atom::Unbracketed(_) => Charge::default(),
+            Atom::Bracketed(bracket_atom) => bracket_atom.charge(),
+        }
+    }
+    /// returns the charge value as `i8` 
+    #[must_use]
+    pub fn charge_value(&self) -> i8 {
+        match self {
+            Atom::Unbracketed(_) => Charge::default().get(),
+            Atom::Bracketed(bracket_atom) => bracket_atom.charge_value(),
+        }
+    }
+    /// returns the hydrogen count if present as `u8`
+    #[must_use]
+    pub fn hydrogen_count(&self) -> Option<u8> {
+        match self {
+            Atom::Unbracketed(_) => None,
+            Atom::Bracketed(bracket_atom) => bracket_atom.hydrogen_count(),
+        }
+    }
+    /// returns the [`HydrogenCount`] for the atom
+    #[must_use]
+    pub fn hydrogens(&self) -> HydrogenCount {
+        match self {
+            Atom::Unbracketed(_) => HydrogenCount::Unspecified,
+            Atom::Bracketed(bracket_atom) => bracket_atom.hydrogens(),
+        }
+    }
+    /// returns the [`Isotope`] form for the atom 
+    pub fn isotope(&self) -> Result<Isotope, SmilesError> {
+        match self {
+            Atom::Unbracketed(unbracketed_atom) => {
+                let element = unbracketed_atom.element().ok_or(SmilesError::InvalidIsotope)?;
+                Ok(element.most_abundant_isotope())
+            },
+            Atom::Bracketed(bracket_atom) => bracket_atom.isotope(),
         }
     }
 }

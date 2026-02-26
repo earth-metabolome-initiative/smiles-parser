@@ -25,7 +25,7 @@ pub struct BracketAtom {
     /// Unspecified default is 0
     class: u16,
     /// Denotes Chirality if present
-    chiral: Option<Chirality>,
+    chirality: Option<Chirality>,
 }
 
 impl BracketAtom {
@@ -40,7 +40,7 @@ impl BracketAtom {
                 hydrogens: HydrogenCount::Unspecified,
                 charge: Charge::default(),
                 class: 0,
-                chiral: None,
+                chirality: None,
             },
         }
     }
@@ -110,8 +110,8 @@ impl BracketAtom {
     }
     /// Returns the [`Chirality`] of the atom
     #[must_use]
-    pub fn chiral(&self) -> Option<Chirality> {
-        self.chiral
+    pub fn chirality(&self) -> Option<Chirality> {
+        self.chirality
     }
 }
 
@@ -161,8 +161,8 @@ impl BracketAtomBuilder {
     }
     /// Adds a specified [`Chirality`]
     #[must_use]
-    pub fn with_chiral(mut self, chiral: Chirality) -> Self {
-        self.bracket_atom.chiral = Some(chiral);
+    pub fn with_chiral(mut self, chirality: Chirality) -> Self {
+        self.bracket_atom.chirality = Some(chirality);
         self
     }
     /// Returns the [`Element`] contained in builder
@@ -185,7 +185,7 @@ impl BracketAtomBuilder {
             hydrogens: self.bracket_atom.hydrogens,
             charge: self.bracket_atom.charge,
             class: self.bracket_atom.class,
-            chiral: self.bracket_atom.chiral,
+            chirality: self.bracket_atom.chirality,
         }
     }
 }
@@ -213,7 +213,7 @@ mod tests {
         assert_eq!(a.hydrogen_count(), None);
         assert_eq!(a.charge_value(), 0);
         assert_eq!(a.class(), 0);
-        assert_eq!(a.chiral(), None);
+        assert_eq!(a.chirality(), None);
     }
 
     #[test]
@@ -241,7 +241,7 @@ mod tests {
         assert_eq!(a.charge(), charge);
         assert_eq!(a.charge_value(), -3);
         assert_eq!(a.class(), 42);
-        assert_eq!(a.chiral(), Some(chiral));
+        assert_eq!(a.chirality(), Some(chiral));
     }
 
     #[test]
@@ -313,10 +313,10 @@ mod tests {
     #[test]
     fn chiral_is_none_by_default_and_some_when_set() {
         let a = BracketAtom::builder().build();
-        assert_eq!(a.chiral(), None);
+        assert_eq!(a.chirality(), None);
 
         let b = BracketAtom::builder().with_chiral(Chirality::At).build();
-        assert_eq!(b.chiral(), Some(Chirality::At));
+        assert_eq!(b.chirality(), Some(Chirality::At));
     }
 
     #[test]
@@ -336,6 +336,6 @@ mod tests {
         assert_eq!(a.hydrogen_count(), Some(1));
         assert_eq!(a.charge_value(), -1);
         assert_eq!(a.class(), 7);
-        assert_eq!(a.chiral(), Some(Chirality::AtAt));
+        assert_eq!(a.chirality(), Some(Chirality::AtAt));
     }
 }

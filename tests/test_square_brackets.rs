@@ -83,7 +83,7 @@ fn test_smiles_tokens_water() {
             assert_eq!(b.hydrogen_count(), Some(2));
             assert_eq!(b.charge_value(), 0);
             assert_eq!(b.class(), 0);
-            assert_eq!(b.chiral(), None);
+            assert_eq!(b.chirality(), None);
             assert_eq!(b.isotope_mass_number(), None);
         }
         other => panic!("Expected Token::BracketedAtom, got {other:?}"),
