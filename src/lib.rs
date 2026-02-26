@@ -11,6 +11,7 @@ pub mod ring_num;
 pub mod smiles;
 pub mod token;
 pub mod unbracketed;
+pub mod bond_edge;
 /// A prelude module to simplify imports.
 pub mod prelude {
     pub use crate::smiles::Smiles;
