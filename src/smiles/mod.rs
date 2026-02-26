@@ -1,6 +1,9 @@
 //! Represents a SMILES structure.
 
-use crate::{atom::atom_node::AtomNode, bond::Bond, bond::bond_edge::BondEdge};
+use crate::{
+    atom::atom_node::AtomNode,
+    bond::{Bond, bond_edge::BondEdge},
+};
 
 mod from_str;
 
@@ -28,5 +31,7 @@ impl Smiles {
 }
 
 impl Default for Smiles {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }

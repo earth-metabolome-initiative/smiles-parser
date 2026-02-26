@@ -5,7 +5,7 @@ use std::{num::TryFromIntError, ops::Range};
 
 use elements_rs::Element;
 
-use crate::{atom_symbol::AtomSymbol, bond::Bond};
+use crate::{atom::atom_symbol::AtomSymbol, bond::Bond};
 
 /// The errors that could occur during SMILES parsing.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

@@ -2,12 +2,11 @@
 
 use elements_rs::Element;
 use smiles_parser::{
-    atom_symbol::AtomSymbol,
+    atom::{atom_symbol::AtomSymbol, unbracketed::UnbracketedAtom},
+    bond::ring_num::RingNum,
     errors::SmilesError,
     parser::token_iter::TokenIter,
-    ring_num::RingNum,
     token::{Token, TokenWithSpan},
-    unbracketed::UnbracketedAtom,
 };
 const SMILES_STR: &[&str] = &[
     "c1ccccc1",          // benzene
@@ -63,12 +62,12 @@ fn test_aromatic_imidazole_from_tokenization() -> Result<(), SmilesError> {
         TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 3, 4),
         TokenWithSpan::new(
             Token::BracketedAtom(
-                smiles_parser::bracketed::bracket_atom::BracketAtom::builder()
+                smiles_parser::atom::bracketed::BracketAtom::builder()
                     .with_symbol(AtomSymbol::Element(Element::N))
                     .with_aromatic(true)
-                    .with_hydrogens(smiles_parser::bracketed::hydrogen_count::HydrogenCount::new(
-                        Some(1),
-                    ))
+                    .with_hydrogens(
+                        smiles_parser::atom::bracketed::hydrogen_count::HydrogenCount::new(Some(1)),
+                    )
                     .build(),
             ),
             4,

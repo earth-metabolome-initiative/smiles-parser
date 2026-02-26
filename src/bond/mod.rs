@@ -2,7 +2,6 @@
 pub mod bond_edge;
 pub mod ring_num;
 
-
 use core::fmt;
 
 #[derive(Copy, Debug, Default, PartialEq, Clone, Eq, Hash)]

@@ -3,8 +3,8 @@
 use std::ops::Range;
 
 use crate::{
-    bond::Bond, bracketed::bracket_atom::BracketAtom, ring_num::RingNum,
-    unbracketed::UnbracketedAtom,
+    atom::{bracketed::BracketAtom, unbracketed::UnbracketedAtom},
+    bond::{Bond, ring_num::RingNum},
 };
 
 #[derive(Copy, Debug, PartialEq, Clone, Eq, Hash)]

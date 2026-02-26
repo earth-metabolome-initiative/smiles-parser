@@ -8,10 +8,12 @@ use elements_rs::Element;
 use crate::{
     atom::{
         atom_symbol::AtomSymbol,
+        bracketed::{
+            BracketAtom, charge::Charge, chirality::Chirality, hydrogen_count::HydrogenCount,
+        },
         unbracketed::UnbracketedAtom,
-        bracketed::{BracketAtom, Charge, Chirality, HydrogenCount},
     },
-    bond::{Bond, RingNum},
+    bond::{Bond, ring_num::RingNum},
     errors::{SmilesError, SmilesErrorWithSpan},
     token::{Token, TokenWithSpan},
 };
@@ -419,43 +421,43 @@ fn try_bond(char: char, bracket: bool) -> Result<Token, SmilesError> {
             if bracket {
                 return Err(SmilesError::UnexpectedDash);
             }
-            Token::Bond(crate::bond::Bond::Single)
+            Token::Bond(Bond::Single)
         }
         '=' => {
             if bracket {
-                return Err(SmilesError::BondInBracket(crate::bond::Bond::Double));
+                return Err(SmilesError::BondInBracket(Bond::Double));
             }
-            Token::Bond(crate::bond::Bond::Double)
+            Token::Bond(Bond::Double)
         }
         '#' => {
             if bracket {
-                return Err(SmilesError::BondInBracket(crate::bond::Bond::Triple));
+                return Err(SmilesError::BondInBracket(Bond::Triple));
             }
-            Token::Bond(crate::bond::Bond::Triple)
+            Token::Bond(Bond::Triple)
         }
         '$' => {
             if bracket {
-                return Err(SmilesError::BondInBracket(crate::bond::Bond::Quadruple));
+                return Err(SmilesError::BondInBracket(Bond::Quadruple));
             }
-            Token::Bond(crate::bond::Bond::Quadruple)
+            Token::Bond(Bond::Quadruple)
         }
         ':' => {
             if bracket {
                 return Err(SmilesError::UnexpectedColon);
             }
-            Token::Bond(crate::bond::Bond::Aromatic)
+            Token::Bond(Bond::Aromatic)
         }
         '/' => {
             if bracket {
-                return Err(SmilesError::BondInBracket(crate::bond::Bond::Up));
+                return Err(SmilesError::BondInBracket(Bond::Up));
             }
-            Token::Bond(crate::bond::Bond::Up)
+            Token::Bond(Bond::Up)
         }
         '\\' => {
             if bracket {
-                return Err(SmilesError::BondInBracket(crate::bond::Bond::Down));
+                return Err(SmilesError::BondInBracket(Bond::Down));
             }
-            Token::Bond(crate::bond::Bond::Down)
+            Token::Bond(Bond::Down)
         }
         _ => return Err(SmilesError::UnexpectedCharacter(char)),
     };

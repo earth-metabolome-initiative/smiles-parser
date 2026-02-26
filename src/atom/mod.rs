@@ -4,21 +4,18 @@ pub mod atom_symbol;
 pub mod bracketed;
 pub mod unbracketed;
 
+use elements_rs::Isotope;
+
 use crate::{
     atom::{
         atom_symbol::AtomSymbol,
         bracketed::{
-            bracket_atom::BracketAtom,
-            charge::Charge,
-            chirality::Chirality,
-            hydrogen_count::HydrogenCount,
+            BracketAtom, charge::Charge, chirality::Chirality, hydrogen_count::HydrogenCount,
         },
         unbracketed::UnbracketedAtom,
     },
     errors::SmilesError,
 };
-use elements_rs::Isotope;
-
 
 /// Enum for each variant
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -63,7 +60,7 @@ impl Atom {
     pub fn chirality(&self) -> Option<Chirality> {
         match self {
             Atom::Unbracketed(_) => None,
-            Atom::Bracketed(atom) => atom.chirality()
+            Atom::Bracketed(atom) => atom.chirality(),
         }
     }
     /// returns the class (if present) of the atom
@@ -82,7 +79,7 @@ impl Atom {
             Atom::Bracketed(bracket_atom) => bracket_atom.charge(),
         }
     }
-    /// returns the charge value as `i8` 
+    /// returns the charge value as `i8`
     #[must_use]
     pub fn charge_value(&self) -> i8 {
         match self {
@@ -106,13 +103,19 @@ impl Atom {
             Atom::Bracketed(bracket_atom) => bracket_atom.hydrogens(),
         }
     }
-    /// returns the [`Isotope`] form for the atom 
+    /// returns the [`Isotope`] form for the atom
+    ///
+    /// # Errors
+    /// - Will return [`SmilesError::InvalidIsotope`] if the element is unable
+    ///   to be returned
+    /// - If unable to retrieve valid [`Isotope`] will return relevant
+    ///   `element_rs` error
     pub fn isotope(&self) -> Result<Isotope, SmilesError> {
         match self {
             Atom::Unbracketed(unbracketed_atom) => {
                 let element = unbracketed_atom.element().ok_or(SmilesError::InvalidIsotope)?;
                 Ok(element.most_abundant_isotope())
-            },
+            }
             Atom::Bracketed(bracket_atom) => bracket_atom.isotope(),
         }
     }

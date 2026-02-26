@@ -1,14 +1,16 @@
 //! Module for parsing and storing the values of an atom specified in brackets -
 //! `[]`.
 
-pub mod hydrogen_count;
-pub mod chirality;
 pub mod charge;
+pub mod chirality;
+pub mod hydrogen_count;
 use elements_rs::{Element, Isotope};
 
 use crate::{
-    atom_symbol::AtomSymbol,
-    bracketed::{charge::Charge, chirality::Chirality, hydrogen_count::HydrogenCount},
+    atom::{
+        atom_symbol::AtomSymbol,
+        bracketed::{charge::Charge, chirality::Chirality, hydrogen_count::HydrogenCount},
+    },
     errors::SmilesError,
 };
 
@@ -200,8 +202,10 @@ mod tests {
 
     use super::BracketAtom;
     use crate::{
-        atom_symbol::AtomSymbol,
-        bracketed::{charge::Charge, chirality::Chirality, hydrogen_count::HydrogenCount},
+        atom::{
+            atom_symbol::AtomSymbol,
+            bracketed::{charge::Charge, chirality::Chirality, hydrogen_count::HydrogenCount},
+        },
         errors::SmilesError,
     };
 

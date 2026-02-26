@@ -2,14 +2,15 @@
 
 use crate::bond::Bond;
 
-/// Contains the two ID's of the [`AtomNode`] that are connected via the [`Bond`]
+/// Contains the two ID's of the [`AtomNode`] that are connected via the
+/// [`Bond`]
 pub struct BondEdge {
     /// The first node
     node_a: usize,
     /// The Second node
     node_b: usize,
     /// The bond between the nodes
-    bond: Bond
+    bond: Bond,
 }
 
 impl BondEdge {
@@ -25,7 +26,7 @@ impl BondEdge {
     }
     /// Returns a tuple of the two vertices
     #[must_use]
-    pub fn vertices(&self) -> (usize,usize) {
+    pub fn vertices(&self) -> (usize, usize) {
         (self.node_a, self.node_b)
     }
     /// Returns the first vertex

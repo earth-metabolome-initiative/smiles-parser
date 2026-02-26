@@ -2,12 +2,11 @@
 
 use elements_rs::Element;
 use smiles_parser::{
-    atom_symbol::AtomSymbol,
+    atom::{atom_symbol::AtomSymbol, unbracketed::UnbracketedAtom},
+    bond::ring_num::RingNum,
     errors::{SmilesError, SmilesErrorWithSpan},
     parser::token_iter::TokenIter,
-    ring_num::RingNum,
     token::{Token, TokenWithSpan},
-    unbracketed::UnbracketedAtom,
 };
 const SMILES_STR: &[&str] = &[
     "C1=CC=CC=C1",

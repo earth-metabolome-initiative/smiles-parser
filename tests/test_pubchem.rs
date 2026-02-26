@@ -20,7 +20,10 @@ use csv::ReaderBuilder;
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::Deserialize;
-use smiles_parser::{smiles::Smiles, token::{Token, TokenWithSpan}};
+use smiles_parser::{
+    smiles::Smiles,
+    token::{Token, TokenWithSpan},
+};
 
 /// Structure representing a PubChem compound as a SMILES string
 #[derive(Debug, Deserialize)]

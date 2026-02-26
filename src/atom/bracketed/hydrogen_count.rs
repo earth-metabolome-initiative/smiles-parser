@@ -32,7 +32,7 @@ impl HydrogenCount {
 
 #[cfg(test)]
 mod tests {
-    use crate::bracketed::hydrogen_count::HydrogenCount;
+    use crate::atom::bracketed::hydrogen_count::HydrogenCount;
 
     #[test]
     fn test_hydro_variants() {
