@@ -68,7 +68,7 @@ impl fmt::Display for AtomSymbol {
 mod tests {
     use elements_rs::Element;
 
-    use crate::atom_symbol::AtomSymbol;
+    use crate::atom::atom_symbol::AtomSymbol;
 
     #[test]
     fn test_atom_symbols_all() {

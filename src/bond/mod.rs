@@ -1,4 +1,7 @@
 //! Module for specifying the bond between two atoms in a `SMILES` string
+pub mod bond_edge;
+pub mod ring_num;
+
 
 use core::fmt;
 

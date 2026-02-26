@@ -1,5 +1,9 @@
 //! Module for parsing and storing the values of an atom specified in brackets -
 //! `[]`.
+
+pub mod hydrogen_count;
+pub mod chirality;
+pub mod charge;
 use elements_rs::{Element, Isotope};
 
 use crate::{

@@ -1,10 +1,24 @@
 //! Wrapper module for both bracketed and unbracketed atoms
-
-use elements_rs::Isotope;
+pub mod atom_node;
+pub mod atom_symbol;
+pub mod bracketed;
+pub mod unbracketed;
 
 use crate::{
-    atom_symbol::AtomSymbol, bracketed::{bracket_atom::BracketAtom, charge::Charge, chirality::Chirality, hydrogen_count::HydrogenCount}, errors::SmilesError, unbracketed::UnbracketedAtom
+    atom::{
+        atom_symbol::AtomSymbol,
+        bracketed::{
+            bracket_atom::BracketAtom,
+            charge::Charge,
+            chirality::Chirality,
+            hydrogen_count::HydrogenCount,
+        },
+        unbracketed::UnbracketedAtom,
+    },
+    errors::SmilesError,
 };
+use elements_rs::Isotope;
+
 
 /// Enum for each variant
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

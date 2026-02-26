@@ -6,15 +6,14 @@ use std::str::FromStr;
 use elements_rs::Element;
 
 use crate::{
-    atom_symbol::AtomSymbol,
-    bracketed::{
-        bracket_atom::BracketAtom, charge::Charge, chirality::Chirality,
-        hydrogen_count::HydrogenCount,
+    atom::{
+        atom_symbol::AtomSymbol,
+        unbracketed::UnbracketedAtom,
+        bracketed::{BracketAtom, Charge, Chirality, HydrogenCount},
     },
+    bond::{Bond, RingNum},
     errors::{SmilesError, SmilesErrorWithSpan},
-    ring_num::RingNum,
     token::{Token, TokenWithSpan},
-    unbracketed::UnbracketedAtom,
 };
 
 /// An iterator over the tokens found in a SMILES string.
