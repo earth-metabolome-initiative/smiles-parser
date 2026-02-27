@@ -5,7 +5,7 @@ use std::{num::TryFromIntError, ops::Range};
 
 use elements_rs::Element;
 
-use crate::{atom::atom_symbol::AtomSymbol, bond::Bond};
+use crate::{atom::atom_symbol::AtomSymbol, bond::Bond, token::Token};
 
 /// The errors that could occur during SMILES parsing.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -30,6 +30,8 @@ pub enum SmilesError {
     InvalidElementName(char),
     /// Invalid Isotope value passed
     InvalidIsotope,
+    /// Invalid [`Token::NonBond`]
+    InvalidNonBondToken,
     /// Error indicating that an invalid number was encountered.
     InvalidNumber,
     /// Integer Overflow
@@ -75,7 +77,7 @@ impl fmt::Display for SmilesError {
             InvalidUnbracketedAtom, MissingBracketElement, MissingElement, NonBondInBracket,
             RingNumberOverflow, UnclosedBracket, UnexpectedBracketedState, UnexpectedCharacter,
             UnexpectedColon, UnexpectedDash, UnexpectedEndOfString, UnexpectedLeftBracket,
-            UnexpectedPercent, UnexpectedRightBracket,
+            UnexpectedPercent, UnexpectedRightBracket, InvalidNonBondToken
         };
         match self {
             MissingElement => write!(f, "Missing element"),
@@ -105,6 +107,7 @@ impl fmt::Display for SmilesError {
             UnexpectedPercent => write!(f, "Unexpected '%'"),
             InvalidRingNumber => write!(f, "Invalid ring number"),
             ElementsRs(error) => write!(f, "Error Parsing Element: {error}"),
+            InvalidNonBondToken => write!(f, "Invalid Non-bond '.' found"),
         }
     }
 }

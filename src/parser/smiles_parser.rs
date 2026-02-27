@@ -1,9 +1,7 @@
 //! Second pass that parses the [`TokenWithSpan`]
 
 use crate::{
-    errors::SmilesErrorWithSpan,
-    smiles::Smiles,
-    token::{self, TokenWithSpan},
+    atom::{Atom, atom_node::AtomNode, bracketed::BracketAtom, unbracketed::UnbracketedAtom}, bond::bond_edge::{self, BondEdge}, errors::{SmilesError, SmilesErrorWithSpan}, smiles::Smiles, token::{self, Token, TokenWithSpan}
 };
 
 /// Contains the vec of tokens being iterated on and tracks the current position
@@ -72,18 +70,54 @@ impl<'a> SmilesParser<'a> {
     /// Parses the tokens to construct the [`Smiles`] structure
     pub fn parse(mut self) -> Result<Smiles, SmilesErrorWithSpan> {
         let mut smiles = Smiles::new();
+        let mut id_count: usize = 0;
         while let Some(token_with_span) = self.current() {
             match token_with_span.token() {
-                token::Token::NonBond => todo!(),
-                token::Token::BracketedAtom(bracket_atom) => todo!(),
-                token::Token::UnbracketedAtom(unbracketed_atom) => todo!(),
-                token::Token::Bond(bond) => todo!(),
-                token::Token::LeftParentheses => todo!(),
-                token::Token::RightParentheses => todo!(),
-                token::Token::RingClosure(ring_num) => todo!(),
+                Token::NonBond => try_non_bond(self.peek_last(), self.peek_next(), token_with_span)?,
+                Token::BracketedAtom(atom) => {
+                    let atom = Atom::from(atom);
+
+                    id_count +=1;
+                },
+                Token::UnbracketedAtom(atom) => todo!(),
+                Token::Bond(bond) => todo!(),
+                Token::LeftParentheses => todo!(),
+                Token::RightParentheses => todo!(),
+                Token::RingClosure(ring_num) => todo!(),
             }
             self.advance();
         }
         Ok(smiles)
     }
+
+}
+
+fn try_non_bond(
+    prev_token: Option<&TokenWithSpan>,
+    next_token: Option<&TokenWithSpan>,
+    dot_token: &TokenWithSpan,
+) -> Result<(), SmilesErrorWithSpan> {
+    let prev_is_atom = prev_token.is_some_and(|t| {
+        matches!(
+            t.token(),
+            Token::BracketedAtom(_) | Token::UnbracketedAtom(_)
+        )
+    });
+
+    let next_is_atom = next_token.is_some_and(|t| {
+        matches!(
+            t.token(),
+            Token::BracketedAtom(_) | Token::UnbracketedAtom(_)
+        )
+    });
+
+    if !prev_is_atom || !next_is_atom {
+        return Err(SmilesErrorWithSpan::new(
+            SmilesError::InvalidNonBondToken,
+            dot_token.start(),
+            dot_token.end(),
+        ));
+    }
+
+    Ok(())
 }
