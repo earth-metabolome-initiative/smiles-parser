@@ -1,9 +1,9 @@
 //! Represents a SMILES structure.
 
-
 use crate::{
     atom::atom_node::AtomNode,
-    bond::{Bond, bond_edge::BondEdge}, errors::SmilesError,
+    bond::{Bond, bond_edge::BondEdge},
+    errors::SmilesError,
 };
 
 mod from_str;
@@ -25,9 +25,20 @@ impl Smiles {
         self.atom_nodes.push(node);
     }
     /// adds an edge from two nodes and the [`Bond`]
-    pub fn push_edge(&mut self, node_a: usize, node_b: usize, bond: Bond) -> Result<(), SmilesError>{
+    pub fn push_edge(
+        &mut self,
+        node_a: usize,
+        node_b: usize,
+        bond: Bond,
+    ) -> Result<(), SmilesError> {
         self.atom_nodes.sort();
-        
+        // use the NodeIdInvalid for err
+        if self.atom_nodes.binary_search_by_key(&node_a, |n| n.id()).is_err() {
+            return Err(SmilesError::NodeIdInvalid(node_a));
+        }
+        if self.atom_nodes.binary_search_by_key(&node_b, |n| n.id()).is_err() {
+            return Err(SmilesError::NodeIdInvalid(node_b));
+        }
         let bond_edge = BondEdge::new(node_a, node_b, bond);
         self.bond_edges.push(bond_edge);
 

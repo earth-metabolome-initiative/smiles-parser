@@ -5,7 +5,7 @@ use std::{num::TryFromIntError, ops::Range};
 
 use elements_rs::Element;
 
-use crate::{atom::atom_symbol::AtomSymbol, bond::Bond, token::Token};
+use crate::{atom::atom_symbol::AtomSymbol, bond::Bond};
 
 /// The errors that could occur during SMILES parsing.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -44,6 +44,8 @@ pub enum SmilesError {
     MissingBracketElement,
     /// Missing Element
     MissingElement,
+    /// Node id does not point to a valid `AtomNode`
+    NodeIdInvalid(usize),
     /// Non Bond in Bracket
     NonBondInBracket,
     /// Ring Number Overflow (greater than 99)
@@ -73,11 +75,11 @@ impl fmt::Display for SmilesError {
         use SmilesError::{
             BondInBracket, ChargeOverflow, ChargeUnderflow, ElementRequiresBrackets, ElementsRs,
             IntegerOverflow, InvalidAromaticElement, InvalidChirality, InvalidClass,
-            InvalidElementName, InvalidIsotope, InvalidNumber, InvalidRingNumber,
-            InvalidUnbracketedAtom, MissingBracketElement, MissingElement, NonBondInBracket,
-            RingNumberOverflow, UnclosedBracket, UnexpectedBracketedState, UnexpectedCharacter,
-            UnexpectedColon, UnexpectedDash, UnexpectedEndOfString, UnexpectedLeftBracket,
-            UnexpectedPercent, UnexpectedRightBracket, InvalidNonBondToken
+            InvalidElementName, InvalidIsotope, InvalidNonBondToken, InvalidNumber,
+            InvalidRingNumber, InvalidUnbracketedAtom, MissingBracketElement, MissingElement,
+            NonBondInBracket, RingNumberOverflow, UnclosedBracket, UnexpectedBracketedState,
+            UnexpectedCharacter, UnexpectedColon, UnexpectedDash, UnexpectedEndOfString,
+            UnexpectedLeftBracket, UnexpectedPercent, UnexpectedRightBracket,
         };
         match self {
             MissingElement => write!(f, "Missing element"),

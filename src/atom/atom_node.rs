@@ -1,7 +1,8 @@
 //! Module for the structure of an atom as a node for use in a [`Smiles`] graph
 
-use crate::atom::Atom;
 use std::cmp::Ordering;
+
+use crate::atom::Atom;
 /// Contains information about atom parsed from the SMILES string
 #[derive(PartialEq, Eq)]
 pub struct AtomNode {
