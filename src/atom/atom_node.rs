@@ -1,8 +1,9 @@
 //! Module for the structure of an atom as a node for use in a [`Smiles`] graph
 
 use crate::atom::Atom;
-
+use std::cmp::Ordering;
 /// Contains information about atom parsed from the SMILES string
+#[derive(PartialEq, Eq)]
 pub struct AtomNode {
     /// Unique identifier for each node
     id: usize,
@@ -25,5 +26,17 @@ impl AtomNode {
     #[must_use]
     pub fn atom(&self) -> &Atom {
         &self.atom
+    }
+}
+
+impl PartialOrd for AtomNode {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for AtomNode {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.id.cmp(&other.id)
     }
 }

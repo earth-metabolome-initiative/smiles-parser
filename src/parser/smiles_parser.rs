@@ -70,14 +70,13 @@ impl<'a> SmilesParser<'a> {
     /// Parses the tokens to construct the [`Smiles`] structure
     pub fn parse(mut self) -> Result<Smiles, SmilesErrorWithSpan> {
         let mut smiles = Smiles::new();
-        let mut id_count: usize = 0;
+        
         while let Some(token_with_span) = self.current() {
             match token_with_span.token() {
                 Token::NonBond => try_non_bond(self.peek_last(), self.peek_next(), token_with_span)?,
                 Token::BracketedAtom(atom) => {
                     let atom = Atom::from(atom);
 
-                    id_count +=1;
                 },
                 Token::UnbracketedAtom(atom) => todo!(),
                 Token::Bond(bond) => todo!(),
@@ -91,6 +90,8 @@ impl<'a> SmilesParser<'a> {
     }
 
 }
+
+
 
 fn try_non_bond(
     prev_token: Option<&TokenWithSpan>,
