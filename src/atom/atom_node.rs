@@ -41,3 +41,23 @@ impl Ord for AtomNode {
         self.id.cmp(&other.id)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::cmp::Ordering;
+
+    use crate::atom::{Atom, atom_node::AtomNode, atom_symbol::AtomSymbol, bracketed::BracketAtom, unbracketed::UnbracketedAtom};
+
+    #[test]
+    fn test_atom_node_all_fields_and_implementations() {
+        let ac_symbol = AtomSymbol::new(Some(elements_rs::Element::Ac));
+        let atom: Atom = BracketAtom::builder().with_symbol(ac_symbol).build().into();
+        let atom_node = AtomNode::new(atom.clone(), 0);
+        assert_eq!(&atom_node.id, &0);
+        assert_eq!(&atom_node.atom, &atom);
+        let next_atom: Atom = UnbracketedAtom::new(AtomSymbol::WildCard, false).into();
+        let next_atom_node = AtomNode::new(next_atom.clone(), 1);
+        assert_eq!(atom_node.cmp(&next_atom_node), Ordering::Less);
+
+    }
+}
