@@ -77,9 +77,10 @@ impl fmt::Display for SmilesError {
             IntegerOverflow, InvalidAromaticElement, InvalidChirality, InvalidClass,
             InvalidElementName, InvalidIsotope, InvalidNonBondToken, InvalidNumber,
             InvalidRingNumber, InvalidUnbracketedAtom, MissingBracketElement, MissingElement,
-            NonBondInBracket, RingNumberOverflow, UnclosedBracket, UnexpectedBracketedState,
-            UnexpectedCharacter, UnexpectedColon, UnexpectedDash, UnexpectedEndOfString,
-            UnexpectedLeftBracket, UnexpectedPercent, UnexpectedRightBracket,
+            NodeIdInvalid, NonBondInBracket, RingNumberOverflow, UnclosedBracket,
+            UnexpectedBracketedState, UnexpectedCharacter, UnexpectedColon, UnexpectedDash,
+            UnexpectedEndOfString, UnexpectedLeftBracket, UnexpectedPercent,
+            UnexpectedRightBracket,
         };
         match self {
             MissingElement => write!(f, "Missing element"),
@@ -110,6 +111,7 @@ impl fmt::Display for SmilesError {
             InvalidRingNumber => write!(f, "Invalid ring number"),
             ElementsRs(error) => write!(f, "Error Parsing Element: {error}"),
             InvalidNonBondToken => write!(f, "Invalid Non-bond '.' found"),
+            NodeIdInvalid(n) => write!(f, "Invalid Atom Node ID: {}", n),
         }
     }
 }

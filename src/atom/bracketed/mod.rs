@@ -167,7 +167,7 @@ impl BracketAtomBuilder {
     }
     /// Adds a specified [`Chirality`]
     #[must_use]
-    pub fn with_chiral(mut self, chirality: Chirality) -> Self {
+    pub fn with_chirality(mut self, chirality: Chirality) -> Self {
         self.bracket_atom.chirality = Some(chirality);
         self
     }
@@ -237,7 +237,7 @@ mod tests {
             .with_hydrogens(HydrogenCount::Explicit(2))
             .with_charge(charge)
             .with_class(42)
-            .with_chiral(chiral)
+            .with_chirality(chiral)
             .build();
 
         assert_eq!(a.symbol(), sym);
@@ -323,7 +323,7 @@ mod tests {
         let a = BracketAtom::builder().build();
         assert_eq!(a.chirality(), None);
 
-        let b = BracketAtom::builder().with_chiral(Chirality::At).build();
+        let b = BracketAtom::builder().with_chirality(Chirality::At).build();
         assert_eq!(b.chirality(), Some(Chirality::At));
     }
 
@@ -336,7 +336,7 @@ mod tests {
             .with_hydrogens(HydrogenCount::Explicit(1))
             .with_charge(Charge::try_new(-1).unwrap())
             .with_class(7)
-            .with_chiral(Chirality::AtAt)
+            .with_chirality(Chirality::AtAt)
             .build();
 
         assert_eq!(a.element(), Some(Element::O));

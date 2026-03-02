@@ -56,7 +56,7 @@ impl TokenIter<'_> {
                 possible_bracket_atom =
                     possible_bracket_atom.with_symbol(atom).with_aromatic(aromatic);
                 if let Some(chiral) = try_chirality(self)? {
-                    possible_bracket_atom = possible_bracket_atom.with_chiral(chiral);
+                    possible_bracket_atom = possible_bracket_atom.with_chirality(chiral);
                 }
 
                 if possible_bracket_atom.symbol() == AtomSymbol::Unspecified {

@@ -120,3 +120,135 @@ impl Atom {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use elements_rs::Element;
+
+    fn ac_symbol() -> AtomSymbol {
+        AtomSymbol::Element(Element::Ac)
+    }
+
+    #[test]
+    fn from_unbracketed_sets_correct_variant_and_symbol_delegates() {
+        let unbracketed = UnbracketedAtom::new(ac_symbol(), false);
+        let atom: Atom = Atom::from(unbracketed);
+
+        assert!(matches!(atom, Atom::Unbracketed(_)));
+        assert_eq!(atom.symbol().element(), Some(Element::Ac));
+        assert_eq!(atom.aromatic(), false);
+    }
+
+    #[test]
+    fn from_bracketed_sets_correct_variant_and_symbol_delegates() {
+        let bracketed = BracketAtom::builder()
+            .with_symbol(ac_symbol())
+            .build();
+
+        let atom: Atom = Atom::from(bracketed);
+
+        assert!(matches!(atom, Atom::Bracketed(_)));
+        assert_eq!(atom.symbol().element(), Some(Element::Ac));
+    }
+
+    #[test]
+    fn unbracketed_bracket_only_fields_are_defaults() {
+        let atom: Atom = UnbracketedAtom::new(ac_symbol(), true).into();
+
+        assert_eq!(atom.aromatic(), true);
+        assert_eq!(atom.symbol().element(), Some(Element::Ac));
+
+        assert_eq!(atom.chirality(), None);
+        assert_eq!(atom.class(), 0);
+
+        assert_eq!(atom.charge(), Charge::default());
+        assert_eq!(atom.charge_value(), Charge::default().get());
+
+        assert_eq!(atom.hydrogen_count(), None);
+        assert_eq!(atom.hydrogens(), HydrogenCount::Unspecified);
+    }
+
+    #[test]
+    fn bracketed_defaults_match_bracket_atom_defaults() {
+        let atom: Atom = BracketAtom::builder()
+            .with_symbol(ac_symbol())
+            .build()
+            .into();
+
+        assert_eq!(atom.symbol().element(), Some(Element::Ac));
+        assert_eq!(atom.chirality(), None);
+        assert_eq!(atom.charge(), Charge::default());
+        assert_eq!(atom.charge_value(), 0);
+        assert_eq!(atom.hydrogens(), HydrogenCount::Unspecified);
+        assert_eq!(atom.hydrogen_count(), None);
+    }
+
+    #[test]
+    fn bracketed_with_charge_is_reflected_in_wrapper() {
+        let plus_one = Charge::try_new(1_i8).expect("charge +1 should be valid");
+
+        let atom: Atom = BracketAtom::builder()
+            .with_symbol(ac_symbol())
+            .with_charge(plus_one)
+            .build()
+            .into();
+
+        assert_eq!(atom.charge_value(), 1);
+        assert_eq!(atom.charge(), plus_one);
+    }
+
+    #[test]
+    fn bracketed_with_hydrogens_is_reflected_in_wrapper() {
+        let h1 = HydrogenCount::Explicit(1);
+
+        let atom: Atom = BracketAtom::builder()
+            .with_symbol(ac_symbol())
+            .with_hydrogens(h1)
+            .build()
+            .into();
+
+        assert_eq!(atom.hydrogens(), h1);
+        assert_eq!(atom.hydrogen_count(), Some(1));
+    }
+
+    #[test]
+    fn bracketed_with_class_is_reflected_in_wrapper() {
+        let atom: Atom = BracketAtom::builder()
+            .with_symbol(ac_symbol())
+            .with_class(12)
+            .build()
+            .into();
+
+        assert_eq!(atom.class(), 12);
+    }
+
+    #[test]
+    fn bracketed_with_chirality_is_reflected_in_wrapper() {
+        let chirality = Chirality::At;
+
+        let atom: Atom = BracketAtom::builder()
+            .with_symbol(ac_symbol())
+            .with_chirality(chirality)
+            .build()
+            .into();
+
+        assert_eq!(atom.chirality(), Some(chirality));
+    }
+
+    #[test]
+    fn isotope_unbracketed_ok_for_element() {
+        let atom: Atom = UnbracketedAtom::new(ac_symbol(), false).into();
+        assert!(atom.isotope().is_ok());
+    }
+
+    #[test]
+    fn isotope_bracketed_delegates_to_bracket_atom() {
+        let atom: Atom = BracketAtom::builder()
+            .with_symbol(ac_symbol())
+            .build()
+            .into();
+
+        assert!(atom.isotope().is_ok());
+    }
+}

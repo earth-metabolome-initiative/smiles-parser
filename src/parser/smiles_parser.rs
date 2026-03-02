@@ -2,7 +2,10 @@
 
 use crate::{
     atom::{Atom, atom_node::AtomNode, bracketed::BracketAtom, unbracketed::UnbracketedAtom},
-    bond::bond_edge::{self, BondEdge},
+    bond::{
+        Bond,
+        bond_edge::{self, BondEdge},
+    },
     errors::{SmilesError, SmilesErrorWithSpan},
     smiles::Smiles,
     token::{self, Token, TokenWithSpan},
@@ -74,16 +77,13 @@ impl<'a> SmilesParser<'a> {
     /// Parses the tokens to construct the [`Smiles`] structure
     pub fn parse(mut self) -> Result<Smiles, SmilesErrorWithSpan> {
         let mut smiles = Smiles::new();
+        let mut current_node: usize = 0;
 
         while let Some(token_with_span) = self.current() {
             match token_with_span.token() {
-                Token::NonBond => {
-                    try_non_bond(self.peek_last(), self.peek_next(), token_with_span)?
-                }
-                Token::BracketedAtom(atom) => {
-                    let atom = Atom::from(atom);
-                }
-                Token::UnbracketedAtom(atom) => todo!(),
+                Token::NonBond => todo!(),
+                Token::BracketedAtom(bracket_atom) => todo!(),
+                Token::UnbracketedAtom(unbracketed_atom) => todo!(),
                 Token::Bond(bond) => todo!(),
                 Token::LeftParentheses => todo!(),
                 Token::RightParentheses => todo!(),
