@@ -1,14 +1,13 @@
 //! Second pass that parses the [`TokenWithSpan`]
 
+use std::collections::HashMap;
+
 use crate::{
-    atom::{Atom, atom_node::AtomNode, bracketed::BracketAtom, unbracketed::UnbracketedAtom},
-    bond::{
-        Bond,
-        bond_edge::{self, BondEdge},
-    },
+    atom::{Atom, atom_node::AtomNode},
+    bond::Bond,
     errors::{SmilesError, SmilesErrorWithSpan},
     smiles::Smiles,
-    token::{self, Token, TokenWithSpan},
+    token::{Token, TokenWithSpan},
 };
 
 /// Contains the vec of tokens being iterated on and tracks the current position
@@ -22,7 +21,10 @@ impl<'a> SmilesParser<'a> {
     /// Creates a new `SmilesParser` structure
     #[must_use]
     pub fn new(tokens: &'a [TokenWithSpan]) -> Self {
-        SmilesParser { tokens, position: 0 }
+        SmilesParser {
+            tokens,
+            position: 0,
+        }
     }
     /// Retrieves the `tokens` field of [`Vec<TokenWithSpan>`]
     #[must_use]
@@ -77,9 +79,16 @@ impl<'a> SmilesParser<'a> {
     /// Parses the tokens to construct the [`Smiles`] structure
     pub fn parse(mut self) -> Result<Smiles, SmilesErrorWithSpan> {
         let mut smiles = Smiles::new();
-        let mut current_node: usize = 0;
+        let mut current_node_id: Option<usize> = None;
+        let mut next_node_id: Option<usize> = None;
+        let mut previous_node_id: Option<usize> = None;
+        // hold potential next bond, needs to be evaluated as valid before pushing
+        let mut pending_bond: Option<(Bond, usize, usize)> = None;
 
-        while let Some(token_with_span) = self.current() {
+        let mut branch_stack: Vec<usize> = Vec::new();
+        let mut open_rings: HashMap<u8, (usize, Option<Bond>, usize, usize)> = HashMap::new();
+
+        while let Some(token_with_span) = self.current().cloned() {
             match token_with_span.token() {
                 Token::NonBond => todo!(),
                 Token::BracketedAtom(bracket_atom) => todo!(),
@@ -91,28 +100,19 @@ impl<'a> SmilesParser<'a> {
             }
             self.advance();
         }
+
+        if let Some((_, start, end)) = pending_bond {
+
+            return Err(SmilesErrorWithSpan::new(SmilesError::UnexpectedEndOfString, start, end));
+        }
+        if !branch_stack.is_empty() {
+            let end = self.tokens.last().map_or(0, TokenWithSpan::end);
+            return Err(SmilesErrorWithSpan::new(SmilesError::UnexpectedEndOfString, end, end));
+        }
+        if let Some((_, (_, _, start, end))) = open_rings.into_iter().next() {
+            return Err(SmilesErrorWithSpan::new(SmilesError::InvalidRingNumber, start, end));
+        }
+
         Ok(smiles)
     }
-}
-
-fn try_non_bond(
-    prev_token: Option<&TokenWithSpan>,
-    next_token: Option<&TokenWithSpan>,
-    dot_token: &TokenWithSpan,
-) -> Result<(), SmilesErrorWithSpan> {
-    let prev_is_atom = prev_token
-        .is_some_and(|t| matches!(t.token(), Token::BracketedAtom(_) | Token::UnbracketedAtom(_)));
-
-    let next_is_atom = next_token
-        .is_some_and(|t| matches!(t.token(), Token::BracketedAtom(_) | Token::UnbracketedAtom(_)));
-
-    if !prev_is_atom || !next_is_atom {
-        return Err(SmilesErrorWithSpan::new(
-            SmilesError::InvalidNonBondToken,
-            dot_token.start(),
-            dot_token.end(),
-        ));
-    }
-
-    Ok(())
 }

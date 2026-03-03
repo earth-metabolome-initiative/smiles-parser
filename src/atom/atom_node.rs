@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 
 use crate::atom::Atom;
 /// Contains information about atom parsed from the SMILES string
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct AtomNode {
     /// Unique identifier for each node
     id: usize,
@@ -46,7 +46,10 @@ impl Ord for AtomNode {
 mod tests {
     use std::cmp::Ordering;
 
-    use crate::atom::{Atom, atom_node::AtomNode, atom_symbol::AtomSymbol, bracketed::BracketAtom, unbracketed::UnbracketedAtom};
+    use crate::atom::{
+        Atom, atom_node::AtomNode, atom_symbol::AtomSymbol, bracketed::BracketAtom,
+        unbracketed::UnbracketedAtom,
+    };
 
     #[test]
     fn test_atom_node_all_fields_and_implementations() {
@@ -58,6 +61,5 @@ mod tests {
         let next_atom: Atom = UnbracketedAtom::new(AtomSymbol::WildCard, false).into();
         let next_atom_node = AtomNode::new(next_atom.clone(), 1);
         assert_eq!(atom_node.cmp(&next_atom_node), Ordering::Less);
-
     }
 }

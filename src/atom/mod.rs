@@ -123,8 +123,9 @@ impl Atom {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use elements_rs::Element;
+
+    use super::*;
 
     fn ac_symbol() -> AtomSymbol {
         AtomSymbol::Element(Element::Ac)
@@ -142,9 +143,7 @@ mod tests {
 
     #[test]
     fn from_bracketed_sets_correct_variant_and_symbol_delegates() {
-        let bracketed = BracketAtom::builder()
-            .with_symbol(ac_symbol())
-            .build();
+        let bracketed = BracketAtom::builder().with_symbol(ac_symbol()).build();
 
         let atom: Atom = Atom::from(bracketed);
 
@@ -171,10 +170,7 @@ mod tests {
 
     #[test]
     fn bracketed_defaults_match_bracket_atom_defaults() {
-        let atom: Atom = BracketAtom::builder()
-            .with_symbol(ac_symbol())
-            .build()
-            .into();
+        let atom: Atom = BracketAtom::builder().with_symbol(ac_symbol()).build().into();
 
         assert_eq!(atom.symbol().element(), Some(Element::Ac));
         assert_eq!(atom.chirality(), None);
@@ -188,11 +184,8 @@ mod tests {
     fn bracketed_with_charge_is_reflected_in_wrapper() {
         let plus_one = Charge::try_new(1_i8).expect("charge +1 should be valid");
 
-        let atom: Atom = BracketAtom::builder()
-            .with_symbol(ac_symbol())
-            .with_charge(plus_one)
-            .build()
-            .into();
+        let atom: Atom =
+            BracketAtom::builder().with_symbol(ac_symbol()).with_charge(plus_one).build().into();
 
         assert_eq!(atom.charge_value(), 1);
         assert_eq!(atom.charge(), plus_one);
@@ -202,11 +195,8 @@ mod tests {
     fn bracketed_with_hydrogens_is_reflected_in_wrapper() {
         let h1 = HydrogenCount::Explicit(1);
 
-        let atom: Atom = BracketAtom::builder()
-            .with_symbol(ac_symbol())
-            .with_hydrogens(h1)
-            .build()
-            .into();
+        let atom: Atom =
+            BracketAtom::builder().with_symbol(ac_symbol()).with_hydrogens(h1).build().into();
 
         assert_eq!(atom.hydrogens(), h1);
         assert_eq!(atom.hydrogen_count(), Some(1));
@@ -214,11 +204,8 @@ mod tests {
 
     #[test]
     fn bracketed_with_class_is_reflected_in_wrapper() {
-        let atom: Atom = BracketAtom::builder()
-            .with_symbol(ac_symbol())
-            .with_class(12)
-            .build()
-            .into();
+        let atom: Atom =
+            BracketAtom::builder().with_symbol(ac_symbol()).with_class(12).build().into();
 
         assert_eq!(atom.class(), 12);
     }
@@ -244,10 +231,7 @@ mod tests {
 
     #[test]
     fn isotope_bracketed_delegates_to_bracket_atom() {
-        let atom: Atom = BracketAtom::builder()
-            .with_symbol(ac_symbol())
-            .build()
-            .into();
+        let atom: Atom = BracketAtom::builder().with_symbol(ac_symbol()).build().into();
 
         assert!(atom.isotope().is_ok());
     }
