@@ -70,15 +70,14 @@ pub enum SmilesError {
     UnexpectedRightBracket,
     /// A closing `]` bracket was not found
     UnclosedBracket,
-        
 }
 
 impl fmt::Display for SmilesError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use SmilesError::{
             BondInBracket, ChargeOverflow, ChargeUnderflow, ElementRequiresBrackets, ElementsRs,
-            IntegerOverflow, InvalidAromaticElement, InvalidChirality, InvalidClass,
-            InvalidElementName, InvalidIsotope, InvalidNonBondToken, InvalidNumber,
+            IncompleteBond, IntegerOverflow, InvalidAromaticElement, InvalidChirality,
+            InvalidClass, InvalidElementName, InvalidIsotope, InvalidNonBondToken, InvalidNumber,
             InvalidRingNumber, InvalidUnbracketedAtom, MissingBracketElement, MissingElement,
             NodeIdInvalid, NonBondInBracket, RingNumberOverflow, UnclosedBracket,
             UnexpectedBracketedState, UnexpectedCharacter, UnexpectedColon, UnexpectedDash,
@@ -114,7 +113,8 @@ impl fmt::Display for SmilesError {
             InvalidRingNumber => write!(f, "Invalid ring number"),
             ElementsRs(error) => write!(f, "Error Parsing Element: {error}"),
             InvalidNonBondToken => write!(f, "Invalid Non-bond '.' found"),
-            NodeIdInvalid(n) => write!(f, "Invalid Atom Node ID: {}", n),
+            NodeIdInvalid(n) => write!(f, "Invalid Atom Node ID: {n}"),
+            IncompleteBond(bond) => write!(f, "Bond: {bond} missing Atom Node(s)"),
         }
     }
 }

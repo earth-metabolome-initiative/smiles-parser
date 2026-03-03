@@ -78,7 +78,8 @@ impl<'a> SmilesParser<'a> {
         let mut smiles = Smiles::new();
         let mut first_node_id_in_sequence: Option<usize> = None;
         let mut previous_node_id: Option<usize> = None;
-        // hold potential next bond and its span, needs to be evaluated as valid before pushing
+        // hold potential next bond and its span, needs to be evaluated as valid before
+        // pushing
         let mut pending_bond: Option<(Bond, usize, usize)> = None;
 
         while let Some(token_with_span) = self.current().cloned() {
@@ -90,9 +91,7 @@ impl<'a> SmilesParser<'a> {
                     check_first_node(&mut first_node_id_in_sequence, current_node.id());
                     previous_node_id = Some(current_node.id());
                     smiles.push_node(current_node);
-                    
-
-                },
+                }
                 Token::UnbracketedAtom(unbracketed_atom) => todo!(),
                 Token::Bond(bond) => todo!(),
                 Token::LeftParentheses => todo!(),
@@ -102,20 +101,23 @@ impl<'a> SmilesParser<'a> {
             self.advance();
         }
 
-        if let Some((_, start, end)) = pending_bond {
-            return Err(SmilesErrorWithSpan::new(SmilesError::UnexpectedEndOfString, start, end));
+        if let Some((bond, start, end)) = pending_bond {
+            return Err(SmilesErrorWithSpan::new(SmilesError::IncompleteBond(bond), start, end));
         }
 
         Ok(smiles)
     }
-    
-    /// Tries to set the bond between the current atom and the previous atom
-    /// 
-    /// # Error
-    /// - Will return [`SmilesError::IncompleteBond`] as a [`SmilesErrorWithSpan`]
-    fn try_add_bond_edge(self, current_atom_id: usize, ) -> Result<(Bond, usize, usize), SmilesErrorWithSpan> {
 
-    } 
+    /// Tries to set the bond between the current atom and the previous atom
+    ///
+    /// # Error
+    /// - Will return [`SmilesError::IncompleteBond`] as a
+    ///   [`SmilesErrorWithSpan`]
+    fn try_add_bond_edge(
+        self,
+        current_atom_id: usize,
+    ) -> Result<(Bond, usize, usize), SmilesErrorWithSpan> {
+    }
 }
 
 fn set_atom_node(previous_node_id: Option<usize>, atom: Atom) -> AtomNode {
@@ -134,8 +136,6 @@ fn check_first_node(first_node_id_in_sequence: &mut Option<usize>, current_node_
         *first_node_id_in_sequence = Some(current_node_id);
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

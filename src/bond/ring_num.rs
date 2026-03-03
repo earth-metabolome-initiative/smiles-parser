@@ -27,7 +27,7 @@ mod tests {
     use crate::{bond::ring_num::RingNum, errors::SmilesError};
 
     #[test]
-    fn test_try_and_get() -> Result<(), SmilesError>{
+    fn test_try_and_get() -> Result<(), SmilesError> {
         let num: u8 = 3;
         let invalid_num: u8 = 200;
         let valid_ring = RingNum::try_new(num)?;
