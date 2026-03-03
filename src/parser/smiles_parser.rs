@@ -77,7 +77,7 @@ impl<'a> SmilesParser<'a> {
     pub fn parse(mut self) -> Result<Smiles, SmilesErrorWithSpan> {
         let mut smiles = Smiles::new();
         let mut current_node_id: Option<usize> = None;
-        let mut next_node_id: Option<usize> = None;
+        let mut first_node_id_in_sequence: Option<usize> = None;
         let mut previous_node_id: Option<usize> = None;
         // hold potential next bond, needs to be evaluated as valid before pushing
         let mut pending_bond: Option<(Bond, usize, usize)> = None;
@@ -101,4 +101,19 @@ impl<'a> SmilesParser<'a> {
 
         Ok(smiles)
     }
+}
+
+fn set_atom_node(
+    prev_id: Option<usize>,
+    atom: Atom, 
+    smiles: &mut Smiles
+) -> usize {
+    let id: usize;
+    if let Some(prev) = prev_id {
+        id = prev+1;
+    } else {
+        id = 0;
+    }
+    smiles.push_node(AtomNode::new(atom, id));
+    id
 }
