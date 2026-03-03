@@ -49,7 +49,7 @@ mod tests {
         &[
             AtomSymbol::Unspecified,
             AtomSymbol::WildCard,
-            AtomSymbol::Element(elements_rs::Element::Ac)
+            AtomSymbol::Element(elements_rs::Element::Ac),
         ]
     }
     #[test]
@@ -63,9 +63,6 @@ mod tests {
             if symbol == &AtomSymbol::WildCard {
                 assert_eq!(true, atom.is_wildcard());
             }
-
         }
-        
     }
-    
 }

@@ -103,14 +103,10 @@ impl<'a> SmilesParser<'a> {
     }
 }
 
-fn set_atom_node(
-    prev_id: Option<usize>,
-    atom: Atom, 
-    smiles: &mut Smiles
-) -> usize {
+fn set_atom_node(prev_id: Option<usize>, atom: Atom, smiles: &mut Smiles) -> usize {
     let id: usize;
     if let Some(prev) = prev_id {
-        id = prev+1;
+        id = prev + 1;
     } else {
         id = 0;
     }
