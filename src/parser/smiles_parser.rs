@@ -21,10 +21,7 @@ impl<'a> SmilesParser<'a> {
     /// Creates a new `SmilesParser` structure
     #[must_use]
     pub fn new(tokens: &'a [TokenWithSpan]) -> Self {
-        SmilesParser {
-            tokens,
-            position: 0,
-        }
+        SmilesParser { tokens, position: 0 }
     }
     /// Retrieves the `tokens` field of [`Vec<TokenWithSpan>`]
     #[must_use]
@@ -85,9 +82,6 @@ impl<'a> SmilesParser<'a> {
         // hold potential next bond, needs to be evaluated as valid before pushing
         let mut pending_bond: Option<(Bond, usize, usize)> = None;
 
-        let mut branch_stack: Vec<usize> = Vec::new();
-        let mut open_rings: HashMap<u8, (usize, Option<Bond>, usize, usize)> = HashMap::new();
-
         while let Some(token_with_span) = self.current().cloned() {
             match token_with_span.token() {
                 Token::NonBond => todo!(),
@@ -102,15 +96,7 @@ impl<'a> SmilesParser<'a> {
         }
 
         if let Some((_, start, end)) = pending_bond {
-
             return Err(SmilesErrorWithSpan::new(SmilesError::UnexpectedEndOfString, start, end));
-        }
-        if !branch_stack.is_empty() {
-            let end = self.tokens.last().map_or(0, TokenWithSpan::end);
-            return Err(SmilesErrorWithSpan::new(SmilesError::UnexpectedEndOfString, end, end));
-        }
-        if let Some((_, (_, _, start, end))) = open_rings.into_iter().next() {
-            return Err(SmilesErrorWithSpan::new(SmilesError::InvalidRingNumber, start, end));
         }
 
         Ok(smiles)
