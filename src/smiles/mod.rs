@@ -44,19 +44,19 @@ impl Smiles {
 
         Ok(())
     }
-    /// returns slice of the nodes
+    /// Returns slice of the nodes
     pub fn nodes(&self) -> &[AtomNode] {
         &self.atom_nodes
     }
-    /// returns mutable slice of nodes
+    /// Returns mutable slice of nodes
     pub fn nodes_mut(&mut self) -> &mut [AtomNode] {
         &mut self.atom_nodes
     }
-    /// returns slice of the edges
+    /// Returns slice of the edges
     pub fn edges(&self) -> &[BondEdge] {
         &self.bond_edges
     }
-    /// returns mutable slice of edges
+    /// Returns mutable slice of edges
     pub fn edges_mut(&mut self) -> &mut [BondEdge] {
         &mut self.bond_edges
     }

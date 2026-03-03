@@ -20,6 +20,8 @@ pub enum SmilesError {
     ElementRequiresBrackets,
     /// Wrapper for `element_rs` errors
     ElementsRs(elements_rs::errors::Error),
+    /// A bond was not able to bind two atoms
+    IncompleteBond(Bond),
     /// Element forbidden to be written as aromatic here
     InvalidAromaticElement(Element),
     /// Specified Chirality is not a valid form
@@ -68,6 +70,7 @@ pub enum SmilesError {
     UnexpectedRightBracket,
     /// A closing `]` bracket was not found
     UnclosedBracket,
+        
 }
 
 impl fmt::Display for SmilesError {

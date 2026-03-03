@@ -76,16 +76,23 @@ impl<'a> SmilesParser<'a> {
     /// Parses the tokens to construct the [`Smiles`] structure
     pub fn parse(mut self) -> Result<Smiles, SmilesErrorWithSpan> {
         let mut smiles = Smiles::new();
-        let mut current_node_id: Option<usize> = None;
         let mut first_node_id_in_sequence: Option<usize> = None;
         let mut previous_node_id: Option<usize> = None;
-        // hold potential next bond, needs to be evaluated as valid before pushing
+        // hold potential next bond and its span, needs to be evaluated as valid before pushing
         let mut pending_bond: Option<(Bond, usize, usize)> = None;
 
         while let Some(token_with_span) = self.current().cloned() {
             match token_with_span.token() {
                 Token::NonBond => todo!(),
-                Token::BracketedAtom(bracket_atom) => todo!(),
+                Token::BracketedAtom(bracket_atom) => {
+                    let atom = Atom::from(bracket_atom);
+                    let current_node = set_atom_node(previous_node_id, atom);
+                    check_first_node(&mut first_node_id_in_sequence, current_node.id());
+                    previous_node_id = Some(current_node.id());
+                    smiles.push_node(current_node);
+                    
+
+                },
                 Token::UnbracketedAtom(unbracketed_atom) => todo!(),
                 Token::Bond(bond) => todo!(),
                 Token::LeftParentheses => todo!(),
@@ -101,15 +108,43 @@ impl<'a> SmilesParser<'a> {
 
         Ok(smiles)
     }
+    
+    /// Tries to set the bond between the current atom and the previous atom
+    /// 
+    /// # Error
+    /// - Will return [`SmilesError::IncompleteBond`] as a [`SmilesErrorWithSpan`]
+    fn try_add_bond_edge(self, current_atom_id: usize, ) -> Result<(Bond, usize, usize), SmilesErrorWithSpan> {
+
+    } 
 }
 
-fn set_atom_node(prev_id: Option<usize>, atom: Atom, smiles: &mut Smiles) -> usize {
+fn set_atom_node(previous_node_id: Option<usize>, atom: Atom) -> AtomNode {
     let id: usize;
-    if let Some(prev) = prev_id {
+    if let Some(prev) = previous_node_id {
         id = prev + 1;
     } else {
         id = 0;
     }
-    smiles.push_node(AtomNode::new(atom, id));
-    id
+    let atom_node = AtomNode::new(atom, id);
+    atom_node
+}
+
+fn check_first_node(first_node_id_in_sequence: &mut Option<usize>, current_node_id: usize) {
+    if first_node_id_in_sequence.is_none() {
+        *first_node_id_in_sequence = Some(current_node_id);
+    }
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    use crate::parser::smiles_parser::check_first_node;
+
+    #[test]
+    fn test_check_first_node() {
+        let mut node = None;
+        check_first_node(&mut node, 3);
+        assert_eq!(node, Some(3));
+    }
 }
