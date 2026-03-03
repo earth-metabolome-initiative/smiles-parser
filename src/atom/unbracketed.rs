@@ -40,3 +40,32 @@ impl UnbracketedAtom {
         self.symbol.is_wildcard()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::atom::{atom_symbol::AtomSymbol, unbracketed::UnbracketedAtom};
+
+    fn symbols() -> &'static [AtomSymbol] {
+        &[
+            AtomSymbol::Unspecified,
+            AtomSymbol::WildCard,
+            AtomSymbol::Element(elements_rs::Element::Ac)
+        ]
+    }
+    #[test]
+    fn test_all_unbracketed_files_and_impls() {
+        let symbols = symbols();
+        for symbol in symbols {
+            let atom = UnbracketedAtom::new(symbol.clone(), false);
+            assert_eq!(symbol, &atom.symbol());
+            assert_eq!(symbol.element(), atom.element());
+            assert!(!atom.aromatic());
+            if symbol == &AtomSymbol::WildCard {
+                assert_eq!(true, atom.is_wildcard());
+            }
+
+        }
+        
+    }
+    
+}
