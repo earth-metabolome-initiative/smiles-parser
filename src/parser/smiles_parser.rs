@@ -4,10 +4,10 @@ use std::ops::Range;
 
 use crate::{
     atom::{Atom, atom_node::AtomNode},
-    bond::{Bond, ring_num::RingNum},
+    bond::{self, Bond, ring_num::RingNum},
     errors::{SmilesError, SmilesErrorWithSpan},
     smiles::Smiles,
-    token::{Token, TokenWithSpan},
+    token::{self, Token, TokenWithSpan},
 };
 
 /// Contains the vec of tokens being iterated on and tracks the current position
@@ -78,13 +78,47 @@ impl<'a> SmilesParser<'a> {
         let mut smiles = Smiles::new();
         let mut first_node_id_in_sequence: Option<(usize, TokenWithSpan)> = None;
         let mut previous_node_id: Option<usize> = None;
-        // hold potential next bond and its span, needs to be evaluated as valid before
-        // pushing
-        let mut pending_bond: Option<(Bond, usize, usize)> = None;
 
         while let Some(token_with_span) = self.current().cloned() {
             match token_with_span.token() {
-                Token::NonBond => todo!(),
+                Token::UnbracketedAtom(unbracketed_atom) => {
+                    let atom = Atom::Unbracketed(unbracketed_atom);
+                    let id = match previous_node_id {
+                        Some(id) => id+1,
+                        None => 0,
+                    };
+                    previous_node_id = Some(id);
+                    let possible_ring: Option<RingNum> = if let Some(token) = self.peek_next() {
+                        match token.token() {
+                            Token::RingClosure(ring_num) => {self.advance(); Some(ring_num)},
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    };
+                    let bond: Result<Option<Bond>, SmilesErrorWithSpan> = if let Some(token) = self.peek_next() {
+                        match token.token(){
+                            Token::NonBond => Ok(None),
+                            Token::BracketedAtom(_) => Ok(Some(Bond::Single)),
+                            Token::UnbracketedAtom(atom) => {
+                                if unbracketed_atom.aromatic() && atom.aromatic() {
+                                    Ok((Some(Bond::Aromatic)))
+                                } else {
+                                    Ok(Some(Bond::Single))
+                                }
+                            },
+                            Token::Bond(bond) => {
+                                self.advance();
+                                Ok(Some(bond))},
+                            Token::LeftParentheses => todo!(),
+                            Token::RightParentheses => todo!(),
+                            Token::RingClosure(ring_num) => Err(SmilesErrorWithSpan::new(SmilesError::InvalidRingNumber, token.start(), token.end())),
+                        }
+                    } else {
+                        Ok(None)
+                    };
+
+                },
                 Token::BracketedAtom(bracket_atom) => {
                     let atom = Atom::from(bracket_atom);
                     let current_node =
@@ -97,17 +131,13 @@ impl<'a> SmilesParser<'a> {
                     previous_node_id = Some(current_id);
                     smiles.push_node(current_node);
                 }
-                Token::UnbracketedAtom(unbracketed_atom) => todo!(),
                 Token::Bond(bond) => todo!(),
                 Token::LeftParentheses => todo!(),
+                Token::NonBond => todo!(),
                 Token::RightParentheses => todo!(),
                 Token::RingClosure(ring_num) => {}
             }
             self.advance();
-        }
-
-        if let Some((bond, start, end)) = pending_bond {
-            return Err(SmilesErrorWithSpan::new(SmilesError::IncompleteBond(bond), start, end));
         }
 
         Ok(smiles)
