@@ -41,7 +41,7 @@ impl TokenWithSpan {
     /// Generates a new token with a specified span
     #[must_use]
     pub fn new(token: Token, start: usize, end: usize) -> Self {
-        Self { token, span: Range { start, end } }
+        Self { token, span: start..end }
     }
     /// Returns the token
     #[must_use]
@@ -50,8 +50,8 @@ impl TokenWithSpan {
     }
     /// Returns the span as [`Range`]
     #[must_use]
-    pub fn span(&self) -> &Range<usize> {
-        &self.span
+    pub fn span(&self) -> Range<usize> {
+        self.span.start..self.span.end
     }
     /// Returns the start of the span as [`usize`]
     #[must_use]

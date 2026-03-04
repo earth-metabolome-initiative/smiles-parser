@@ -1,10 +1,10 @@
 //! Second pass that parses the [`TokenWithSpan`]
 
-use std::collections::HashMap;
+use std::ops::Range;
 
 use crate::{
     atom::{Atom, atom_node::AtomNode},
-    bond::Bond,
+    bond::{Bond, ring_num::RingNum},
     errors::{SmilesError, SmilesErrorWithSpan},
     smiles::Smiles,
     token::{Token, TokenWithSpan},
@@ -76,7 +76,7 @@ impl<'a> SmilesParser<'a> {
     /// Parses the tokens to construct the [`Smiles`] structure
     pub fn parse(mut self) -> Result<Smiles, SmilesErrorWithSpan> {
         let mut smiles = Smiles::new();
-        let mut first_node_id_in_sequence: Option<usize> = None;
+        let mut first_node_id_in_sequence: Option<(usize, TokenWithSpan)> = None;
         let mut previous_node_id: Option<usize> = None;
         // hold potential next bond and its span, needs to be evaluated as valid before
         // pushing
@@ -87,16 +87,21 @@ impl<'a> SmilesParser<'a> {
                 Token::NonBond => todo!(),
                 Token::BracketedAtom(bracket_atom) => {
                     let atom = Atom::from(bracket_atom);
-                    let current_node = set_atom_node(previous_node_id, atom);
-                    check_first_node(&mut first_node_id_in_sequence, current_node.id());
-                    previous_node_id = Some(current_node.id());
+                    let current_node =
+                        set_atom_node(previous_node_id, atom, None, token_with_span.span());
+                    let current_id = current_node.id();
+                    let current_val = (current_id, token_with_span);
+                    first_node_id_in_sequence =
+                        check_first_node(first_node_id_in_sequence, current_val);
+
+                    previous_node_id = Some(current_id);
                     smiles.push_node(current_node);
                 }
                 Token::UnbracketedAtom(unbracketed_atom) => todo!(),
                 Token::Bond(bond) => todo!(),
                 Token::LeftParentheses => todo!(),
                 Token::RightParentheses => todo!(),
-                Token::RingClosure(ring_num) => todo!(),
+                Token::RingClosure(ring_num) => {}
             }
             self.advance();
         }
@@ -107,44 +112,76 @@ impl<'a> SmilesParser<'a> {
 
         Ok(smiles)
     }
-
-    /// Tries to set the bond between the current atom and the previous atom
-    ///
-    /// # Error
-    /// - Will return [`SmilesError::IncompleteBond`] as a
-    ///   [`SmilesErrorWithSpan`]
-    fn try_add_bond_edge(
-        self,
-        current_atom_id: usize,
-    ) -> Result<(Bond, usize, usize), SmilesErrorWithSpan> {
-    }
 }
 
-fn set_atom_node(previous_node_id: Option<usize>, atom: Atom) -> AtomNode {
+fn set_atom_node(
+    previous_node_id: Option<usize>,
+    atom: Atom,
+    ring_num: Option<RingNum>,
+    span: Range<usize>,
+) -> AtomNode {
     let id: usize;
     if let Some(prev) = previous_node_id {
         id = prev + 1;
     } else {
         id = 0;
     }
-    let atom_node = AtomNode::new(atom, id);
+    let atom_node = AtomNode::new(atom, id, span, ring_num);
     atom_node
 }
 
-fn check_first_node(first_node_id_in_sequence: &mut Option<usize>, current_node_id: usize) {
-    if first_node_id_in_sequence.is_none() {
-        *first_node_id_in_sequence = Some(current_node_id);
+fn check_first_node(
+    first_node_id_in_sequence: Option<(usize, TokenWithSpan)>,
+    current_val: (usize, TokenWithSpan),
+) -> Option<(usize, TokenWithSpan)> {
+    if first_node_id_in_sequence.is_none() { Some(current_val) } else { first_node_id_in_sequence }
+}
+
+fn try_peek_bond(
+    tokens: &[TokenWithSpan],
+    next_token_location: usize,
+) -> Result<(Bond, usize, usize), SmilesError> {
+    let current = &tokens[next_token_location - 1];
+    let next = &tokens[next_token_location];
+    match next.token() {
+        Token::NonBond => Ok((Bond::Single, next.start(), next.end())),
+        Token::BracketedAtom(_) => Ok((Bond::Single, current.start(), next.end())),
+        Token::UnbracketedAtom(_) => Ok((Bond::Single, current.start(), next.end())),
+        Token::Bond(bond) => Ok((bond, next.start(), next.end())),
+        Token::LeftParentheses => Ok((Bond::Single, current.start(), next.end())),
+        Token::RightParentheses => Ok((Bond::Single, current.start(), next.end())),
+        Token::RingClosure(ring_num) => {
+            let second = &tokens[next_token_location + 1];
+            match second.token() {
+                Token::NonBond => todo!(),
+                Token::BracketedAtom(bracket_atom) => todo!(),
+                Token::UnbracketedAtom(unbracketed_atom) => todo!(),
+                Token::Bond(bond) => todo!(),
+                Token::LeftParentheses => todo!(),
+                Token::RightParentheses => todo!(),
+                Token::RingClosure(ring_num) => todo!(),
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::smiles_parser::check_first_node;
+    use crate::{
+        errors::SmilesError, parser::smiles_parser::check_first_node, token::TokenWithSpan,
+    };
 
     #[test]
-    fn test_check_first_node() {
-        let mut node = None;
-        check_first_node(&mut node, 3);
-        assert_eq!(node, Some(3));
+    fn test_check_first_node() -> Result<(), SmilesError> {
+        let node = 1;
+        let token = TokenWithSpan::new(crate::token::Token::NonBond, 1, 2);
+        let new_node = check_first_node(None, (node, token.clone()));
+        if let Some((found_node, found_token)) = new_node {
+            assert_eq!(found_node, node);
+            assert_eq!(found_token, token);
+        } else {
+            return Err(SmilesError::NodeIdInvalid(node));
+        }
+        Ok(())
     }
 }
