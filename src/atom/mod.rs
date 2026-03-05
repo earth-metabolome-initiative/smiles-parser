@@ -138,7 +138,7 @@ mod tests {
 
         assert!(matches!(atom, Atom::Unbracketed(_)));
         assert_eq!(atom.symbol().element(), Some(Element::Ac));
-        assert_eq!(atom.aromatic(), false);
+        assert!(!atom.aromatic());
     }
 
     #[test]
@@ -155,7 +155,7 @@ mod tests {
     fn unbracketed_bracket_only_fields_are_defaults() {
         let atom: Atom = UnbracketedAtom::new(ac_symbol(), true).into();
 
-        assert_eq!(atom.aromatic(), true);
+        assert!(atom.aromatic());
         assert_eq!(atom.symbol().element(), Some(Element::Ac));
 
         assert_eq!(atom.chirality(), None);

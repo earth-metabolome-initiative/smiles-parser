@@ -37,13 +37,10 @@ impl AtomNode {
     pub fn ring_num(&self) -> &Option<RingNum> {
         &self.ring_num
     }
-    /// retursn the [`RingNum`] value
+    /// returns the [`RingNum`] value
     #[must_use]
     pub fn ring_num_val(&self) -> Option<u8> {
-        match self.ring_num {
-            Some(num) => Some(num.get()),
-            None => None,
-        }
+        self.ring_num.map(|num| num.get())
     }
 }
 

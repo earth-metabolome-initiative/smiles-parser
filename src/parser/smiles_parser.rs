@@ -3,14 +3,11 @@
 use std::collections::HashMap;
 
 use crate::{
-    atom::{self, Atom, atom_node::AtomNode},
-    bond::{
-        self, Bond,
-        ring_num::{self, RingNum},
-    },
+    atom::{Atom, atom_node::AtomNode},
+    bond::{Bond, ring_num::RingNum},
     errors::{SmilesError, SmilesErrorWithSpan},
-    smiles::{self, Smiles},
-    token::{self, Token, TokenWithSpan},
+    smiles::Smiles,
+    token::{Token, TokenWithSpan},
 };
 
 /// Contains the vec of tokens being iterated on and tracks the current position
@@ -58,7 +55,7 @@ impl<'a> SmilesParser<'a> {
         self.position.checked_sub(1).and_then(|i| self.tokens.get(i))
     }
     /// Consumes and returns the next token
-    pub fn next(&mut self) -> Option<&TokenWithSpan> {
+    pub fn next_token(&mut self) -> Option<&TokenWithSpan> {
         let token = self.tokens.get(self.position);
         if token.is_some() {
             self.position += 1;
@@ -77,6 +74,32 @@ impl<'a> SmilesParser<'a> {
         }
     }
     /// Parses the tokens to construct the [`Smiles`] structure
+    ///
+    /// # Errors
+    /// - [`SmilesError::UnexpectedLeftParentheses`]: Encountered `(` when there
+    ///   is no current atom to branch from (e.g. the input begins with `(`, or
+    ///   appears after `.`).
+    ///
+    /// - [`SmilesError::UnexpectedRightParentheses`]: Encountered `)` without a
+    ///   matching `(` (branch stack underflow).
+    ///
+    /// - [`SmilesError::UnclosedBranch`]: A component boundary `.` was
+    ///   encountered while there are still open branches.
+    ///
+    /// - [`SmilesError::InvalidRingNumber`]: A ring closure token was
+    ///   encountered without a current atom (e.g. input starts with a ring
+    ///   number), or a ring closure is left unmatched by end-of-input.
+    ///
+    /// - [`SmilesError::UnclosedRing`]: A component boundary `.` was
+    ///   encountered while there are still open ring closures.
+    ///
+    /// - [`SmilesError::IncompleteBond`]: A bond token (e.g. `-`, `=`, `#`,
+    ///   `:`) was read but no subsequent atom or ring closure was available to
+    ///   complete the bond (for example, a bond immediately followed by `.`).
+    ///
+    /// - Any error produced while adding edges to the graph (e.g. invalid node
+    ///   ids), which is wrapped into [`SmilesErrorWithSpan`] using the span of
+    ///   the token that attempted the insertion.
     pub fn parse(mut self) -> Result<Smiles, SmilesErrorWithSpan> {
         let mut smiles = Smiles::new();
 
@@ -87,6 +110,8 @@ impl<'a> SmilesParser<'a> {
         let mut ring_open: HashMap<RingNum, (usize, Option<Bond>)> = HashMap::new();
 
         while let Some(token_with_span) = self.current() {
+            let start = token_with_span.start();
+            let end = token_with_span.end();
             match token_with_span.token() {
                 Token::UnbracketedAtom(atom) => {
                     let atom: Atom = Atom::Unbracketed(atom);
@@ -98,13 +123,9 @@ impl<'a> SmilesParser<'a> {
 
                     if let Some(prev) = last_atom {
                         let bond = pending_bond.unwrap_or_else(|| default_bond(&smiles, prev, id));
-                        smiles.push_edge(prev, id, bond).map_err(|e| {
-                            SmilesErrorWithSpan::new(
-                                e,
-                                token_with_span.start(),
-                                token_with_span.end(),
-                            )
-                        })?;
+                        smiles
+                            .push_edge(prev, id, bond)
+                            .map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
                     }
                     last_atom = Some(id);
                     pending_bond = None;
@@ -119,13 +140,9 @@ impl<'a> SmilesParser<'a> {
 
                     if let Some(prev) = last_atom {
                         let bond = pending_bond.unwrap_or_else(|| default_bond(&smiles, prev, id));
-                        smiles.push_edge(prev, id, bond).map_err(|e| {
-                            SmilesErrorWithSpan::new(
-                                e,
-                                token_with_span.start(),
-                                token_with_span.end(),
-                            )
-                        })?;
+                        smiles
+                            .push_edge(prev, id, bond)
+                            .map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
                     }
 
                     last_atom = Some(id);
@@ -136,34 +153,20 @@ impl<'a> SmilesParser<'a> {
                     let Some(anchor) = last_atom else {
                         return Err(SmilesErrorWithSpan::new(
                             SmilesError::UnexpectedLeftParentheses,
-                            token_with_span.start(),
-                            token_with_span.end(),
+                            start,
+                            end,
                         ));
                     };
                     last_atom = Some(anchor);
                 }
                 Token::NonBond => {
-                    if let Some(bond) = pending_bond {
-                        return Err(SmilesErrorWithSpan::new(
-                            SmilesError::IncompleteBond(bond),
-                            token_with_span.start() - 1,
-                            token_with_span.end(),
-                        ));
-                    }
-                    if !branch_stack.is_empty() {
-                        return Err(SmilesErrorWithSpan::new(
-                            SmilesError::UnclosedBranch,
-                            token_with_span.start(),
-                            token_with_span.end(),
-                        ));
-                    }
-                    if !ring_open.is_empty() {
-                        return Err(SmilesErrorWithSpan::new(
-                            SmilesError::UnclosedRing,
-                            token_with_span.start(),
-                            token_with_span.end(),
-                        ));
-                    }
+                    is_valid_non_bond(
+                        pending_bond,
+                        start,
+                        end,
+                        branch_stack.is_empty(),
+                        ring_open.is_empty(),
+                    )?;
                     last_atom = None;
                     pending_bond = None;
                 }
@@ -171,21 +174,17 @@ impl<'a> SmilesParser<'a> {
                     let Some(current) = last_atom else {
                         return Err(SmilesErrorWithSpan::new(
                             SmilesError::InvalidRingNumber,
-                            token_with_span.start(),
-                            token_with_span.end(),
+                            start,
+                            end,
                         ));
                     };
                     if let Some((other, stored_bond)) = ring_open.remove(&ring_num) {
                         let bond = pending_bond
                             .or(stored_bond)
                             .unwrap_or_else(|| default_bond(&smiles, current, other));
-                        smiles.push_edge(current, other, bond).map_err(|e| {
-                            SmilesErrorWithSpan::new(
-                                e,
-                                token_with_span.start(),
-                                token_with_span.end(),
-                            )
-                        })?;
+                        smiles
+                            .push_edge(current, other, bond)
+                            .map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
                         pending_bond = None;
                     } else {
                         ring_open.insert(ring_num, (current, pending_bond));
@@ -196,8 +195,8 @@ impl<'a> SmilesParser<'a> {
                     let Some(anchor) = branch_stack.pop() else {
                         return Err(SmilesErrorWithSpan::new(
                             SmilesError::UnexpectedRightParentheses,
-                            token_with_span.start(),
-                            token_with_span.end(),
+                            start,
+                            end,
                         ));
                     };
                     last_atom = Some(anchor);
@@ -206,11 +205,30 @@ impl<'a> SmilesParser<'a> {
             self.advance();
         }
 
-        if let Some((ring_num, _)) = ring_open.into_iter().next() {
+        if let Some((_ring_num, _)) = ring_open.into_iter().next() {
             return Err(SmilesErrorWithSpan::new(SmilesError::InvalidRingNumber, 0, 0));
         }
         Ok(smiles)
     }
+}
+
+fn is_valid_non_bond(
+    pending_bond: Option<Bond>,
+    start: usize,
+    end: usize,
+    branch_stack: bool,
+    ring_open: bool,
+) -> Result<(), SmilesErrorWithSpan> {
+    if let Some(bond) = pending_bond {
+        return Err(SmilesErrorWithSpan::new(SmilesError::IncompleteBond(bond), start - 1, end));
+    }
+    if !branch_stack {
+        return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedBranch, start, end));
+    }
+    if !ring_open {
+        return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedRing, start, end));
+    }
+    Ok(())
 }
 
 fn default_bond(smiles: &Smiles, id_a: usize, id_b: usize) -> Bond {

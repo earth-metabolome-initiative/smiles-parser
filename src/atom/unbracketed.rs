@@ -56,12 +56,12 @@ mod tests {
     fn test_all_unbracketed_files_and_impls() {
         let symbols = symbols();
         for symbol in symbols {
-            let atom = UnbracketedAtom::new(symbol.clone(), false);
+            let atom = UnbracketedAtom::new(*symbol, false);
             assert_eq!(symbol, &atom.symbol());
             assert_eq!(symbol.element(), atom.element());
             assert!(!atom.aromatic());
             if symbol == &AtomSymbol::WildCard {
-                assert_eq!(true, atom.is_wildcard());
+                assert!(atom.is_wildcard());
             }
         }
     }
