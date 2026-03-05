@@ -1,12 +1,15 @@
 //! Second pass that parses the [`TokenWithSpan`]
 
-use std::ops::Range;
+use std::collections::HashMap;
 
 use crate::{
-    atom::{Atom, atom_node::AtomNode},
-    bond::{self, Bond, ring_num::RingNum},
+    atom::{self, Atom, atom_node::AtomNode},
+    bond::{
+        self, Bond,
+        ring_num::{self, RingNum},
+    },
     errors::{SmilesError, SmilesErrorWithSpan},
-    smiles::Smiles,
+    smiles::{self, Smiles},
     token::{self, Token, TokenWithSpan},
 };
 
@@ -76,142 +79,145 @@ impl<'a> SmilesParser<'a> {
     /// Parses the tokens to construct the [`Smiles`] structure
     pub fn parse(mut self) -> Result<Smiles, SmilesErrorWithSpan> {
         let mut smiles = Smiles::new();
-        let mut first_node_id_in_sequence: Option<(usize, TokenWithSpan)> = None;
-        let mut previous_node_id: Option<usize> = None;
 
-        while let Some(token_with_span) = self.current().cloned() {
+        let mut next_id: usize = 0;
+        let mut last_atom: Option<usize> = None;
+        let mut pending_bond: Option<Bond> = None;
+        let mut branch_stack: Vec<usize> = Vec::new();
+        let mut ring_open: HashMap<RingNum, (usize, Option<Bond>)> = HashMap::new();
+
+        while let Some(token_with_span) = self.current() {
             match token_with_span.token() {
-                Token::UnbracketedAtom(unbracketed_atom) => {
-                    let atom = Atom::Unbracketed(unbracketed_atom);
-                    let id = match previous_node_id {
-                        Some(id) => id+1,
-                        None => 0,
-                    };
-                    previous_node_id = Some(id);
-                    let possible_ring: Option<RingNum> = if let Some(token) = self.peek_next() {
-                        match token.token() {
-                            Token::RingClosure(ring_num) => {self.advance(); Some(ring_num)},
-                            _ => None,
-                        }
-                    } else {
-                        None
-                    };
-                    let bond: Result<Option<Bond>, SmilesErrorWithSpan> = if let Some(token) = self.peek_next() {
-                        match token.token(){
-                            Token::NonBond => Ok(None),
-                            Token::BracketedAtom(_) => Ok(Some(Bond::Single)),
-                            Token::UnbracketedAtom(atom) => {
-                                if unbracketed_atom.aromatic() && atom.aromatic() {
-                                    Ok((Some(Bond::Aromatic)))
-                                } else {
-                                    Ok(Some(Bond::Single))
-                                }
-                            },
-                            Token::Bond(bond) => {
-                                self.advance();
-                                Ok(Some(bond))},
-                            Token::LeftParentheses => todo!(),
-                            Token::RightParentheses => todo!(),
-                            Token::RingClosure(ring_num) => Err(SmilesErrorWithSpan::new(SmilesError::InvalidRingNumber, token.start(), token.end())),
-                        }
-                    } else {
-                        Ok(None)
-                    };
+                Token::UnbracketedAtom(atom) => {
+                    let atom: Atom = Atom::Unbracketed(atom);
+                    let id = next_id;
+                    next_id += 1;
 
-                },
-                Token::BracketedAtom(bracket_atom) => {
-                    let atom = Atom::from(bracket_atom);
-                    let current_node =
-                        set_atom_node(previous_node_id, atom, None, token_with_span.span());
-                    let current_id = current_node.id();
-                    let current_val = (current_id, token_with_span);
-                    first_node_id_in_sequence =
-                        check_first_node(first_node_id_in_sequence, current_val);
+                    let node = AtomNode::new(atom, id, token_with_span.span(), None);
+                    smiles.push_node(node);
 
-                    previous_node_id = Some(current_id);
-                    smiles.push_node(current_node);
+                    if let Some(prev) = last_atom {
+                        let bond = pending_bond.unwrap_or_else(|| default_bond(&smiles, prev, id));
+                        smiles.push_edge(prev, id, bond).map_err(|e| {
+                            SmilesErrorWithSpan::new(
+                                e,
+                                token_with_span.start(),
+                                token_with_span.end(),
+                            )
+                        })?;
+                    }
+                    last_atom = Some(id);
+                    pending_bond = None;
                 }
-                Token::Bond(bond) => todo!(),
-                Token::LeftParentheses => todo!(),
-                Token::NonBond => todo!(),
-                Token::RightParentheses => todo!(),
-                Token::RingClosure(ring_num) => {}
+                Token::BracketedAtom(atom) => {
+                    let atom: Atom = Atom::from(atom);
+                    let id = next_id;
+                    next_id += 1;
+
+                    let node = AtomNode::new(atom, id, token_with_span.span(), None);
+                    smiles.push_node(node);
+
+                    if let Some(prev) = last_atom {
+                        let bond = pending_bond.unwrap_or_else(|| default_bond(&smiles, prev, id));
+                        smiles.push_edge(prev, id, bond).map_err(|e| {
+                            SmilesErrorWithSpan::new(
+                                e,
+                                token_with_span.start(),
+                                token_with_span.end(),
+                            )
+                        })?;
+                    }
+
+                    last_atom = Some(id);
+                    pending_bond = None;
+                }
+                Token::Bond(bond) => pending_bond = Some(bond),
+                Token::LeftParentheses => {
+                    let Some(anchor) = last_atom else {
+                        return Err(SmilesErrorWithSpan::new(
+                            SmilesError::UnexpectedLeftParentheses,
+                            token_with_span.start(),
+                            token_with_span.end(),
+                        ));
+                    };
+                    last_atom = Some(anchor);
+                }
+                Token::NonBond => {
+                    if let Some(bond) = pending_bond {
+                        return Err(SmilesErrorWithSpan::new(
+                            SmilesError::IncompleteBond(bond),
+                            token_with_span.start() - 1,
+                            token_with_span.end(),
+                        ));
+                    }
+                    if !branch_stack.is_empty() {
+                        return Err(SmilesErrorWithSpan::new(
+                            SmilesError::UnclosedBranch,
+                            token_with_span.start(),
+                            token_with_span.end(),
+                        ));
+                    }
+                    if !ring_open.is_empty() {
+                        return Err(SmilesErrorWithSpan::new(
+                            SmilesError::UnclosedRing,
+                            token_with_span.start(),
+                            token_with_span.end(),
+                        ));
+                    }
+                    last_atom = None;
+                    pending_bond = None;
+                }
+                Token::RingClosure(ring_num) => {
+                    let Some(current) = last_atom else {
+                        return Err(SmilesErrorWithSpan::new(
+                            SmilesError::InvalidRingNumber,
+                            token_with_span.start(),
+                            token_with_span.end(),
+                        ));
+                    };
+                    if let Some((other, stored_bond)) = ring_open.remove(&ring_num) {
+                        let bond = pending_bond
+                            .or(stored_bond)
+                            .unwrap_or_else(|| default_bond(&smiles, current, other));
+                        smiles.push_edge(current, other, bond).map_err(|e| {
+                            SmilesErrorWithSpan::new(
+                                e,
+                                token_with_span.start(),
+                                token_with_span.end(),
+                            )
+                        })?;
+                        pending_bond = None;
+                    } else {
+                        ring_open.insert(ring_num, (current, pending_bond));
+                        pending_bond = None;
+                    }
+                }
+                Token::RightParentheses => {
+                    let Some(anchor) = branch_stack.pop() else {
+                        return Err(SmilesErrorWithSpan::new(
+                            SmilesError::UnexpectedRightParentheses,
+                            token_with_span.start(),
+                            token_with_span.end(),
+                        ));
+                    };
+                    last_atom = Some(anchor);
+                }
             }
             self.advance();
         }
 
+        if let Some((ring_num, _)) = ring_open.into_iter().next() {
+            return Err(SmilesErrorWithSpan::new(SmilesError::InvalidRingNumber, 0, 0));
+        }
         Ok(smiles)
     }
 }
 
-fn set_atom_node(
-    previous_node_id: Option<usize>,
-    atom: Atom,
-    ring_num: Option<RingNum>,
-    span: Range<usize>,
-) -> AtomNode {
-    let id: usize;
-    if let Some(prev) = previous_node_id {
-        id = prev + 1;
-    } else {
-        id = 0;
-    }
-    let atom_node = AtomNode::new(atom, id, span, ring_num);
-    atom_node
-}
-
-fn check_first_node(
-    first_node_id_in_sequence: Option<(usize, TokenWithSpan)>,
-    current_val: (usize, TokenWithSpan),
-) -> Option<(usize, TokenWithSpan)> {
-    if first_node_id_in_sequence.is_none() { Some(current_val) } else { first_node_id_in_sequence }
-}
-
-fn try_peek_bond(
-    tokens: &[TokenWithSpan],
-    next_token_location: usize,
-) -> Result<(Bond, usize, usize), SmilesError> {
-    let current = &tokens[next_token_location - 1];
-    let next = &tokens[next_token_location];
-    match next.token() {
-        Token::NonBond => Ok((Bond::Single, next.start(), next.end())),
-        Token::BracketedAtom(_) => Ok((Bond::Single, current.start(), next.end())),
-        Token::UnbracketedAtom(_) => Ok((Bond::Single, current.start(), next.end())),
-        Token::Bond(bond) => Ok((bond, next.start(), next.end())),
-        Token::LeftParentheses => Ok((Bond::Single, current.start(), next.end())),
-        Token::RightParentheses => Ok((Bond::Single, current.start(), next.end())),
-        Token::RingClosure(ring_num) => {
-            let second = &tokens[next_token_location + 1];
-            match second.token() {
-                Token::NonBond => todo!(),
-                Token::BracketedAtom(bracket_atom) => todo!(),
-                Token::UnbracketedAtom(unbracketed_atom) => todo!(),
-                Token::Bond(bond) => todo!(),
-                Token::LeftParentheses => todo!(),
-                Token::RightParentheses => todo!(),
-                Token::RingClosure(ring_num) => todo!(),
-            }
-        }
-    }
+fn default_bond(smiles: &Smiles, id_a: usize, id_b: usize) -> Bond {
+    let node_a = &smiles.nodes()[id_a];
+    let node_b = &smiles.nodes()[id_b];
+    if node_a.atom().aromatic() && node_b.atom().aromatic() { Bond::Aromatic } else { Bond::Single }
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::{
-        errors::SmilesError, parser::smiles_parser::check_first_node, token::TokenWithSpan,
-    };
-
-    #[test]
-    fn test_check_first_node() -> Result<(), SmilesError> {
-        let node = 1;
-        let token = TokenWithSpan::new(crate::token::Token::NonBond, 1, 2);
-        let new_node = check_first_node(None, (node, token.clone()));
-        if let Some((found_node, found_token)) = new_node {
-            assert_eq!(found_node, node);
-            assert_eq!(found_token, token);
-        } else {
-            return Err(SmilesError::NodeIdInvalid(node));
-        }
-        Ok(())
-    }
-}
+mod tests {}

@@ -66,10 +66,18 @@ pub enum SmilesError {
     UnexpectedPercent,
     /// An unexpected left bracket `[` was found
     UnexpectedLeftBracket,
+    /// A `(` that wasn't expected has been found
+    UnexpectedLeftParentheses,
     /// An unexpected right bracket `]` was found
     UnexpectedRightBracket,
+    /// An unexpected right parentheses `)` was found
+    UnexpectedRightParentheses,
     /// A closing `]` bracket was not found
     UnclosedBracket,
+    /// A branch has not been closed with a `)`
+    UnclosedBranch,
+    /// A ring number has been found that was not completed
+    UnclosedRing,
 }
 
 impl fmt::Display for SmilesError {
@@ -79,10 +87,11 @@ impl fmt::Display for SmilesError {
             IncompleteBond, IntegerOverflow, InvalidAromaticElement, InvalidChirality,
             InvalidClass, InvalidElementName, InvalidIsotope, InvalidNonBondToken, InvalidNumber,
             InvalidRingNumber, InvalidUnbracketedAtom, MissingBracketElement, MissingElement,
-            NodeIdInvalid, NonBondInBracket, RingNumberOverflow, UnclosedBracket,
-            UnexpectedBracketedState, UnexpectedCharacter, UnexpectedColon, UnexpectedDash,
-            UnexpectedEndOfString, UnexpectedLeftBracket, UnexpectedPercent,
-            UnexpectedRightBracket,
+            NodeIdInvalid, NonBondInBracket, RingNumberOverflow, UnclosedBracket, UnclosedBranch,
+            UnclosedRing, UnexpectedBracketedState, UnexpectedCharacter, UnexpectedColon,
+            UnexpectedDash, UnexpectedEndOfString, UnexpectedLeftBracket,
+            UnexpectedLeftParentheses, UnexpectedPercent, UnexpectedRightBracket,
+            UnexpectedRightParentheses,
         };
         match self {
             MissingElement => write!(f, "Missing element"),
@@ -115,6 +124,10 @@ impl fmt::Display for SmilesError {
             InvalidNonBondToken => write!(f, "Invalid Non-bond '.' found"),
             NodeIdInvalid(n) => write!(f, "Invalid Atom Node ID: {n}"),
             IncompleteBond(bond) => write!(f, "Bond: {bond} missing Atom Node(s)"),
+            UnexpectedLeftParentheses => write!(f, "Unexpected '('"),
+            UnclosedBranch => write!(f, "Branch not closed"),
+            UnclosedRing => write!(f, "Ring not closed"),
+            UnexpectedRightParentheses => write!(f, "Unexpected `)`"),
         }
     }
 }
