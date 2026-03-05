@@ -1,13 +1,6 @@
 //! Tests of the parser module for several corner cases.
 
-use elements_rs::Element;
-use smiles_parser::{
-    atom::{atom_symbol::AtomSymbol, unbracketed::UnbracketedAtom},
-    bond::ring_num::RingNum,
-    errors::{SmilesError, SmilesErrorWithSpan},
-    parser::token_iter::TokenIter,
-    token::{Token, TokenWithSpan},
-};
+use smiles_parser::{errors::SmilesErrorWithSpan, parser::token_iter::TokenIter};
 const SMILES_STR: &[&str] = &[
     "C1=CC=CC=C1",
     "[OH2]",
@@ -42,7 +35,6 @@ const SMILES_STR: &[&str] = &[
     "CC1=C[C@H](O)CC(C)(C)[C@H]1/C=C/C(C)=C/C=C/C(C)=C/C=C/C=C(C)/C=C/C=C(\\C)CO",
     "c1ccccc1*",
 ];
-
 #[test]
 fn test_tokenizer() {
     for &s in SMILES_STR {
@@ -53,56 +45,45 @@ fn test_tokenizer() {
 }
 
 #[test]
-fn test_smiles_tokens_benzene() -> Result<(), SmilesError> {
-    // C1=CC=CC=C1
-    // (not aromatic because uppercase C)
-    let c = UnbracketedAtom::new(AtomSymbol::Element(Element::C), false);
+fn test_parser_all_inputs() {
+    use std::str::FromStr;
 
-    let expected = vec![
-        TokenWithSpan::new(Token::UnbracketedAtom(c), 0, 1),
-        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?), 1, 2),
-        TokenWithSpan::new(Token::Bond(smiles_parser::bond::Bond::Double), 2, 3),
-        TokenWithSpan::new(Token::UnbracketedAtom(c), 3, 4),
-        TokenWithSpan::new(Token::UnbracketedAtom(c), 4, 5),
-        TokenWithSpan::new(Token::Bond(smiles_parser::bond::Bond::Double), 5, 6),
-        TokenWithSpan::new(Token::UnbracketedAtom(c), 6, 7),
-        TokenWithSpan::new(Token::UnbracketedAtom(c), 7, 8),
-        TokenWithSpan::new(Token::Bond(smiles_parser::bond::Bond::Double), 8, 9),
-        TokenWithSpan::new(Token::UnbracketedAtom(c), 9, 10),
-        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?), 10, 11),
-    ];
-    let line = SMILES_STR[0];
-    let got = TokenIter::from(line)
-        .collect::<Result<Vec<_>, SmilesErrorWithSpan>>()
-        .unwrap_or_else(|e| panic!("Failed to tokenize:\n{}", e.render(line)));
+    use smiles_parser::smiles::Smiles;
 
-    assert_eq!(expected, got);
-    Ok(())
+    for &s in SMILES_STR {
+        Smiles::from_str(s).unwrap_or_else(|e| panic!("Failed to parse:\n{}", e.render(s)));
+    }
 }
 
 #[test]
-fn test_smiles_tokens_benzene_with_wildcard() -> Result<(), SmilesError> {
-    // c1ccccc1*
-    let aromatic_c = UnbracketedAtom::new(AtomSymbol::Element(Element::C), true);
-    let star = UnbracketedAtom::new(AtomSymbol::WildCard, false);
+fn test_parse_benzene_graph_shape() {
+    // C1=CC=CC=C1
+    use std::str::FromStr;
 
-    let expected = vec![
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 0, 1),
-        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?), 1, 2),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 2, 3),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 3, 4),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 4, 5),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 5, 6),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 6, 7),
-        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?), 7, 8),
-        TokenWithSpan::new(Token::UnbracketedAtom(star), 8, 9),
-    ];
+    use smiles_parser::smiles::Smiles;
+
+    let line = SMILES_STR[0];
+    let smiles =
+        Smiles::from_str(line).unwrap_or_else(|e| panic!("Failed to parse:\n{}", e.render(line)));
+
+    assert_eq!(smiles.nodes().len(), 6);
+    assert_eq!(smiles.edges().len(), 6);
+    assert!(smiles.nodes().iter().all(|n| !n.atom().aromatic()));
+}
+
+#[test]
+fn test_parse_benzene_with_wildcard_graph_shape() {
+    // c1ccccc1*
+    use std::str::FromStr;
+
+    use smiles_parser::smiles::Smiles;
 
     let line = SMILES_STR[31];
-    let got = TokenIter::from(line)
-        .collect::<Result<Vec<_>, SmilesErrorWithSpan>>()
-        .unwrap_or_else(|e| panic!("Failed to tokenize:\n{}", e.render(line)));
+    let smiles =
+        Smiles::from_str(line).unwrap_or_else(|e| panic!("Failed to parse:\n{}", e.render(line)));
 
-    assert_eq!(expected, got);
-    Ok(())
+    assert_eq!(smiles.nodes().len(), 7);
+    assert_eq!(smiles.edges().len(), 7);
+    let aromatic_count = smiles.nodes().iter().filter(|n| n.atom().aromatic()).count();
+    assert_eq!(aromatic_count, 6);
 }

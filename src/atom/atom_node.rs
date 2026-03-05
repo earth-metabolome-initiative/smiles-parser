@@ -1,4 +1,4 @@
-//! Module for the structure of an atom as a node for use in a [`Smiles`] graph
+//! Module for the structure of an atom as a node for use in a `Smiles` graph
 
 use std::{cmp::Ordering, ops::Range};
 

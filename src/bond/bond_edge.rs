@@ -2,7 +2,7 @@
 
 use crate::bond::Bond;
 
-/// Contains the two ID's of the [`AtomNode`] that are connected via the
+/// Contains the two ID's of the `AtomNode` that are connected via the
 /// [`Bond`]
 pub struct BondEdge {
     /// The first node

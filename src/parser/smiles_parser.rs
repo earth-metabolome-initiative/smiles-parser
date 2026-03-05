@@ -10,8 +10,8 @@ use crate::{
     token::{Token, TokenWithSpan},
 };
 
-/// Contains the vec of tokens being iterated on and tracks the current position
-/// in that vec
+/// Contains the slice of tokens being iterated on and current position in that
+/// slice
 pub struct SmilesParser<'a> {
     tokens: &'a [TokenWithSpan],
     position: usize,
@@ -77,29 +77,25 @@ impl<'a> SmilesParser<'a> {
     ///
     /// # Errors
     /// - [`SmilesError::UnexpectedLeftParentheses`]: Encountered `(` when there
-    ///   is no current atom to branch from (e.g. the input begins with `(`, or
-    ///   appears after `.`).
+    ///   is no current atom to branch from.
     ///
     /// - [`SmilesError::UnexpectedRightParentheses`]: Encountered `)` without a
-    ///   matching `(` (branch stack underflow).
+    ///   matching `(`.
     ///
-    /// - [`SmilesError::UnclosedBranch`]: A component boundary `.` was
-    ///   encountered while there are still open branches.
+    /// - [`SmilesError::UnclosedBranch`]: A boundary was encountered while a
+    ///   branch is still open.
     ///
     /// - [`SmilesError::InvalidRingNumber`]: A ring closure token was
-    ///   encountered without a current atom (e.g. input starts with a ring
-    ///   number), or a ring closure is left unmatched by end-of-input.
+    ///   encountered without a current atom or a ring closure is left unmatched
+    ///   by end-of-input.
     ///
-    /// - [`SmilesError::UnclosedRing`]: A component boundary `.` was
-    ///   encountered while there are still open ring closures.
+    /// - [`SmilesError::UnclosedRing`]: A boundary was encountered while there
+    ///   are still open ring closures.
     ///
-    /// - [`SmilesError::IncompleteBond`]: A bond token (e.g. `-`, `=`, `#`,
-    ///   `:`) was read but no subsequent atom or ring closure was available to
-    ///   complete the bond (for example, a bond immediately followed by `.`).
+    /// - [`SmilesError::IncompleteBond`]: A bond token was parsed but no atom
+    ///   proceeded to complete the bond.
     ///
-    /// - Any error produced while adding edges to the graph (e.g. invalid node
-    ///   ids), which is wrapped into [`SmilesErrorWithSpan`] using the span of
-    ///   the token that attempted the insertion.
+    /// - Any other error will be emitted as a  [`SmilesErrorWithSpan`]
     pub fn parse(mut self) -> Result<Smiles, SmilesErrorWithSpan> {
         let mut smiles = Smiles::new();
 
@@ -108,10 +104,12 @@ impl<'a> SmilesParser<'a> {
         let mut pending_bond: Option<Bond> = None;
         let mut branch_stack: Vec<usize> = Vec::new();
         let mut ring_open: HashMap<RingNum, (usize, Option<Bond>)> = HashMap::new();
+        let mut last_span: (usize, usize) = (0, 0);
 
         while let Some(token_with_span) = self.current() {
             let start = token_with_span.start();
             let end = token_with_span.end();
+            last_span = (start, end);
             match token_with_span.token() {
                 Token::UnbracketedAtom(atom) => {
                     let atom: Atom = Atom::Unbracketed(atom);
@@ -157,15 +155,14 @@ impl<'a> SmilesParser<'a> {
                             end,
                         ));
                     };
-                    last_atom = Some(anchor);
+                    branch_stack.push(anchor);
                 }
                 Token::NonBond => {
-                    is_valid_non_bond(
+                    validate_non_bond(
                         pending_bond,
-                        start,
-                        end,
                         branch_stack.is_empty(),
                         ring_open.is_empty(),
+                        last_span,
                     )?;
                     last_atom = None;
                     pending_bond = None;
@@ -204,28 +201,51 @@ impl<'a> SmilesParser<'a> {
             }
             self.advance();
         }
+        parse_end_check(pending_bond, branch_stack.is_empty(), ring_open.is_empty(), last_span)?;
 
-        if let Some((_ring_num, _)) = ring_open.into_iter().next() {
-            return Err(SmilesErrorWithSpan::new(SmilesError::InvalidRingNumber, 0, 0));
-        }
         Ok(smiles)
     }
 }
 
-fn is_valid_non_bond(
+fn parse_end_check(
     pending_bond: Option<Bond>,
-    start: usize,
-    end: usize,
-    branch_stack: bool,
-    ring_open: bool,
+    branch_stack_empty: bool,
+    ring_open_empty: bool,
+    last_span: (usize, usize),
 ) -> Result<(), SmilesErrorWithSpan> {
+    let (start, end) = last_span;
+    let start = start.min(end.saturating_sub(1));
+    let end = end.max(start.saturating_add(1));
+
     if let Some(bond) = pending_bond {
-        return Err(SmilesErrorWithSpan::new(SmilesError::IncompleteBond(bond), start - 1, end));
+        return Err(SmilesErrorWithSpan::new(SmilesError::IncompleteBond(bond), start, end));
     }
-    if !branch_stack {
+    if !branch_stack_empty {
         return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedBranch, start, end));
     }
-    if !ring_open {
+    if !ring_open_empty {
+        return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedRing, start, end));
+    }
+    Ok(())
+}
+
+fn validate_non_bond(
+    pending_bond: Option<Bond>,
+    branch_stack_empty: bool,
+    ring_open_empty: bool,
+    last_span: (usize, usize),
+) -> Result<(), SmilesErrorWithSpan> {
+    let (start, end) = last_span;
+    let start = start.min(end.saturating_sub(1));
+    let end = end.max(start.saturating_add(1));
+
+    if let Some(bond) = pending_bond {
+        return Err(SmilesErrorWithSpan::new(SmilesError::IncompleteBond(bond), start, end));
+    }
+    if !branch_stack_empty {
+        return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedBranch, start, end));
+    }
+    if !ring_open_empty {
         return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedRing, start, end));
     }
     Ok(())

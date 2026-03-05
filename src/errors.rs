@@ -32,7 +32,7 @@ pub enum SmilesError {
     InvalidElementName(char),
     /// Invalid Isotope value passed
     InvalidIsotope,
-    /// Invalid [`Token::NonBond`]
+    /// Invalid `Token::NonBond`
     InvalidNonBondToken,
     /// Error indicating that an invalid number was encountered.
     InvalidNumber,
