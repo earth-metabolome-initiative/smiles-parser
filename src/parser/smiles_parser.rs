@@ -258,4 +258,112 @@ fn default_bond(smiles: &Smiles, id_a: usize, id_b: usize) -> Bond {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use elements_rs::Element;
+
+    use crate::{
+        atom::{atom_symbol::AtomSymbol, unbracketed::UnbracketedAtom},
+        bond::{Bond, ring_num::RingNum},
+        parser::smiles_parser::SmilesParser, // adjust if your module path differs
+        token::{Token, TokenWithSpan},
+    };
+
+    fn test_tokens() -> Vec<TokenWithSpan> {
+        let c = UnbracketedAtom::new(AtomSymbol::Element(Element::C), false);
+        let o = UnbracketedAtom::new(AtomSymbol::Element(Element::O), false);
+        let n = UnbracketedAtom::new(AtomSymbol::Element(Element::N), false);
+        let aromatic_c = UnbracketedAtom::new(AtomSymbol::Element(Element::C), true);
+
+        vec![
+            // COc(c1)cccc1C#N
+            TokenWithSpan::new(Token::UnbracketedAtom(c), 0, 1), // C
+            TokenWithSpan::new(Token::UnbracketedAtom(o), 1, 2), // O
+            TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 2, 3), // c
+            TokenWithSpan::new(Token::LeftParentheses, 3, 4), // (
+            TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 4, 5), // c
+            TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1).unwrap()), 5, 6), // 1
+            TokenWithSpan::new(Token::RightParentheses, 6, 7), // )
+            TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 7, 8), // c
+            TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 8, 9), // c
+            TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 9, 10), // c
+            TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 10, 11), // c
+            TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1).unwrap()), 11, 12), // 1
+            TokenWithSpan::new(Token::UnbracketedAtom(c), 12, 13), // C
+            TokenWithSpan::new(Token::Bond(Bond::Triple), 13, 14), // #
+            TokenWithSpan::new(Token::UnbracketedAtom(n), 14, 15), // N
+        ]
+    }
+
+    #[test]
+    fn smiles_parser_new_sets_position_zero() {
+        let tokens = test_tokens();
+        let p = SmilesParser::new(&tokens);
+        assert_eq!(p.position(), 0);
+    }
+
+    #[test]
+    fn smiles_parser_tokens_returns_same_slice() {
+        let tokens = test_tokens();
+        let p = SmilesParser::new(&tokens);
+        assert_eq!(p.tokens(), tokens.as_slice());
+    }
+
+    #[test]
+    fn smiles_parser_current_peek_methods_work() {
+        let tokens = test_tokens();
+        let p = SmilesParser::new(&tokens);
+
+        assert_eq!(p.current(), Some(&tokens[0]));
+        assert_eq!(p.peek_next(), Some(&tokens[1]));
+        assert_eq!(p.peek_n(2), Some(&tokens[2]));
+        assert_eq!(p.peek_last(), None);
+    }
+
+    #[test]
+    fn smiles_parser_advance_moves_position() {
+        let tokens = test_tokens();
+        let mut p = SmilesParser::new(&tokens);
+
+        p.advance();
+        assert_eq!(p.position(), 1);
+        assert_eq!(p.current(), Some(&tokens[1]));
+    }
+
+    #[test]
+    fn smiles_parser_next_token_returns_and_advances() {
+        let tokens = test_tokens();
+        let mut p = SmilesParser::new(&tokens);
+
+        let t0 = p.next_token();
+        assert_eq!(t0, Some(&tokens[0]));
+        assert_eq!(p.position(), 1);
+
+        let t1 = p.next_token();
+        assert_eq!(t1, Some(&tokens[1]));
+        assert_eq!(p.position(), 2);
+    }
+
+    #[test]
+    fn smiles_parser_done_is_false_then_true() {
+        let tokens = test_tokens();
+        let mut p = SmilesParser::new(&tokens);
+
+        assert!(!p.done());
+        while !p.done() {
+            p.advance();
+        }
+        assert!(p.done());
+        assert_eq!(p.current(), None);
+        assert_eq!(p.peek_next(), None);
+        assert_eq!(p.peek_n(1), None);
+    }
+
+    #[test]
+    fn smiles_parser_parse_builds_graph() {
+        let tokens = test_tokens();
+        let smiles = SmilesParser::new(&tokens).parse().expect("parse should succeed");
+
+        assert_eq!(smiles.nodes().len(), 10); 
+        assert!(!smiles.edges().is_empty());
+    }
+}
