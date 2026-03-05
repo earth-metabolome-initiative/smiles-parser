@@ -5,15 +5,12 @@
 //! To run this test (validates SMILES in the PubChem dataset), ensure that:
 //!
 //! ```
-//! cargo test --release --test test_pubchem_inchi_validation -- --ignored --nocapture
+//! cargo test --release --test validate_pubchem_smiles -- --ignored --nocapture
 //! ```
 
+use core::error;
 use std::{
-    collections::HashMap,
-    fs::File,
-    io::{BufReader, Write},
-    path::Path,
-    result,
+    collections::HashMap, fs::File, io::{BufReader, Write},path::Path, result
 };
 
 use csv::ReaderBuilder;
@@ -34,8 +31,12 @@ struct SmilesPubChemCompound {
     smiles: String,
 }
 
-fn validate_pubchem_smiles(file_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let file = File::open(file_path)?;
+
+#[test]
+#[ignore = "This test downloads a ~6.79 GB file and is time-consuming."]
+fn validate_pubchem_smiles() -> Result<(), Box<dyn std::error::Error>> {
+    let file = File::open("tests/CID-SMILES.gz")?;
+    //let file = File::open(file_path)?;
     let decoder = GzDecoder::new(file);
     let reader = BufReader::new(decoder);
 
@@ -56,10 +57,11 @@ fn validate_pubchem_smiles(file_path: &Path) -> Result<(), Box<dyn std::error::E
         pb.inc(1);
 
         let smiles_str = &result.smiles;
-        match smiles_str.parse::<Smiles>() {
-            Ok(_) => todo!(),
-            Err(_) => todo!(),
+        if let Err(err) = smiles_str.parse::<Smiles>() {
+            panic!("{}", err.render(smiles_str));
+            
         }
     }
     Ok(())
 }
+

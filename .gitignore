@@ -1,3 +1,3 @@
 target/
-
+tests/CID-SMILES.gz
 .vscode/*

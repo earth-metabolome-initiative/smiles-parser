@@ -49,7 +49,7 @@ impl TokenIter<'_> {
                 }
                 self.in_bracket = true;
                 let mut possible_bracket_atom = BracketAtom::builder();
-                if let Some(isotope) = try_fold_number(self) {
+                if let Some(isotope) = try_fold_number::<u16, 3>(self) {
                     possible_bracket_atom = possible_bracket_atom.with_isotope(isotope?);
                 }
                 let (atom, aromatic) = try_element(self)?;
@@ -91,7 +91,7 @@ impl TokenIter<'_> {
                         return Err(SmilesError::UnexpectedPercent);
                     }
 
-                    if let Some(num) = try_fold_number::<u8>(self) {
+                    if let Some(num) = try_fold_number::<u8, 2>(self) {
                         let ring_num = RingNum::try_new(num?)?;
                         if ring_num.get() < 10 {
                             return Err(SmilesError::InvalidRingNumber);
@@ -282,13 +282,13 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
                 'H' => {
                     stream.chars.next();
                     let num =
-                        try_fold_number::<u8>(stream).ok_or(SmilesError::InvalidChirality)??;
+                        try_fold_number::<u8, 1>(stream).ok_or(SmilesError::InvalidChirality)??;
                     Chirality::try_th(num)?
                 }
                 'B' => {
                     stream.chars.next();
                     let num =
-                        try_fold_number::<u8>(stream).ok_or(SmilesError::InvalidChirality)??;
+                        try_fold_number::<u8, 2>(stream).ok_or(SmilesError::InvalidChirality)??;
                     Chirality::try_tb(num)?
                 }
                 _ => return Err(SmilesError::InvalidChirality),
@@ -300,7 +300,7 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
                 'P' => {
                     stream.chars.next();
                     let num =
-                        try_fold_number::<u8>(stream).ok_or(SmilesError::InvalidChirality)??;
+                        try_fold_number::<u8, 1>(stream).ok_or(SmilesError::InvalidChirality)??;
                     Chirality::try_sp(num)?
                 }
                 _ => return Err(SmilesError::InvalidChirality),
@@ -312,7 +312,7 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
                 'H' => {
                     stream.chars.next();
                     let num =
-                        try_fold_number::<u8>(stream).ok_or(SmilesError::InvalidChirality)??;
+                        try_fold_number::<u8, 2>(stream).ok_or(SmilesError::InvalidChirality)??;
                     Chirality::try_oh(num)?
                 }
                 _ => return Err(SmilesError::InvalidChirality),
@@ -324,26 +324,30 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
     Ok(Some(chirality))
 }
 
-fn try_fold_number<B>(stream: &mut TokenIter<'_>) -> Option<Result<B, SmilesError>>
+fn try_fold_number<B, const MAX_DIGITS: usize>(stream: &mut TokenIter<'_>) -> Option<Result<B, SmilesError>>
 where
-    B: TryFrom<u32>,
+    B: TryFrom<u16>,
 {
-    let mut seen_any = false;
-    let mut amount: u32 = 0;
+    let mut amount: u16 = 0;
+    let mut digits_found = 0;
 
     while let Some(char) = stream.peek_char() {
+        if digits_found == MAX_DIGITS {
+            break;
+        }
         let Some(digit) = char.to_digit(10) else {
             break;
         };
+        let digit = u16::try_from(digit).unwrap_or_else(|_| unreachable!("a character cannot be greater than u16"));
         stream.chars.next();
-        seen_any = true;
+        digits_found += 1;
         match amount.checked_mul(10).and_then(|x| x.checked_add(digit)) {
             Some(val) => amount = val,
             None => return Some(Err(SmilesError::IntegerOverflow)),
         }
     }
 
-    if !seen_any {
+    if digits_found == 0 {
         return None;
     }
 
@@ -354,7 +358,7 @@ fn hydrogen_count(stream: &mut TokenIter<'_>) -> Result<HydrogenCount, SmilesErr
     let possible_hydrogen = stream.peek_char();
     if matches!(possible_hydrogen, Some('H')) {
         stream.chars.next();
-        match try_fold_number::<u8>(stream) {
+        match try_fold_number::<u8, 3>(stream) {
             Some(h) => Ok(HydrogenCount::new(Some(h?))),
             None => Ok(HydrogenCount::new(Some(1))),
         }
@@ -373,7 +377,7 @@ fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
                     Charge::try_new(-2)
                 }
                 _ => {
-                    if let Some(possible_num) = try_fold_number::<i8>(stream) {
+                    if let Some(possible_num) = try_fold_number::<i8,2>(stream) {
                         Charge::try_new(-possible_num?)
                     } else {
                         Charge::try_new(-1)
@@ -389,7 +393,7 @@ fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
                     Charge::try_new(2)
                 }
                 _ => {
-                    if let Some(possible_num) = try_fold_number::<i8>(stream) {
+                    if let Some(possible_num) = try_fold_number::<i8, 2>(stream) {
                         Charge::try_new(possible_num?)
                     } else {
                         Charge::try_new(1)
@@ -405,7 +409,7 @@ fn try_class(stream: &mut TokenIter<'_>) -> Result<u16, SmilesError> {
     match stream.peek_char() {
         Some(':') => {
             stream.chars.next();
-            if let Some(possible_num) = try_fold_number(stream) {
+            if let Some(possible_num) = try_fold_number::<u16, 3>(stream) {
                 possible_num
             } else {
                 Err(SmilesError::InvalidClass)
