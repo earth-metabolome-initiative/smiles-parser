@@ -1,5 +1,7 @@
 //! Represents a SMILES structure.
 
+use std::fmt;
+
 use crate::{
     atom::atom_node::AtomNode,
     bond::{Bond, bond_edge::BondEdge},
@@ -75,6 +77,16 @@ impl Smiles {
     pub fn edges_mut(&mut self) -> &mut [BondEdge] {
         &mut self.bond_edges
     }
+    /// Find all neighboring edges bonded to the current node id
+    pub fn neighbors(&self, id: usize) -> Vec<(usize, Bond)>{
+        self.bond_edges.iter().filter_map(|edge| if edge.node_a() == id {
+            Some((edge.node_b(), edge.bond().to_owned()))
+        } else if edge.node_b() == id {
+            Some((edge.node_a(), edge.bond().to_owned()))
+        } else {
+            None
+        }).collect()
+    }
 }
 
 impl Default for Smiles {
@@ -82,3 +94,13 @@ impl Default for Smiles {
         Self::new()
     }
 }
+
+// impl fmt::Display for Smiles {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         for node in self.atom_nodes {
+//             let id = node.id();
+//             let edges = self.find_node_edges(id);
+
+//         }
+//     }
+// }
