@@ -8,19 +8,13 @@
 //! cargo test --release --test validate_pubchem_smiles -- --ignored --nocapture
 //! ```
 
-use core::error;
-use std::{
-    collections::HashMap, fs::File, io::{BufReader, Write},path::Path, result
-};
+use std::{fs::File, io::BufReader};
 
 use csv::ReaderBuilder;
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::Deserialize;
-use smiles_parser::{
-    smiles::Smiles,
-    token::{Token, TokenWithSpan},
-};
+use smiles_parser::smiles::Smiles;
 
 /// Structure representing a PubChem compound as a SMILES string
 #[derive(Debug, Deserialize)]
@@ -31,12 +25,11 @@ struct SmilesPubChemCompound {
     smiles: String,
 }
 
-
 #[test]
 #[ignore = "This test downloads a ~6.79 GB file and is time-consuming."]
 fn validate_pubchem_smiles() -> Result<(), Box<dyn std::error::Error>> {
     let file = File::open("tests/CID-SMILES.gz")?;
-    //let file = File::open(file_path)?;
+    // let file = File::open(file_path)?;
     let decoder = GzDecoder::new(file);
     let reader = BufReader::new(decoder);
 
@@ -51,17 +44,14 @@ fn validate_pubchem_smiles() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap()
             .progress_chars("#>-"),
     );
-    let start = std::time::Instant::now();
     for result in csv_reader.deserialize::<SmilesPubChemCompound>() {
         let result = result?;
         pb.inc(1);
 
         let smiles_str = &result.smiles;
         if let Err(err) = smiles_str.parse::<Smiles>() {
-            panic!("{}", err.render(smiles_str));
-            
+            panic!("{}\n{}", result.id, err.render(smiles_str));
         }
     }
     Ok(())
 }
-

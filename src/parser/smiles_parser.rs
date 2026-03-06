@@ -279,10 +279,10 @@ mod tests {
             TokenWithSpan::new(Token::UnbracketedAtom(c), 0, 1), // C
             TokenWithSpan::new(Token::UnbracketedAtom(o), 1, 2), // O
             TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 2, 3), // c
-            TokenWithSpan::new(Token::LeftParentheses, 3, 4), // (
+            TokenWithSpan::new(Token::LeftParentheses, 3, 4),    // (
             TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 4, 5), // c
             TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1).unwrap()), 5, 6), // 1
-            TokenWithSpan::new(Token::RightParentheses, 6, 7), // )
+            TokenWithSpan::new(Token::RightParentheses, 6, 7),   // )
             TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 7, 8), // c
             TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 8, 9), // c
             TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 9, 10), // c
@@ -363,7 +363,7 @@ mod tests {
         let tokens = test_tokens();
         let smiles = SmilesParser::new(&tokens).parse().expect("parse should succeed");
 
-        assert_eq!(smiles.nodes().len(), 10); 
+        assert_eq!(smiles.nodes().len(), 10);
         assert!(!smiles.edges().is_empty());
     }
 }

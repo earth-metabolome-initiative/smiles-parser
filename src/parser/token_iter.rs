@@ -324,7 +324,9 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
     Ok(Some(chirality))
 }
 
-fn try_fold_number<B, const MAX_DIGITS: usize>(stream: &mut TokenIter<'_>) -> Option<Result<B, SmilesError>>
+fn try_fold_number<B, const MAX_DIGITS: usize>(
+    stream: &mut TokenIter<'_>,
+) -> Option<Result<B, SmilesError>>
 where
     B: TryFrom<u16>,
 {
@@ -338,7 +340,8 @@ where
         let Some(digit) = char.to_digit(10) else {
             break;
         };
-        let digit = u16::try_from(digit).unwrap_or_else(|_| unreachable!("a character cannot be greater than u16"));
+        let digit = u16::try_from(digit)
+            .unwrap_or_else(|_| unreachable!("a character cannot be greater than u16"));
         stream.chars.next();
         digits_found += 1;
         match amount.checked_mul(10).and_then(|x| x.checked_add(digit)) {
@@ -377,7 +380,7 @@ fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
                     Charge::try_new(-2)
                 }
                 _ => {
-                    if let Some(possible_num) = try_fold_number::<i8,2>(stream) {
+                    if let Some(possible_num) = try_fold_number::<i8, 2>(stream) {
                         Charge::try_new(-possible_num?)
                     } else {
                         Charge::try_new(-1)
