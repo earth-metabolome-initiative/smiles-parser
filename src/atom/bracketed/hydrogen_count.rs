@@ -1,5 +1,9 @@
 //! Module for specifying the total number of hydrogens a `SMILES` string
 //! specifies
+
+use std::fmt;
+
+
 #[derive(Copy, Default, Debug, PartialEq, Clone, Eq, Hash)]
 /// Designates the hydrogen count (explicit only). Currently Hydrogen count has
 /// no upper bound, and may go to [`u8::MAX`]
@@ -30,6 +34,15 @@ impl HydrogenCount {
     }
 }
 
+impl fmt::Display for HydrogenCount {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HydrogenCount::Unspecified => Ok(()),
+            HydrogenCount::Explicit(n) => write!(f, "H{}",n),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::atom::bracketed::hydrogen_count::HydrogenCount;
@@ -46,5 +59,13 @@ mod tests {
         assert_eq!(no_count.get_count(), None);
         assert_eq!(no_count, HydrogenCount::Unspecified);
         assert_eq!(no_count, HydrogenCount::default());
+    }
+
+    #[test]
+    fn test_hydrogen_count_fmt_all_arms() {
+        let no_count = HydrogenCount::Unspecified;
+        let count = HydrogenCount::Explicit(5);
+        assert_eq!(no_count.to_string(), "".to_string());
+        assert_eq!(count.to_string(), "H5");
     }
 }
