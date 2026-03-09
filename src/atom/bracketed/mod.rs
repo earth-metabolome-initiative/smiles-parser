@@ -4,6 +4,8 @@
 pub mod charge;
 pub mod chirality;
 pub mod hydrogen_count;
+use std::fmt;
+
 use elements_rs::{Element, Isotope};
 
 use crate::{
@@ -196,6 +198,34 @@ impl BracketAtomBuilder {
     }
 }
 
+impl fmt::Display for BracketAtom {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("[")?;
+        if let Some(isotope) = self.isotope_mass_number() {
+            write!(f, "{isotope}")?;
+        }
+        match self.symbol() {
+            AtomSymbol::Element(element) => {
+                if self.aromatic() {
+                    write!(f, "{}", element.to_string().to_ascii_lowercase())?;
+                } else {
+                    write!(f,"{element}")?;
+                }
+            },
+            AtomSymbol::WildCard | AtomSymbol::Unspecified => f.write_str("*")?,
+        }
+        if let Some(chirality) = self.chirality() {
+            write!(f, "{chirality}")?;
+        }
+        write!(f, "{}", self.hydrogens())?;
+        write!(f, "{}", self.charge())?;
+        if self.class() != 0 {
+            write!(f, ":{}", self.class())?;
+        }
+        f.write_str("]")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use elements_rs::Element;
@@ -346,4 +376,112 @@ mod tests {
         assert_eq!(a.class(), 7);
         assert_eq!(a.chirality(), Some(Chirality::AtAt));
     }
+
+#[test]
+fn test_bracketed_atom_fmt_all_arms() {
+    let cases = [
+        (
+            BracketAtom::builder().build(),
+            "[*]",
+        ),
+        (
+            BracketAtom::builder()
+                .with_symbol(AtomSymbol::WildCard)
+                .build(),
+            "[*]",
+        ),
+        (
+            BracketAtom::builder()
+                .with_symbol(AtomSymbol::Element(Element::C))
+                .build(),
+            "[C]",
+        ),
+        (
+            BracketAtom::builder()
+                .with_symbol(AtomSymbol::Element(Element::C))
+                .with_aromatic(true)
+                .build(),
+            "[c]",
+        ),
+        (
+            BracketAtom::builder()
+                .with_symbol(AtomSymbol::Element(Element::C))
+                .with_isotope(13)
+                .build(),
+            "[13C]",
+        ),
+        (
+            BracketAtom::builder()
+                .with_symbol(AtomSymbol::Element(Element::C))
+                .with_chirality(Chirality::At)
+                .build(),
+            "[C@]",
+        ),
+        (
+            BracketAtom::builder()
+                .with_symbol(AtomSymbol::Element(Element::C))
+                .with_chirality(Chirality::AtAt)
+                .build(),
+            "[C@@]",
+        ),
+        (
+            BracketAtom::builder()
+                .with_symbol(AtomSymbol::Element(Element::C))
+                .with_hydrogens(HydrogenCount::Explicit(2))
+                .build(),
+            "[CH2]",
+        ),
+        (
+            BracketAtom::builder()
+                .with_symbol(AtomSymbol::Element(Element::C))
+                .with_charge(Charge::try_new(1).unwrap())
+                .build(),
+            "[C+]",
+        ),
+        (
+            BracketAtom::builder()
+                .with_symbol(AtomSymbol::Element(Element::C))
+                .with_charge(Charge::try_new(3).unwrap())
+                .build(),
+            "[C+3]",
+        ),
+        (
+            BracketAtom::builder()
+                .with_symbol(AtomSymbol::Element(Element::C))
+                .with_charge(Charge::try_new(-1).unwrap())
+                .build(),
+            "[C-]",
+        ),
+        (
+            BracketAtom::builder()
+                .with_symbol(AtomSymbol::Element(Element::C))
+                .with_charge(Charge::try_new(-3).unwrap())
+                .build(),
+            "[C-3]",
+        ),
+        (
+            BracketAtom::builder()
+                .with_symbol(AtomSymbol::Element(Element::C))
+                .with_class(7)
+                .build(),
+            "[C:7]",
+        ),
+        (
+            BracketAtom::builder()
+                .with_symbol(AtomSymbol::Element(Element::C))
+                .with_isotope(13)
+                .with_aromatic(true)
+                .with_chirality(Chirality::At)
+                .with_hydrogens(HydrogenCount::Explicit(2))
+                .with_charge(Charge::try_new(-1).unwrap())
+                .with_class(7)
+                .build(),
+            "[13c@H2-:7]",
+        ),
+    ];
+
+    for (atom, expected) in cases {
+        assert_eq!(expected, atom.to_string());
+    }
+}
 }
