@@ -1,5 +1,5 @@
 //! Module for parsing, validating, and specifying the chirality of an atom
-use core::fmt;
+use std::fmt;
 
 use crate::errors::SmilesError;
 
@@ -66,7 +66,7 @@ impl Chirality {
 }
 
 impl fmt::Display for Chirality {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Chirality::At => f.write_str("@"),
             Chirality::AtAt => f.write_str("@@"),
