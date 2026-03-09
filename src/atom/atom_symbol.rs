@@ -57,9 +57,8 @@ impl AtomSymbol {
 impl fmt::Display for AtomSymbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AtomSymbol::Element(e) => write!(f, "{e}"),
-            AtomSymbol::WildCard => f.write_str("*"),
-            AtomSymbol::Unspecified => f.write_str("?"),
+            Self::Element(e) => {write!(f, "{e}")},
+            Self::WildCard | Self::Unspecified => f.write_str("*"),
         }
     }
 }
@@ -85,4 +84,17 @@ mod tests {
         let wild = AtomSymbol::new_wildcard();
         assert!(wild.is_wildcard());
     }
+
+    #[test]
+fn test_atom_symbol_fmt_all_arms() {
+    let cases = [
+        (AtomSymbol::Element(Element::H), "H"),
+        (AtomSymbol::WildCard, "*"),
+        (AtomSymbol::Unspecified, "*"),
+    ];
+
+    for (symbol, expected) in cases {
+        assert_eq!(expected, symbol.to_string());
+    }
+}
 }
