@@ -4,6 +4,8 @@ pub mod atom_symbol;
 pub mod bracketed;
 pub mod unbracketed;
 
+use std::fmt;
+
 use elements_rs::Isotope;
 
 use crate::{
@@ -43,8 +45,8 @@ impl Atom {
     #[must_use]
     pub fn aromatic(&self) -> bool {
         match self {
-            Atom::Unbracketed(unbracketed_atom) => unbracketed_atom.aromatic(),
-            Atom::Bracketed(bracket_atom) => bracket_atom.aromatic(),
+            Self::Unbracketed(atom) => atom.aromatic(),
+            Self::Bracketed(atom) => atom.aromatic(),
         }
     }
     /// returns the [`AtomSymbol`]
@@ -82,10 +84,7 @@ impl Atom {
     /// returns the charge value as `i8`
     #[must_use]
     pub fn charge_value(&self) -> i8 {
-        match self {
-            Atom::Unbracketed(_) => Charge::default().get(),
-            Atom::Bracketed(bracket_atom) => bracket_atom.charge_value(),
-        }
+        self.charge().get()
     }
     /// returns the hydrogen count if present as `u8`
     #[must_use]
@@ -117,6 +116,15 @@ impl Atom {
                 Ok(element.most_abundant_isotope())
             }
             Atom::Bracketed(bracket_atom) => bracket_atom.isotope(),
+        }
+    }
+}
+
+impl fmt::Display for Atom {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unbracketed(atom) => write!(f, "{atom}"),
+            Self::Bracketed(atom) => write!(f, "{atom}"),
         }
     }
 }
@@ -234,5 +242,35 @@ mod tests {
         let atom: Atom = BracketAtom::builder().with_symbol(ac_symbol()).build().into();
 
         assert!(atom.isotope().is_ok());
+    }
+
+    #[test]
+    fn test_atom_fmt_all_arms() {
+        let cases = [
+            (Atom::from(UnbracketedAtom::new(AtomSymbol::Element(Element::C), false)), "C"),
+            (Atom::from(UnbracketedAtom::new(AtomSymbol::Element(Element::C), true)), "c"),
+            (Atom::from(UnbracketedAtom::new(AtomSymbol::WildCard, false)), "*"),
+            (
+                Atom::from(
+                    BracketAtom::builder().with_symbol(AtomSymbol::Element(Element::C)).build(),
+                ),
+                "[C]",
+            ),
+            (
+                Atom::from(
+                    BracketAtom::builder()
+                        .with_symbol(AtomSymbol::Element(Element::C))
+                        .with_isotope(13)
+                        .with_hydrogens(HydrogenCount::Explicit(2))
+                        .with_charge(Charge::try_new(-1).unwrap())
+                        .build(),
+                ),
+                "[13CH2-]",
+            ),
+        ];
+
+        for (atom, expected) in cases {
+            assert_eq!(expected, atom.to_string());
+        }
     }
 }
