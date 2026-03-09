@@ -78,14 +78,20 @@ impl Smiles {
         &mut self.bond_edges
     }
     /// Find all neighboring edges bonded to the current node id
-    pub fn neighbors(&self, id: usize) -> Vec<(usize, Bond)>{
-        self.bond_edges.iter().filter_map(|edge| if edge.node_a() == id {
-            Some((edge.node_b(), edge.bond().to_owned()))
-        } else if edge.node_b() == id {
-            Some((edge.node_a(), edge.bond().to_owned()))
-        } else {
-            None
-        }).collect()
+    #[must_use]
+    pub fn neighbors(&self, id: usize) -> Vec<(usize, Bond)> {
+        self.bond_edges
+            .iter()
+            .filter_map(|edge| {
+                if edge.node_a() == id {
+                    Some((edge.node_b(), edge.bond().to_owned()))
+                } else if edge.node_b() == id {
+                    Some((edge.node_a(), edge.bond().to_owned()))
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 

@@ -56,7 +56,7 @@ impl BracketAtom {
     #[must_use]
     pub fn element(&self) -> Option<Element> {
         match self.symbol {
-            AtomSymbol::WildCard | AtomSymbol::Unspecified => None,
+            AtomSymbol::WildCard => None,
             AtomSymbol::Element(element) => Some(element),
         }
     }
@@ -207,8 +207,8 @@ impl fmt::Display for BracketAtom {
         match (self.symbol(), self.aromatic()) {
             (AtomSymbol::Element(element), true) => {
                 write!(f, "{}", element.to_string().to_ascii_lowercase())?
-            },
-            _ => write!(f, "{}", self.symbol())?
+            }
+            _ => write!(f, "{}", self.symbol())?,
         }
         if let Some(chirality) = self.chirality() {
             write!(f, "{chirality}")?;
@@ -290,7 +290,7 @@ mod tests {
         let a = BracketAtom::builder().with_symbol(AtomSymbol::WildCard).build();
         assert_eq!(a.element(), None);
 
-        let b = BracketAtom::builder().with_symbol(AtomSymbol::Unspecified).build();
+        let b = BracketAtom::builder().with_symbol(AtomSymbol::WildCard).build();
         assert_eq!(b.element(), None);
     }
 
@@ -318,7 +318,7 @@ mod tests {
         let a = BracketAtom::builder().with_symbol(AtomSymbol::WildCard).with_isotope(13).build();
         assert_eq!(a.isotope(), Err(SmilesError::InvalidIsotope));
 
-        let b = BracketAtom::builder().with_symbol(AtomSymbol::Unspecified).build();
+        let b = BracketAtom::builder().with_symbol(AtomSymbol::WildCard).build();
         assert_eq!(b.isotope(), Err(SmilesError::InvalidIsotope));
     }
 

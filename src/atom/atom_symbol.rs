@@ -10,10 +10,8 @@ pub enum AtomSymbol {
     /// The explicitly named [`Element`]
     Element(Element),
     /// WildCard variant, described [here](http://opensmiles.org/opensmiles.html#inatoms)
-    WildCard,
-    /// unspecified Atom Symbol
     #[default]
-    Unspecified,
+    WildCard,
 }
 
 impl AtomSymbol {
@@ -40,7 +38,7 @@ impl AtomSymbol {
     pub fn element(&self) -> Option<Element> {
         match self {
             AtomSymbol::Element(e) => Some(*e),
-            AtomSymbol::WildCard | AtomSymbol::Unspecified => None,
+            AtomSymbol::WildCard => None,
         }
     }
     /// Consumes the `AtomSymbol` and returns the [`Element`] or `None` if
@@ -49,7 +47,7 @@ impl AtomSymbol {
     pub fn into_element(self) -> Option<Element> {
         match self {
             AtomSymbol::Element(e) => Some(e),
-            AtomSymbol::WildCard | AtomSymbol::Unspecified => None,
+            AtomSymbol::WildCard => None,
         }
     }
 }
@@ -60,7 +58,7 @@ impl fmt::Display for AtomSymbol {
             Self::Element(e) => {
                 write!(f, "{e}")
             }
-            Self::WildCard | Self::Unspecified => f.write_str("*"),
+            Self::WildCard => f.write_str("*"),
         }
     }
 }
@@ -81,7 +79,7 @@ mod tests {
         assert_eq!(into_hydro, Some(hydrogen));
 
         let default = AtomSymbol::default();
-        assert_eq!(default, AtomSymbol::Unspecified);
+        assert_eq!(default, AtomSymbol::WildCard);
 
         let wild = AtomSymbol::new_wildcard();
         assert!(wild.is_wildcard());
@@ -89,11 +87,7 @@ mod tests {
 
     #[test]
     fn test_atom_symbol_fmt_all_arms() {
-        let cases = [
-            (AtomSymbol::Element(Element::H), "H"),
-            (AtomSymbol::WildCard, "*"),
-            (AtomSymbol::Unspecified, "*"),
-        ];
+        let cases = [(AtomSymbol::Element(Element::H), "H"), (AtomSymbol::WildCard, "*")];
 
         for (symbol, expected) in cases {
             assert_eq!(expected, symbol.to_string());

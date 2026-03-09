@@ -61,11 +61,7 @@ mod tests {
     use crate::atom::{atom_symbol::AtomSymbol, unbracketed::UnbracketedAtom};
 
     fn symbols() -> &'static [AtomSymbol] {
-        &[
-            AtomSymbol::Unspecified,
-            AtomSymbol::WildCard,
-            AtomSymbol::Element(elements_rs::Element::Ac),
-        ]
+        &[AtomSymbol::WildCard, AtomSymbol::Element(elements_rs::Element::Ac)]
     }
     #[test]
     fn test_all_unbracketed_files_and_impls() {
@@ -90,8 +86,6 @@ mod tests {
             (UnbracketedAtom::new(AtomSymbol::Element(Element::Cl), true), "cl"),
             (UnbracketedAtom::new(AtomSymbol::WildCard, false), "*"),
             (UnbracketedAtom::new(AtomSymbol::WildCard, true), "*"),
-            (UnbracketedAtom::new(AtomSymbol::Unspecified, false), "*"),
-            (UnbracketedAtom::new(AtomSymbol::Unspecified, true), "*"),
         ];
 
         for (atom, expected) in cases {

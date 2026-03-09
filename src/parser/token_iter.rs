@@ -59,9 +59,6 @@ impl TokenIter<'_> {
                     possible_bracket_atom = possible_bracket_atom.with_chirality(chiral);
                 }
 
-                if possible_bracket_atom.symbol() == AtomSymbol::Unspecified {
-                    return Err(SmilesError::MissingBracketElement);
-                }
                 possible_bracket_atom = possible_bracket_atom.with_hydrogens(hydrogen_count(self)?);
                 possible_bracket_atom = possible_bracket_atom.with_charge(try_charge(self)?);
                 possible_bracket_atom = possible_bracket_atom.with_class(try_class(self)?);
@@ -262,7 +259,6 @@ fn valid_unbracketed(symbol: AtomSymbol) -> bool {
             )
         }
         AtomSymbol::WildCard => true,
-        AtomSymbol::Unspecified => false,
     }
 }
 
