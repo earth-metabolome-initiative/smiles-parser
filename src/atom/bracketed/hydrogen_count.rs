@@ -3,7 +3,6 @@
 
 use std::fmt;
 
-
 #[derive(Copy, Default, Debug, PartialEq, Clone, Eq, Hash)]
 /// Designates the hydrogen count (explicit only). Currently Hydrogen count has
 /// no upper bound, and may go to [`u8::MAX`]
@@ -38,7 +37,7 @@ impl fmt::Display for HydrogenCount {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             HydrogenCount::Unspecified => Ok(()),
-            HydrogenCount::Explicit(n) => write!(f, "H{}",n),
+            HydrogenCount::Explicit(n) => write!(f, "H{}", n),
         }
     }
 }
