@@ -1,6 +1,6 @@
 //! Represents a SMILES structure.
 
-use std::fmt;
+use std::{collections::BTreeSet, fmt};
 
 use crate::{
     atom::atom_node::AtomNode,
@@ -68,6 +68,11 @@ impl Smiles {
     pub fn nodes_mut(&mut self) -> &mut [AtomNode] {
         &mut self.atom_nodes
     }
+    /// Returns a node if exists from an `id`
+    #[must_use]
+    pub fn node_by_id(&self, id: usize) -> Option<&AtomNode> {
+        self.atom_nodes.iter().find(|node| node.id() == id)
+    }
     /// Returns slice of the edges
     #[must_use]
     pub fn edges(&self) -> &[BondEdge] {
@@ -101,12 +106,172 @@ impl Default for Smiles {
     }
 }
 
-// impl fmt::Display for Smiles {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         for node in self.atom_nodes {
-//             let id = node.id();
-//             let edges = self.find_node_edges(id);
+impl fmt::Display for Smiles {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fn write_subtree(
+            smiles: &Smiles,
+            f: &mut fmt::Formatter<'_>,
+            current: usize,
+            parent: Option<usize>,
+            visited: &mut BTreeSet<usize>,
+        ) -> fmt::Result {
+            visited.insert(current);
 
-//         }
-//     }
-// }
+            let node = smiles.node_by_id(current).ok_or(fmt::Error)?;
+            write!(f, "{node}")?;
+
+            let mut children = smiles
+                .neighbors(current)
+                .into_iter()
+                .filter(|(next, _)| Some(*next) != parent && !visited.contains(next))
+                .collect::<Vec<_>>();
+
+            children.sort_by_key(|(id, _)| {
+                smiles.node_by_id(*id).map_or(usize::MAX, |node| node.span().start)
+            });
+
+            if let Some((first_child, first_bond)) = children.first().copied() {
+                if !matches!(first_bond, Bond::Single) {
+                    write!(f, "{first_bond}")?;
+                }
+                write_subtree(smiles, f, first_child, Some(current), visited)?;
+
+                for (child, bond) in children.into_iter().skip(1) {
+                    f.write_str("(")?;
+                    if !matches!(bond, Bond::Single) {
+                        write!(f, "{bond}")?;
+                    }
+                    write_subtree(smiles, f, child, Some(current), visited)?;
+                    f.write_str(")")?;
+                }
+            }
+
+            Ok(())
+        }
+
+        let mut roots = self.atom_nodes.iter().collect::<Vec<_>>();
+        roots.sort_by_key(|node| node.span().start);
+
+        let mut visited = BTreeSet::new();
+        let mut first_component = true;
+
+        for node in roots {
+            if visited.contains(&node.id()) {
+                continue;
+            }
+
+            if !first_component {
+                f.write_str(".")?;
+            }
+            first_component = false;
+
+            write_subtree(self, f, node.id(), None, &mut visited)?;
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use elements_rs::Element;
+
+    use crate::{
+        atom::{Atom, atom_node::AtomNode, atom_symbol::AtomSymbol, unbracketed::UnbracketedAtom},
+        bond::Bond,
+        errors::SmilesError,
+        smiles::Smiles,
+    };
+
+    fn atom_node(id: usize, element: Element) -> AtomNode {
+        let atom: Atom = UnbracketedAtom::new(AtomSymbol::Element(element), false).into();
+        AtomNode::new(atom, id, id..(id + 1), None)
+    }
+
+    #[test]
+    fn test_smiles_display_single_atom() {
+        let mut smiles = Smiles::new();
+        smiles.push_node(atom_node(0, Element::C));
+
+        assert_eq!(smiles.to_string(), "C");
+    }
+
+    #[test]
+    fn test_smiles_display_linear_single_bonds_are_implicit() -> Result<(), SmilesError> {
+        let mut smiles = Smiles::new();
+        smiles.push_node(atom_node(0, Element::C));
+        smiles.push_node(atom_node(1, Element::C));
+        smiles.push_node(atom_node(2, Element::O));
+
+        smiles.push_edge(0, 1, Bond::Single)?;
+        smiles.push_edge(1, 2, Bond::Single)?;
+
+        assert_eq!(smiles.to_string(), "CCO");
+        Ok(())
+    }
+
+    #[test]
+    fn test_smiles_display_explicit_multiple_bond() -> Result<(), SmilesError> {
+        let mut smiles = Smiles::new();
+        smiles.push_node(atom_node(0, Element::C));
+        smiles.push_node(atom_node(1, Element::O));
+
+        smiles.push_edge(0, 1, Bond::Double)?;
+
+        assert_eq!(smiles.to_string(), "C=O");
+        Ok(())
+    }
+
+    #[test]
+    fn test_smiles_display_branching() -> Result<(), SmilesError> {
+        let mut smiles = Smiles::new();
+        smiles.push_node(atom_node(0, Element::C));
+        smiles.push_node(atom_node(1, Element::O));
+        smiles.push_node(atom_node(2, Element::N));
+
+        smiles.push_edge(0, 1, Bond::Single)?;
+        smiles.push_edge(0, 2, Bond::Single)?;
+
+        assert_eq!(smiles.to_string(), "CO(N)");
+        Ok(())
+    }
+
+    #[test]
+    fn test_smiles_display_branch_with_explicit_bond() -> Result<(), SmilesError> {
+        let mut smiles = Smiles::new();
+        smiles.push_node(atom_node(0, Element::C));
+        smiles.push_node(atom_node(1, Element::O));
+        smiles.push_node(atom_node(2, Element::N));
+
+        smiles.push_edge(0, 1, Bond::Double)?;
+        smiles.push_edge(0, 2, Bond::Single)?;
+
+        assert_eq!(smiles.to_string(), "C=O(N)");
+        Ok(())
+    }
+
+    #[test]
+    fn test_smiles_display_disconnected_components() {
+        let mut smiles = Smiles::new();
+        smiles.push_node(atom_node(0, Element::C));
+        smiles.push_node(atom_node(1, Element::O));
+
+        assert_eq!(smiles.to_string(), "C.O");
+    }
+
+    #[test]
+    fn test_smiles_display_branch_off_middle_of_chain() -> Result<(), SmilesError> {
+        let mut smiles = Smiles::new();
+        smiles.push_node(atom_node(0, Element::C));
+        smiles.push_node(atom_node(1, Element::C));
+        smiles.push_node(atom_node(2, Element::O));
+        smiles.push_node(atom_node(3, Element::N));
+
+        smiles.push_edge(0, 1, Bond::Single)?;
+        smiles.push_edge(1, 2, Bond::Single)?;
+        smiles.push_edge(1, 3, Bond::Single)?;
+
+        assert_eq!(smiles.to_string(), "CCO(N)");
+        Ok(())
+    }
+}

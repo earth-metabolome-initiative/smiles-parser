@@ -36,6 +36,7 @@ const SMILES_STR: &[&str] = &[
     "c1ccccc1*",
     "COC1(C23C14C5=C6C7=C8C5=C9C1=C5C%10=C%11C%12=C%13C%10=C%10C1=C8C1=C%10C8=C%10C%14=C%15C%16=C%17C(=C%12C%12=C%17C%17=C%18C%16=C%16C%15=C%15C%10=C1C7=C%15C1=C%16C(=C%18C7=C2C2=C%10C(=C5C9=C42)C%11=C%12C%10=C%177)C3=C16)C%14=C%138)OC",
 ];
+
 #[test]
 fn test_tokenizer() {
     for &s in SMILES_STR {
@@ -53,6 +54,48 @@ fn test_parser_all_inputs() {
 
     for &s in SMILES_STR {
         Smiles::from_str(s).unwrap_or_else(|e| panic!("Failed to parse:\n{}", e.render(s)));
+    }
+}
+
+#[test]
+fn test_parse_then_render_then_parse_all_inputs() {
+    use std::str::FromStr;
+
+    use smiles_parser::smiles::Smiles;
+
+    for &original in SMILES_STR {
+        let parsed = Smiles::from_str(original)
+            .unwrap_or_else(|e| panic!("Failed to parse original:\n{}", e.render(original)));
+
+        let rendered = parsed.to_string();
+
+        let reparsed = Smiles::from_str(&rendered).unwrap_or_else(|e| {
+            panic!(
+                "Failed to parse rendered SMILES.\nOriginal: {original}\nRendered: {rendered}\n{}",
+                e.render(&rendered)
+            )
+        });
+
+        assert_eq!(
+            parsed.nodes().len(),
+            reparsed.nodes().len(),
+            "Node count changed after round trip.\nOriginal: {original}\nRendered: {rendered}"
+        );
+
+        assert_eq!(
+            parsed.edges().len(),
+            reparsed.edges().len(),
+            "Edge count changed after round trip.\nOriginal: {original}\nRendered: {rendered}"
+        );
+
+        let parsed_aromatic = parsed.nodes().iter().filter(|n| n.atom().aromatic()).count();
+        let reparsed_aromatic = reparsed.nodes().iter().filter(|n| n.atom().aromatic()).count();
+
+        assert_eq!(
+            parsed_aromatic,
+            reparsed_aromatic,
+            "Aromatic atom count changed after round trip.\nOriginal: {original}\nRendered: {rendered}"
+        );
     }
 }
 
