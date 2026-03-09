@@ -1,4 +1,6 @@
 //! Module for parsing, validating, and specifying the chirality of an atom
+use core::fmt;
+
 use crate::errors::SmilesError;
 
 #[derive(Copy, Debug, PartialEq, Clone, Eq, Hash)]
@@ -60,6 +62,20 @@ impl Chirality {
     ///   fails
     pub fn try_oh(num: u8) -> Result<Self, SmilesError> {
         (1..=30).contains(&num).then_some(Self::OH(num)).ok_or(SmilesError::InvalidChirality)
+    }
+}
+
+impl fmt::Display for Chirality {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Chirality::At => f.write_str("@"),
+            Chirality::AtAt => f.write_str("@@"),
+            Chirality::TH(n) => write!(f, "@TH{}", n),
+            Chirality::AL(n) => write!(f, "@AL{}", n),
+            Chirality::SP(n) => write!(f, "@SP{}", n),
+            Chirality::TB(n) => write!(f, "@TB{}", n),
+            Chirality::OH(n) => write!(f, "@OH{}", n),
+        }
     }
 }
 
@@ -161,5 +177,22 @@ mod tests {
         assert_ne!(Chirality::SP(1), Chirality::SP(2));
         assert_ne!(Chirality::TB(1), Chirality::TB(2));
         assert_ne!(Chirality::OH(1), Chirality::OH(2));
+    }
+
+    #[test]
+    fn test_chirality_fmt_all_arms() {
+        let chirals = vec![
+            Chirality::At,
+            Chirality::AtAt,
+            Chirality::TH(2),
+            Chirality::AL(2),
+            Chirality::SP(10),
+            Chirality::TB(20),
+            Chirality::OH(30),
+        ];
+        let expected = vec!["@", "@@", "@TH2", "@AL2", "@SP10", "@TB20", "@OH30"];
+        for (chiral, expected) in chirals.into_iter().zip(expected) {
+            assert_eq!(expected, chiral.to_string());
+        }
     }
 }

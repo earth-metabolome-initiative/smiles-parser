@@ -1,4 +1,6 @@
 //! Module for validating a charge on an atom
+use std::fmt;
+
 use crate::errors::SmilesError;
 
 #[derive(Copy, Default, Debug, PartialEq, Clone, Eq, Hash)]
@@ -24,6 +26,19 @@ impl Charge {
     #[must_use]
     pub fn get(&self) -> i8 {
         self.0
+    }
+}
+
+impl fmt::Display for Charge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.get() {
+            0 => Ok(()),
+            1 => f.write_str("+"),
+            n @ 2..=15 => write!(f, "+{}", n),
+            -1 => f.write_str("-"),
+            n @ -15..=-2 => write!(f, "{}", n),
+            _ => unreachable!("state not reachable, charges can only be between -15 & 15"),
+        }
     }
 }
 
@@ -71,5 +86,23 @@ mod tests {
             Err(SmilesError::ChargeOverflow(16)) => {}
             other => panic!("expected ChargeOverflow(16), got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_charge_fmt_all_arms() -> Result<(), SmilesError> {
+        for i in -15..=15 {
+            let charge = Charge::try_new(i)?;
+            let expected = match i {
+                0 => "".to_string(),
+                1 => "+".to_string(),
+                2..=15 => format!("+{i}"),
+                -1 => "-".to_string(),
+                -15..=-2 => i.to_string(),
+                _ => unreachable!(),
+            };
+
+            assert_eq!(expected, charge.to_string());
+        }
+        Ok(())
     }
 }
