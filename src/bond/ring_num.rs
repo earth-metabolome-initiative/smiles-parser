@@ -1,4 +1,6 @@
 //! Module for mapping and validating a ring marker
+use std::fmt;
+
 use crate::errors::SmilesError;
 
 #[derive(Copy, Debug, PartialEq, Clone, Eq, Hash)]
@@ -12,7 +14,7 @@ impl RingNum {
     /// - Returns a [`SmilesError::RingNumberOverflow`] if the value is above
     ///   `99`
     pub fn try_new(num: u8) -> Result<Self, SmilesError> {
-        (0..=99).contains(&num).then_some(Self(num)).ok_or(SmilesError::RingNumberOverflow(num))
+        (num <= 99).then_some(Self(num)).ok_or(SmilesError::RingNumberOverflow(num))
     }
 
     /// Returns the value for the [`RingNum`]
@@ -22,19 +24,43 @@ impl RingNum {
     }
 }
 
+impl fmt::Display for RingNum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.get() > 9 { write!(f, "%{}", self.get()) } else { write!(f, "{}", self.get()) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{bond::ring_num::RingNum, errors::SmilesError};
+    #[test]
+    fn test_ring_num_try_new_bounds() -> Result<(), SmilesError> {
+        assert_eq!(RingNum::try_new(0)?.get(), 0);
+        assert_eq!(RingNum::try_new(9)?.get(), 9);
+        assert_eq!(RingNum::try_new(10)?.get(), 10);
+        assert_eq!(RingNum::try_new(99)?.get(), 99);
+
+        assert_eq!(RingNum::try_new(100), Err(SmilesError::RingNumberOverflow(100)));
+
+        assert_eq!(RingNum::try_new(200), Err(SmilesError::RingNumberOverflow(200)));
+
+        Ok(())
+    }
 
     #[test]
-    fn test_try_and_get() -> Result<(), SmilesError> {
-        let num: u8 = 3;
-        let invalid_num: u8 = 200;
-        let valid_ring = RingNum::try_new(num)?;
-        let invalid_ring = RingNum::try_new(invalid_num);
+    fn test_ring_num_fmt_all_arms() -> Result<(), SmilesError> {
+        let cases = [
+            (RingNum::try_new(0)?, "0"),
+            (RingNum::try_new(3)?, "3"),
+            (RingNum::try_new(9)?, "9"),
+            (RingNum::try_new(10)?, "%10"),
+            (RingNum::try_new(42)?, "%42"),
+            (RingNum::try_new(99)?, "%99"),
+        ];
 
-        assert_eq!(valid_ring.get(), 3);
-        assert!(invalid_ring.is_err());
+        for (ring, expected) in cases {
+            assert_eq!(expected, ring.to_string());
+        }
 
         Ok(())
     }
