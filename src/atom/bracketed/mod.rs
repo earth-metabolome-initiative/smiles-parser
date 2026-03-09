@@ -204,15 +204,11 @@ impl fmt::Display for BracketAtom {
         if let Some(isotope) = self.isotope_mass_number() {
             write!(f, "{isotope}")?;
         }
-        match self.symbol() {
-            AtomSymbol::Element(element) => {
-                if self.aromatic() {
-                    write!(f, "{}", element.to_string().to_ascii_lowercase())?;
-                } else {
-                    write!(f, "{element}")?;
-                }
-            }
-            AtomSymbol::WildCard | AtomSymbol::Unspecified => f.write_str("*")?,
+        match (self.symbol(), self.aromatic()) {
+            (AtomSymbol::Element(element), true) => {
+                write!(f, "{}", element.to_string().to_ascii_lowercase())?
+            },
+            _ => write!(f, "{}", self.symbol())?
         }
         if let Some(chirality) = self.chirality() {
             write!(f, "{chirality}")?;
