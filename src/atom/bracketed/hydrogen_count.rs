@@ -36,8 +36,8 @@ impl HydrogenCount {
 impl fmt::Display for HydrogenCount {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            HydrogenCount::Unspecified => Ok(()),
-            HydrogenCount::Explicit(n) => write!(f, "H{}", n),
+            Self::Unspecified => Ok(()),
+            Self::Explicit(n) => write!(f, "H{n}"),
         }
     }
 }
@@ -64,7 +64,7 @@ mod tests {
     fn test_hydrogen_count_fmt_all_arms() {
         let no_count = HydrogenCount::Unspecified;
         let count = HydrogenCount::Explicit(5);
-        assert_eq!(no_count.to_string(), "".to_string());
+        assert_eq!(no_count.to_string(), String::new());
         assert_eq!(count.to_string(), "H5");
     }
 }

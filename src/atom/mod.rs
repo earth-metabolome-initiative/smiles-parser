@@ -111,11 +111,11 @@ impl Atom {
     ///   `element_rs` error
     pub fn isotope(&self) -> Result<Isotope, SmilesError> {
         match self {
-            Atom::Unbracketed(unbracketed_atom) => {
+            Self::Unbracketed(unbracketed_atom) => {
                 let element = unbracketed_atom.element().ok_or(SmilesError::InvalidIsotope)?;
                 Ok(element.most_abundant_isotope())
             }
-            Atom::Bracketed(bracket_atom) => bracket_atom.isotope(),
+            Self::Bracketed(bracket_atom) => bracket_atom.isotope(),
         }
     }
 }

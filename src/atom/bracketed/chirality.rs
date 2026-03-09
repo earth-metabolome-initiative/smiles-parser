@@ -68,13 +68,13 @@ impl Chirality {
 impl fmt::Display for Chirality {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Chirality::At => f.write_str("@"),
-            Chirality::AtAt => f.write_str("@@"),
-            Chirality::TH(n) => write!(f, "@TH{}", n),
-            Chirality::AL(n) => write!(f, "@AL{}", n),
-            Chirality::SP(n) => write!(f, "@SP{}", n),
-            Chirality::TB(n) => write!(f, "@TB{}", n),
-            Chirality::OH(n) => write!(f, "@OH{}", n),
+            Self::At => f.write_str("@"),
+            Self::AtAt => f.write_str("@@"),
+            Self::TH(n) => write!(f, "@TH{n}"),
+            Self::AL(n) => write!(f, "@AL{n}"),
+            Self::SP(n) => write!(f, "@SP{n}"),
+            Self::TB(n) => write!(f, "@TB{n}"),
+            Self::OH(n) => write!(f, "@OH{n}"),
         }
     }
 }

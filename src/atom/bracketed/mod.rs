@@ -206,16 +206,16 @@ impl fmt::Display for BracketAtom {
         }
         match (self.symbol(), self.aromatic()) {
             (AtomSymbol::Element(element), true) => {
-                write!(f, "{}", element.to_string().to_ascii_lowercase())?
+                write!(f, "{}", element.to_string().to_ascii_lowercase())?;
             }
             _ => write!(f, "{}", self.symbol())?,
         }
         if let Some(chirality) = self.chirality() {
             write!(f, "{chirality}")?;
         }
-        write!(f, "{}{}", self.hydrogens(), self.charge())?;
+        write!(f, "{}{}", self.hydrogens, self.charge)?;
         if self.class() != 0 {
-            write!(f, ":{}", self.class())?;
+            write!(f, ":{}", self.class)?;
         }
         f.write_str("]")
     }

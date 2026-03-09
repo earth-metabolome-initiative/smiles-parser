@@ -34,9 +34,9 @@ impl fmt::Display for Charge {
         match self.get() {
             0 => Ok(()),
             1 => f.write_str("+"),
-            n @ 2..=15 => write!(f, "+{}", n),
+            n @ 2..=15 => write!(f, "+{n}"),
             -1 => f.write_str("-"),
-            n @ -15..=-2 => write!(f, "{}", n),
+            n @ -15..=-2 => write!(f, "{n}"),
             _ => unreachable!("state not reachable, charges can only be between -15 & 15"),
         }
     }
@@ -93,7 +93,7 @@ mod tests {
         for i in -15..=15 {
             let charge = Charge::try_new(i)?;
             let expected = match i {
-                0 => "".to_string(),
+                0 => String::new(),
                 1 => "+".to_string(),
                 2..=15 => format!("+{i}"),
                 -1 => "-".to_string(),
