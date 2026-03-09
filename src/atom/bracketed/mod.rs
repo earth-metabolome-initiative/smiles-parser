@@ -213,8 +213,7 @@ impl fmt::Display for BracketAtom {
         if let Some(chirality) = self.chirality() {
             write!(f, "{chirality}")?;
         }
-        write!(f, "{}", self.hydrogens())?;
-        write!(f, "{}", self.charge())?;
+        write!(f, "{}{}", self.hydrogens(), self.charge())?;
         if self.class() != 0 {
             write!(f, ":{}", self.class())?;
         }
