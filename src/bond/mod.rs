@@ -26,16 +26,15 @@ pub enum Bond {
 
 impl fmt::Display for Bond {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            Bond::Single => "-",
-            Bond::Double => "=",
-            Bond::Triple => "#",
-            Bond::Quadruple => "$",
-            Bond::Aromatic => ":",
-            Bond::Up => "/",
-            Bond::Down => "\\",
-        };
-        f.write_str(s)
+        f.write_str(match self {
+            Self::Single => "-",
+            Self::Double => "=",
+            Self::Triple => "#",
+            Self::Quadruple => "$",
+            Self::Aromatic => ":",
+            Self::Up => "/",
+            Self::Down => "\\",
+        })
     }
 }
 
@@ -46,5 +45,21 @@ mod tests {
     #[test]
     fn test_default() {
         assert_eq!(Bond::default(), Bond::Single);
+    }
+    #[test]
+    fn test_bond_fmt_all_arms() {
+        let cases = [
+            (Bond::Single, "-"),
+            (Bond::Double, "="),
+            (Bond::Triple, "#"),
+            (Bond::Quadruple, "$"),
+            (Bond::Aromatic, ":"),
+            (Bond::Up, "/"),
+            (Bond::Down, "\\"),
+        ];
+
+        for (bond, expected) in cases {
+            assert_eq!(expected, bond.to_string());
+        }
     }
 }
