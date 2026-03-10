@@ -117,7 +117,7 @@ impl<'a> SmilesParser<'a> {
                     next_id += 1;
 
                     let node = AtomNode::new(atom, id, token_with_span.span(), None);
-                    smiles.push_node(node);
+                    smiles.push_node(node).map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
 
                     if let Some(prev) = last_atom {
                         let bond = pending_bond.unwrap_or_else(|| default_bond(&smiles, prev, id));
@@ -134,7 +134,7 @@ impl<'a> SmilesParser<'a> {
                     next_id += 1;
 
                     let node = AtomNode::new(atom, id, token_with_span.span(), None);
-                    smiles.push_node(node);
+                    smiles.push_node(node).map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
 
                     if let Some(prev) = last_atom {
                         let bond = pending_bond.unwrap_or_else(|| default_bond(&smiles, prev, id));

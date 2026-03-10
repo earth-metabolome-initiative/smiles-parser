@@ -16,6 +16,8 @@ pub enum SmilesError {
     ChargeOverflow(i8),
     /// A charge is below allowed minimum (-15)
     ChargeUnderflow(i8),
+    /// A Duplicate [`AtomNode`] id was found
+    DuplicateNodeId(usize),
     /// A non bare element found outside of brackets
     ElementRequiresBrackets,
     /// Wrapper for `element_rs` errors
@@ -83,15 +85,15 @@ pub enum SmilesError {
 impl fmt::Display for SmilesError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use SmilesError::{
-            BondInBracket, ChargeOverflow, ChargeUnderflow, ElementRequiresBrackets, ElementsRs,
-            IncompleteBond, IntegerOverflow, InvalidAromaticElement, InvalidChirality,
-            InvalidClass, InvalidElementName, InvalidIsotope, InvalidNonBondToken, InvalidNumber,
-            InvalidRingNumber, InvalidUnbracketedAtom, MissingBracketElement, MissingElement,
-            NodeIdInvalid, NonBondInBracket, RingNumberOverflow, UnclosedBracket, UnclosedBranch,
-            UnclosedRing, UnexpectedBracketedState, UnexpectedCharacter, UnexpectedColon,
-            UnexpectedDash, UnexpectedEndOfString, UnexpectedLeftBracket,
-            UnexpectedLeftParentheses, UnexpectedPercent, UnexpectedRightBracket,
-            UnexpectedRightParentheses,
+            BondInBracket, ChargeOverflow, ChargeUnderflow, DuplicateNodeId,
+            ElementRequiresBrackets, ElementsRs, IncompleteBond, IntegerOverflow,
+            InvalidAromaticElement, InvalidChirality, InvalidClass, InvalidElementName,
+            InvalidIsotope, InvalidNonBondToken, InvalidNumber, InvalidRingNumber,
+            InvalidUnbracketedAtom, MissingBracketElement, MissingElement, NodeIdInvalid,
+            NonBondInBracket, RingNumberOverflow, UnclosedBracket, UnclosedBranch, UnclosedRing,
+            UnexpectedBracketedState, UnexpectedCharacter, UnexpectedColon, UnexpectedDash,
+            UnexpectedEndOfString, UnexpectedLeftBracket, UnexpectedLeftParentheses,
+            UnexpectedPercent, UnexpectedRightBracket, UnexpectedRightParentheses,
         };
         match self {
             MissingElement => write!(f, "Missing element"),
@@ -128,6 +130,7 @@ impl fmt::Display for SmilesError {
             UnclosedBranch => write!(f, "Branch not closed"),
             UnclosedRing => write!(f, "Ring not closed"),
             UnexpectedRightParentheses => write!(f, "Unexpected `)`"),
+            DuplicateNodeId(id) => write!(f, "Node ID: {id} duplicated"),
         }
     }
 }

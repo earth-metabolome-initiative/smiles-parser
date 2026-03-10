@@ -1,6 +1,8 @@
 //! Represents a SMILES structure.
 
 
+use std::fmt;
+
 use crate::{
     atom::atom_node::AtomNode,
     bond::{Bond, bond_edge::BondEdge},
@@ -22,8 +24,15 @@ impl Smiles {
         Self { atom_nodes: Vec::new(), bond_edges: Vec::new() }
     }
     /// Pushes an AtomNode
-    pub fn push_node(&mut self, node: AtomNode) {
+    /// 
+    /// # Errors
+    /// - Returns [`SmilesError::DuplicateNodeId`] if node id already exists
+    pub fn push_node(&mut self, node: AtomNode) -> Result<(), SmilesError> {
+        if self.node_by_id(node.id()).is_some() {
+            return Err(SmilesError::DuplicateNodeId(node.id()));
+        }
         self.atom_nodes.push(node);
+        Ok(())
     }
     /// adds an edge from two nodes and the [`Bond`]
     ///
@@ -36,26 +45,18 @@ impl Smiles {
         node_b: usize,
         bond: Bond,
     ) -> Result<(), SmilesError> {
-        self.atom_nodes.sort();
-        // use the NodeIdInvalid for err
-        if self
-            .atom_nodes
-            .binary_search_by_key(&node_a, super::atom::atom_node::AtomNode::id)
-            .is_err()
-        {
+        if !self.contains_node_id(node_a) {
             return Err(SmilesError::NodeIdInvalid(node_a));
         }
-        if self
-            .atom_nodes
-            .binary_search_by_key(&node_b, super::atom::atom_node::AtomNode::id)
-            .is_err()
-        {
+        if !self.contains_node_id(node_b) {
             return Err(SmilesError::NodeIdInvalid(node_b));
         }
-        let bond_edge = BondEdge::new(node_a, node_b, bond);
-        self.bond_edges.push(bond_edge);
-
+        self.bond_edges.push(BondEdge::new(node_a, node_b, bond));
         Ok(())
+    }
+    /// Returns `bool` for if the `AtomNode` `id` exists in the set
+    fn contains_node_id(&self, id: usize) -> bool {
+        self.atom_nodes.iter().any(|node| node.id() == id)
     }
     /// Returns slice of the nodes
     #[must_use]
@@ -81,22 +82,6 @@ impl Smiles {
     pub fn edges_mut(&mut self) -> &mut [BondEdge] {
         &mut self.bond_edges
     }
-    /// Find all neighboring edges bonded to the current node id
-    #[must_use]
-    pub fn neighbors(&self, id: usize) -> Vec<(usize, Bond)> {
-        self.bond_edges
-            .iter()
-            .filter_map(|edge| {
-                if edge.node_a() == id {
-                    Some((edge.node_b(), edge.bond().to_owned()))
-                } else if edge.node_b() == id {
-                    Some((edge.node_a(), edge.bond().to_owned()))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
 }
 
 impl Default for Smiles {
@@ -105,3 +90,13 @@ impl Default for Smiles {
     }
 }
 
+impl fmt::Display for Smiles {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Current challenges:
+        // branches,
+        // ring numbers -> for now use ring Display
+        // non bonds -> use visitor struct: https://rust-unofficial.github.io/patterns/patterns/behavioural/visitor.html
+        
+        Ok(())
+    }
+}
