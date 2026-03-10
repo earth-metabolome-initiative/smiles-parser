@@ -24,8 +24,8 @@ impl BondEdge {
     }
     /// Returns the specified [`Bond`]
     #[must_use]
-    pub fn bond(&self) -> &Bond {
-        &self.bond
+    pub fn bond(&self) -> Bond {
+        self.bond
     }
     /// Returns a tuple of the two vertices
     #[must_use]
@@ -42,11 +42,30 @@ impl BondEdge {
     pub fn node_b(&self) -> usize {
         self.node_b
     }
+    /// Checks if the `BondEdge` contains the specified node id as `usize`
+    #[must_use]
+    pub fn contains(&self, node_id: usize) -> bool {
+        self.node_a == node_id || self.node_b == node_id
+    }
+    /// Returns the other node id (if it exists)
+    #[must_use]
+    pub fn other(&self, node_id: usize) -> Option<usize> {
+        if self.node_a == node_id {
+            Some(self.node_b)
+        } else if self.node_b == node_id {
+            Some(self.node_a)
+        } else {
+            None
+        }
+    }
 }
 
 impl fmt::Display for BondEdge {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if matches!(self.bond, Bond::Single) { Ok(()) } else { write!(f, "{}", self.bond) }
+        match self.bond {
+            Bond::Single => Ok(()),
+            _ => write!(f, "{}", self.bond),
+        }
     }
 }
 
@@ -61,7 +80,7 @@ mod tests {
         assert_eq!(edge.node_a(), 3);
         assert_eq!(edge.node_b(), 7);
         assert_eq!(edge.vertices(), (3, 7));
-        assert_eq!(edge.bond(), &Bond::Double);
+        assert_eq!(edge.bond(), Bond::Double);
     }
 
     #[test]
