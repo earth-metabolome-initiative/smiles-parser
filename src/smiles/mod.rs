@@ -1,6 +1,5 @@
 //! Represents a SMILES structure.
 
-
 use std::fmt;
 
 use crate::{
@@ -24,7 +23,7 @@ impl Smiles {
         Self { atom_nodes: Vec::new(), bond_edges: Vec::new() }
     }
     /// Pushes an AtomNode
-    /// 
+    ///
     /// # Errors
     /// - Returns [`SmilesError::DuplicateNodeId`] if node id already exists
     pub fn push_node(&mut self, node: AtomNode) -> Result<(), SmilesError> {
@@ -96,7 +95,7 @@ impl fmt::Display for Smiles {
         // branches,
         // ring numbers -> for now use ring Display
         // non bonds -> use visitor struct: https://rust-unofficial.github.io/patterns/patterns/behavioural/visitor.html
-        
+
         Ok(())
     }
 }
