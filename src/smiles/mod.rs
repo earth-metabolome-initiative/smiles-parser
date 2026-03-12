@@ -9,6 +9,7 @@ use crate::{
 };
 
 mod from_str;
+mod to_smiles;
 
 /// Represents a SMILES structure.
 pub struct Smiles {
