@@ -6,6 +6,8 @@ use crate::{
     atom::atom_node::AtomNode,
     bond::{Bond, bond_edge::BondEdge},
     errors::SmilesError,
+    smiles::to_smiles::RenderVisitor,
+    traversal::walker::walk,
 };
 
 mod from_str;
@@ -82,6 +84,15 @@ impl Smiles {
     pub fn edges_mut(&mut self) -> &mut [BondEdge] {
         &mut self.bond_edges
     }
+    /// Renders the `Smiles` graph into a SMILES string
+    /// 
+    /// # Errors
+    /// - Returns a [`SmilesError`] if the graph fails to walk
+    pub fn render(&self) -> Result<String, SmilesError> {
+        let mut render_visitor = RenderVisitor::new();
+        walk(self, &mut render_visitor)?;
+        Ok(render_visitor.into_string())
+    }
 }
 
 impl Default for Smiles {
@@ -92,11 +103,8 @@ impl Default for Smiles {
 
 impl fmt::Display for Smiles {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Current challenges:
-        // branches,
-        // ring numbers -> for now use ring Display
-        // non bonds -> use visitor struct: https://rust-unofficial.github.io/patterns/patterns/behavioural/visitor.html
-
-        Ok(())
+        // need to map the smiles error to the `fmt::Error`
+        let rendered_smiles = self.render().map_err(|_| fmt::Error)?;
+        write!(f, "{rendered_smiles}")
     }
 }

@@ -56,7 +56,12 @@ impl Visitor for RenderVisitor {
     }
 
     fn enter_node(&mut self, smiles: &Smiles, node_id: usize) -> Result<(), SmilesError> {
-        todo!()
+        if let Some(node) = smiles.node_by_id(node_id) {
+            self.output.push_str(&node.to_string());
+            Ok(())
+        } else {
+            Err(SmilesError::NodeIdInvalid(node_id))
+        }
     }
 
     fn exit_node(&mut self, smiles: &Smiles, node_id: usize) -> Result<(), SmilesError> {
