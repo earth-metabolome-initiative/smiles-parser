@@ -11,10 +11,14 @@ pub fn walk<V: Visitor>(smiles: &Smiles, visitor: &mut V) -> Result<(), SmilesEr
     for node in smiles.nodes() {
         visitor.enter_node(smiles, node.id())?;
         visited_nodes.insert(node.id());
-
+        
         
 
         visitor.exit_node(smiles, node.id())?;
     }
     Ok(())
+}
+
+fn dfs<V: Visitor>(smiles: &Smiles, visitor: &mut V, visited: &mut HashSet<usize>) {
+    
 }
