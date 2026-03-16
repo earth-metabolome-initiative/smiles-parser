@@ -4,6 +4,13 @@ use std::collections::HashMap;
 
 use crate::{errors::SmilesError, smiles::Smiles, traversal::visitor_trait::Visitor};
 
+/// Enum for tracking current node's state
+pub enum CurrentNodeStatus {
+    Unvisited,
+    Visited,
+    Viisting,
+}
+
 /// Structure used for implementing node visits and building output SMILES
 /// `String`
 pub struct RenderVisitor {
@@ -14,6 +21,10 @@ pub struct RenderVisitor {
     ring_labels: HashMap<(usize, usize), u8>,
     /// The next available ring number label to assign for a ring
     next_ring_num: u8,
+    /// The current node in traversal 
+    current_node_id: usize,
+    /// Status of the current node
+    node_status: CurrentNodeStatus
 }
 
 impl RenderVisitor {

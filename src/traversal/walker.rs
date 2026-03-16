@@ -2,19 +2,25 @@
 
 use std::collections::HashSet;
 
-use crate::{errors::SmilesError, smiles::Smiles, traversal::visitor_trait::Visitor};
+use crate::{
+    atom::atom_node::AtomNode, errors::SmilesError, smiles::Smiles,
+    traversal::visitor_trait::Visitor,
+};
 
 /// Traverses the [`Smiles`] graph via a depth first search
 pub fn walk<V: Visitor>(smiles: &Smiles, visitor: &mut V) -> Result<(), SmilesError> {
     let mut visited_nodes: HashSet<usize> = HashSet::new();
+    visitor.start(smiles)?;
+    
+    dfs(smiles, visitor, &mut visited_nodes);
 
-    for node in smiles.nodes() {
-        visitor.enter_node(smiles, node.id())?;
-        visited_nodes.insert(node.id());
-
-        visitor.exit_node(smiles, node.id())?;
-    }
     Ok(())
 }
 
-fn dfs<V: Visitor>(smiles: &Smiles, visitor: &mut V, visited: &mut HashSet<usize>) {}
+fn dfs<V: Visitor>(smiles: &Smiles, visitor: &mut V, visited_nodes: &mut HashSet<usize>) {
+    for node in smiles.nodes() {
+        if !visited_nodes.contains(&node.id()) {
+            visited_nodes.insert(node.id());
+        }
+    }
+}
