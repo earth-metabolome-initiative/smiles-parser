@@ -141,7 +141,7 @@ fn test_parse_tribenzo_annulene_variant() {
 
     use smiles_parser::{bond::Bond, smiles::Smiles};
 
-    let smiles_string = "c1=c\\c2ccc(cc2)-c2ccccc2-c2ccc/1cc2";
+    let smiles_string = r"c1=c\c2ccc(cc2)-c2ccccc2-c2ccc/1cc2";
     let smiles = Smiles::from_str(smiles_string)
         .unwrap_or_else(|e| panic!("Failed to parse:\n{}", e.render(smiles_string)));
 
