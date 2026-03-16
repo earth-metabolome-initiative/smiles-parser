@@ -14,6 +14,7 @@ mod from_str;
 mod to_smiles;
 
 /// Represents a SMILES structure.
+#[derive(Debug)]
 pub struct Smiles {
     atom_nodes: Vec<AtomNode>,
     bond_edges: Vec<BondEdge>,
@@ -85,7 +86,7 @@ impl Smiles {
         &mut self.bond_edges
     }
     /// Renders the `Smiles` graph into a SMILES string
-    /// 
+    ///
     /// # Errors
     /// - Returns a [`SmilesError`] if the graph fails to walk
     pub fn render(&self) -> Result<String, SmilesError> {
