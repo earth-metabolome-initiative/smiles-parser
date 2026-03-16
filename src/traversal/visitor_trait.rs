@@ -4,13 +4,6 @@ use crate::{bond::Bond, errors::SmilesError, smiles::Smiles};
 
 /// Trait that defines visitors to [`Smiles`] nodes
 pub trait Visitor {
-    /// Called once when traversal begins
-    ///
-    /// # Errors
-    /// - Returns a [`SmilesError`] if unable to start visiting nodes in graph.
-    fn start(&mut self, smiles: &Smiles) -> Result<(), SmilesError>;
-    /// Called once when traversal has finished
-    fn end(&mut self, smiles: &Smiles) -> Result<(), SmilesError>;
     /// Called when traversal first enters a node
     fn enter_node(&mut self, smiles: &Smiles, node_id: usize) -> Result<(), SmilesError>;
     /// Called when a traversal finishes processing a node.

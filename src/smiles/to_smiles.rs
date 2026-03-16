@@ -4,12 +4,6 @@ use std::collections::HashMap;
 
 use crate::{errors::SmilesError, smiles::Smiles, traversal::visitor_trait::Visitor};
 
-/// Enum for tracking current node's state
-pub enum CurrentNodeStatus {
-    Unvisited,
-    Visited,
-    Viisting,
-}
 
 /// Structure used for implementing node visits and building output SMILES
 /// `String`
@@ -21,17 +15,13 @@ pub struct RenderVisitor {
     ring_labels: HashMap<(usize, usize), u8>,
     /// The next available ring number label to assign for a ring
     next_ring_num: u8,
-    /// The current node in traversal 
-    current_node_id: usize,
-    /// Status of the current node
-    node_status: CurrentNodeStatus
 }
 
 impl RenderVisitor {
     /// Generates a new `RenderVisitor`
     #[must_use]
     pub fn new() -> Self {
-        Self { output: String::new(), ring_labels: HashMap::new(), next_ring_num: 1 }
+        Self { output: String::new(), ring_labels: HashMap::new(), next_ring_num: 1}
     }
     /// Returns the built string
     #[must_use]
@@ -58,14 +48,6 @@ impl RenderVisitor {
 }
 
 impl Visitor for RenderVisitor {
-    fn start(&mut self, smiles: &Smiles) -> Result<(), SmilesError> {
-        todo!()
-    }
-
-    fn end(&mut self, smiles: &Smiles) -> Result<(), SmilesError> {
-        todo!()
-    }
-
     fn enter_node(&mut self, smiles: &Smiles, node_id: usize) -> Result<(), SmilesError> {
         if let Some(node) = smiles.node_by_id(node_id) {
             self.output.push_str(&node.to_string());
