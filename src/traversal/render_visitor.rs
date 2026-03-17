@@ -51,14 +51,17 @@ impl Visitor for RenderVisitor {
     fn enter_node(&mut self, smiles: &Smiles, node_id: usize) -> Result<(), SmilesError> {
         if let Some(node) = smiles.node_by_id(node_id) {
             self.output.push_str(&node.to_string());
+            if let Some(ring_num) = node.ring_num() {
+                self.output.push_str(&ring_num.to_string());
+            }
             Ok(())
         } else {
             Err(SmilesError::NodeIdInvalid(node_id))
         }
     }
 
-    fn exit_node(&mut self, smiles: &Smiles, node_id: usize) -> Result<(), SmilesError> {
-        todo!()
+    fn exit_node(&mut self, _smiles: &Smiles, _node_id: usize) -> Result<(), SmilesError> {
+        Ok(())
     }
 
     fn tree_edge(&mut self, _smiles: &Smiles, bond_edge: BondEdge) -> Result<(), SmilesError> {
@@ -76,37 +79,70 @@ impl Visitor for RenderVisitor {
 
     fn cycle_edge(
         &mut self,
-        smiles: &Smiles,
+        _smiles: &Smiles,
         from: usize,
         to: usize,
-        bond: crate::bond::Bond,
+        bond: Bond,
     ) -> Result<(), SmilesError> {
-        todo!()
+        let label = self.ring_label_for_edge(from, to);
+
+        match bond {
+            Bond::Single => {}
+            Bond::Double => self.output.push('='),
+            Bond::Triple => self.output.push('#'),
+            Bond::Quadruple => self.output.push('$'),
+            Bond::Aromatic => self.output.push(':'),
+            Bond::Up => self.output.push('/'),
+            Bond::Down => self.output.push('\\'),
+        }
+
+        if label < 10 {
+            self.output.push(char::from_digit(u32::from(label), 10).unwrap());
+        } else {
+            self.output.push('%');
+            self.output.push_str(&label.to_string());
+        }
+
+        Ok(())
+    }
+    fn open_branch(
+        &mut self,
+        _smiles: &Smiles,
+        _from: usize,
+        _to: usize,
+    ) -> Result<(), SmilesError> {
+        self.output.push('(');
+        Ok(())
     }
 
-    fn open_branch(&mut self, smiles: &Smiles, from: usize, to: usize) -> Result<(), SmilesError> {
-        todo!()
-    }
-
-    fn close_branch(&mut self, smiles: &Smiles, from: usize, to: usize) -> Result<(), SmilesError> {
-        todo!()
+    fn close_branch(
+        &mut self,
+        _smiles: &Smiles,
+        _from: usize,
+        _to: usize,
+    ) -> Result<(), SmilesError> {
+        self.output.push(')');
+        Ok(())
     }
 
     fn start_component(
         &mut self,
-        smiles: &Smiles,
-        root_id: usize,
+        _smiles: &Smiles,
+        _root_id: usize,
         component_index: usize,
     ) -> Result<(), SmilesError> {
-        todo!()
+        if component_index > 0 {
+            self.output.push('.');
+        }
+        Ok(())
     }
 
     fn finish_component(
         &mut self,
-        smiles: &Smiles,
-        root_id: usize,
-        component_index: usize,
+        _smiles: &Smiles,
+        _root_id: usize,
+        _component_index: usize,
     ) -> Result<(), SmilesError> {
-        todo!()
+        Ok(())
     }
 }

@@ -6,10 +6,7 @@ use crate::{
     atom::atom_node::AtomNode,
     bond::{Bond, bond_edge::BondEdge},
     errors::SmilesError,
-    traversal::{
-        render_visitor::RenderVisitor,
-        walker::walk,
-    },
+    traversal::{render_visitor::RenderVisitor, walker::walk},
 };
 
 mod from_str;
