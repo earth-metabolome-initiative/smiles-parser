@@ -179,9 +179,19 @@ impl<'a> SmilesParser<'a> {
                         let bond = pending_bond
                             .or(stored_bond)
                             .unwrap_or_else(|| default_bond(&smiles, current, other));
+
                         smiles
                             .push_edge(current, other, bond)
                             .map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
+
+                        let current_node = smiles
+                            .nodes_mut()
+                            .iter_mut()
+                            .find(|node| node.id() == current)
+                            .unwrap();
+
+                        current_node.set_ring_num(Some(ring_num));
+
                         pending_bond = None;
                     } else {
                         let current_node = smiles

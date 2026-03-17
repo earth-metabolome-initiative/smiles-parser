@@ -67,7 +67,7 @@ mod tests {
                     UnbracketedAtom::new(AtomSymbol::Element(Element::C), false).into(),
                     5,
                     9..10,
-                    None,
+                    Some(RingNum::try_new(1).unwrap()),
                 ),
             ],
             bond_edges: vec![
