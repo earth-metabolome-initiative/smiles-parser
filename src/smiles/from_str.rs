@@ -82,6 +82,6 @@ mod tests {
         assert_eq!(smiles.atom_nodes[0], expected.atom_nodes[0]);
         assert_eq!(smiles.atom_nodes[0].ring_num_val(), expected.atom_nodes[0].ring_num_val());
         assert_eq!(smiles.atom_nodes[5], expected.atom_nodes[5]);
-        assert_eq!(smiles.atom_nodes[5].ring_num_val(), expected.atom_nodes[5].ring_num_val());
+        assert_eq!(smiles.atom_nodes[5].ring_num_val(), Some(1));
     }
 }
