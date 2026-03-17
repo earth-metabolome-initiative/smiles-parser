@@ -2,8 +2,12 @@
 
 use std::collections::HashMap;
 
-use crate::{errors::SmilesError, smiles::Smiles, traversal::visitor_trait::Visitor};
-
+use crate::{
+    bond::{Bond, bond_edge::BondEdge},
+    errors::SmilesError,
+    smiles::Smiles,
+    traversal::visitor_trait::Visitor,
+};
 
 /// Structure used for implementing node visits and building output SMILES
 /// `String`
@@ -21,20 +25,16 @@ impl RenderVisitor {
     /// Generates a new `RenderVisitor`
     #[must_use]
     pub fn new() -> Self {
-        Self { output: String::new(), ring_labels: HashMap::new(), next_ring_num: 1}
+        Self { output: String::new(), ring_labels: HashMap::new(), next_ring_num: 1 }
     }
     /// Returns the built string
     #[must_use]
     pub fn into_string(self) -> String {
         self.output
     }
-    /// Returns a normalized edge key with node IDs in ascending order.
-    fn edge_key(a: usize, b: usize) -> (usize, usize) {
-        if a < b { (a, b) } else { (b, a) }
-    }
     /// Returns the ring label for an edge, assigning a new one if needed.
     fn ring_label_for_edge(&mut self, a: usize, b: usize) -> u8 {
-        let pair = Self::edge_key(a, b);
+        let pair = Smiles::edge_key(a, b);
 
         if let Some(&label) = self.ring_labels.get(&pair) {
             return label;
@@ -61,14 +61,17 @@ impl Visitor for RenderVisitor {
         todo!()
     }
 
-    fn tree_edge(
-        &mut self,
-        smiles: &Smiles,
-        from: usize,
-        to: usize,
-        bond: crate::bond::Bond,
-    ) -> Result<(), SmilesError> {
-        todo!()
+    fn tree_edge(&mut self, _smiles: &Smiles, bond_edge: BondEdge) -> Result<(), SmilesError> {
+        match bond_edge.bond() {
+            Bond::Single => {}
+            Bond::Double => self.output.push('='),
+            Bond::Triple => self.output.push('#'),
+            Bond::Quadruple => self.output.push('$'),
+            Bond::Aromatic => self.output.push(':'),
+            Bond::Up => self.output.push('/'),
+            Bond::Down => self.output.push('\\'),
+        }
+        Ok(())
     }
 
     fn cycle_edge(

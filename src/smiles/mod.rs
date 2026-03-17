@@ -1,17 +1,18 @@
 //! Represents a SMILES structure.
 
-use std::fmt;
+use std::{fmt, usize};
 
 use crate::{
     atom::atom_node::AtomNode,
     bond::{Bond, bond_edge::BondEdge},
     errors::SmilesError,
-    smiles::to_smiles::RenderVisitor,
-    traversal::walker::walk,
+    traversal::{
+        render_visitor::RenderVisitor,
+        walker::walk,
+    },
 };
 
 mod from_str;
-mod to_smiles;
 
 /// Represents a SMILES structure.
 #[derive(Debug)]
@@ -80,6 +81,25 @@ impl Smiles {
     #[must_use]
     pub fn edges(&self) -> &[BondEdge] {
         &self.bond_edges
+    }
+    /// Returns a normalized edge key with node IDs in ascending order.
+    #[must_use]
+    pub fn edge_key(a: usize, b: usize) -> (usize, usize) {
+        if a < b { (a, b) } else { (b, a) }
+    }
+    /// Returns the first [`BondEdge`] connecting the given pair of node IDs.
+    #[must_use]
+    pub fn edge_for_node_pair(&self, nodes: (usize, usize)) -> Option<&BondEdge> {
+        let target = Self::edge_key(nodes.0, nodes.1);
+        self.bond_edges.iter().find(|b| {
+            let (a, c) = b.vertices();
+            Self::edge_key(a, c) == target
+        })
+    }
+    /// Returns all edges for a given node `id`
+    #[must_use]
+    pub fn edges_for_node(&self, id: usize) -> Vec<&BondEdge> {
+        self.bond_edges.iter().filter(|b| b.contains(id)).collect()
     }
     /// Returns mutable slice of edges
     pub fn edges_mut(&mut self) -> &mut [BondEdge] {

@@ -1,6 +1,10 @@
 //! Module for graph traversal visitors.
 
-use crate::{bond::Bond, errors::SmilesError, smiles::Smiles};
+use crate::{
+    bond::{Bond, bond_edge::BondEdge},
+    errors::SmilesError,
+    smiles::Smiles,
+};
 
 /// Trait that defines visitors to [`Smiles`] nodes
 pub trait Visitor {
@@ -10,13 +14,7 @@ pub trait Visitor {
     fn exit_node(&mut self, smiles: &Smiles, node_id: usize) -> Result<(), SmilesError>;
     /// Called when traversal follows an edge to an unvisited
     /// node
-    fn tree_edge(
-        &mut self,
-        smiles: &Smiles,
-        from: usize,
-        to: usize,
-        bond: Bond,
-    ) -> Result<(), SmilesError>;
+    fn tree_edge(&mut self, smiles: &Smiles, bond_edge: BondEdge) -> Result<(), SmilesError>;
     /// Called when traversal encounters an edge that closes a
     /// cycle (a ring)
     fn cycle_edge(
