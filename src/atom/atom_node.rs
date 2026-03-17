@@ -37,6 +37,10 @@ impl AtomNode {
     pub fn ring_num(&self) -> Option<RingNum> {
         self.ring_num
     }
+    /// Updates the [`RingNum`] value
+    pub fn set_ring_num(&mut self, ring_num: Option<RingNum>) {
+        self.ring_num = ring_num
+    }
     /// returns the [`RingNum`] value
     #[must_use]
     pub fn ring_num_val(&self) -> Option<u8> {

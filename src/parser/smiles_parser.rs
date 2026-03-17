@@ -184,6 +184,14 @@ impl<'a> SmilesParser<'a> {
                             .map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
                         pending_bond = None;
                     } else {
+                        let current_node = smiles
+                            .nodes_mut()
+                            .iter_mut()
+                            .find(|node| node.id() == current)
+                            .unwrap();
+
+                        current_node.set_ring_num(Some(ring_num));
+
                         ring_open.insert(ring_num, (current, pending_bond));
                         pending_bond = None;
                     }

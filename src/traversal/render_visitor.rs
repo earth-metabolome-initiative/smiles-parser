@@ -84,7 +84,7 @@ impl Visitor for RenderVisitor {
         to: usize,
         bond: Bond,
     ) -> Result<(), SmilesError> {
-        let label = self.ring_label_for_edge(from, to);
+        // let label = self.ring_label_for_edge(from, to);
 
         match bond {
             Bond::Single => {}
@@ -96,12 +96,12 @@ impl Visitor for RenderVisitor {
             Bond::Down => self.output.push('\\'),
         }
 
-        if label < 10 {
-            self.output.push(char::from_digit(u32::from(label), 10).unwrap());
-        } else {
-            self.output.push('%');
-            self.output.push_str(&label.to_string());
-        }
+        // if label < 10 {
+        //     self.output.push(char::from_digit(u32::from(label), 10).unwrap());
+        // } else {
+        //     self.output.push('%');
+        //     self.output.push_str(&label.to_string());
+        // }
 
         Ok(())
     }
