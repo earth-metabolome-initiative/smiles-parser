@@ -64,7 +64,7 @@ fn dfs<V: Visitor>(
             if visited_nodes.contains(&branch_other_id) {
                 continue;
             }
-
+            visited_edges.insert(Smiles::edge_key(current_id, branch_other_id));
             visitor.open_branch(smiles, current_id, branch_other_id)?;
             visitor.tree_edge(smiles, *branch_bond)?;
             dfs(smiles, visitor, branch_other_id, visited_nodes, visited_edges)?;

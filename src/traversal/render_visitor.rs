@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    bond::{Bond, bond_edge::BondEdge, ring_num::RingNum}, errors::SmilesError, smiles::Smiles, token::Token, traversal::visitor_trait::Visitor
+    bond::{Bond, bond_edge::BondEdge, ring_num::RingNum}, errors::SmilesError, smiles::Smiles, traversal::visitor_trait::Visitor
 };
 
 
@@ -86,15 +86,14 @@ impl Visitor for RenderVisitor {
     ) -> Result<(), SmilesError> {
         let label = self.ring_label_for_edge(from, to);
 
-        // match bond {
-        //     Bond::Single => {}
-        //     Bond::Double => self.sections.push(('='.to_string(), None)),
-        //     Bond::Triple => self.sections.push(('#'.to_string(), None)),
-        //     Bond::Quadruple => self.sections.push(('$'.to_string(), None)),
-        //     Bond::Aromatic => self.sections.push((':'.to_string(), None)),
-        //     Bond::Up => self.sections.push(('/'.to_string(), None)),
-        //     Bond::Down => self.sections.push(('\\'.to_string(), None)),
-        // }
+        match bond {
+            Bond::Single | Bond::Aromatic=> {}
+            Bond::Double => self.sections.push(('='.to_string(), None)),
+            Bond::Triple => self.sections.push(('#'.to_string(), None)),
+            Bond::Quadruple => self.sections.push(('$'.to_string(), None)),
+            Bond::Up => self.sections.push(('/'.to_string(), None)),
+            Bond::Down => self.sections.push(('\\'.to_string(), None)),
+        }
 
         for (output_string, id) in self.sections.iter_mut() {
             if let Some(id_val) = id {
