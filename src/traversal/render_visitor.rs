@@ -3,17 +3,16 @@
 use std::collections::HashMap;
 
 use crate::{
-    bond::{Bond, bond_edge::BondEdge},
-    errors::SmilesError,
-    smiles::Smiles,
-    traversal::visitor_trait::Visitor,
+    bond::{Bond, bond_edge::BondEdge, ring_num::RingNum}, errors::SmilesError, smiles::Smiles, token::Token, traversal::visitor_trait::Visitor
 };
+
+
 
 /// Structure used for implementing node visits and building output SMILES
 /// `String`
 pub struct RenderVisitor {
-    /// Contains the SMILES `String` while being rendered
-    output: String,
+    /// Vector of the outputs generated from the [`Smiles`] graph
+    sections: Vec<(String, Option<usize>)>,
     /// [`HashMap`] used to track the ring number assigned to an edge between
     /// nodes
     ring_labels: HashMap<(usize, usize), u8>,
@@ -25,12 +24,16 @@ impl RenderVisitor {
     /// Generates a new `RenderVisitor`
     #[must_use]
     pub fn new() -> Self {
-        Self { output: String::new(), ring_labels: HashMap::new(), next_ring_num: 1 }
+        Self { sections: Vec::new(), ring_labels: HashMap::new(), next_ring_num: 1 }
     }
-    /// Returns the built string
+    /// Builds and returns the string from the section's `String` value
     #[must_use]
     pub fn into_string(self) -> String {
-        self.output
+        let mut output = String::new();
+        for (section, _) in self.sections {
+            output.push_str(&section);
+        }
+        output
     }
     /// Returns the ring label for an edge, assigning a new one if needed.
     fn ring_label_for_edge(&mut self, a: usize, b: usize) -> u8 {
@@ -50,10 +53,7 @@ impl RenderVisitor {
 impl Visitor for RenderVisitor {
     fn enter_node(&mut self, smiles: &Smiles, node_id: usize) -> Result<(), SmilesError> {
         if let Some(node) = smiles.node_by_id(node_id) {
-            self.output.push_str(&node.to_string());
-            if let Some(ring_num) = node.ring_num() {
-                self.output.push_str(&ring_num.to_string());
-            }
+            self.sections.push((node.to_string(), Some(node_id)));
             Ok(())
         } else {
             Err(SmilesError::NodeIdInvalid(node_id))
@@ -67,12 +67,12 @@ impl Visitor for RenderVisitor {
     fn tree_edge(&mut self, _smiles: &Smiles, bond_edge: BondEdge) -> Result<(), SmilesError> {
         match bond_edge.bond() {
             Bond::Single => {}
-            Bond::Double => self.output.push('='),
-            Bond::Triple => self.output.push('#'),
-            Bond::Quadruple => self.output.push('$'),
-            Bond::Aromatic => self.output.push(':'),
-            Bond::Up => self.output.push('/'),
-            Bond::Down => self.output.push('\\'),
+            Bond::Double => self.sections.push(('='.to_string(), None)),
+            Bond::Triple => self.sections.push(('#'.to_string(), None)),
+            Bond::Quadruple => self.sections.push(('$'.to_string(), None)),
+            Bond::Aromatic => self.sections.push((':'.to_string(), None)),
+            Bond::Up => self.sections.push(('/'.to_string(), None)),
+            Bond::Down => self.sections.push(('\\'.to_string(), None)),
         }
         Ok(())
     }
@@ -84,24 +84,27 @@ impl Visitor for RenderVisitor {
         to: usize,
         bond: Bond,
     ) -> Result<(), SmilesError> {
-        // let label = self.ring_label_for_edge(from, to);
+        let label = self.ring_label_for_edge(from, to);
 
         match bond {
             Bond::Single => {}
-            Bond::Double => self.output.push('='),
-            Bond::Triple => self.output.push('#'),
-            Bond::Quadruple => self.output.push('$'),
-            Bond::Aromatic => self.output.push(':'),
-            Bond::Up => self.output.push('/'),
-            Bond::Down => self.output.push('\\'),
+            Bond::Double => self.sections.push(('='.to_string(), None)),
+            Bond::Triple => self.sections.push(('#'.to_string(), None)),
+            Bond::Quadruple => self.sections.push(('$'.to_string(), None)),
+            Bond::Aromatic => self.sections.push((':'.to_string(), None)),
+            Bond::Up => self.sections.push(('/'.to_string(), None)),
+            Bond::Down => self.sections.push(('\\'.to_string(), None)),
         }
 
-        // if label < 10 {
-        //     self.output.push(char::from_digit(u32::from(label), 10).unwrap());
-        // } else {
-        //     self.output.push('%');
-        //     self.output.push_str(&label.to_string());
-        // }
+        for (output_string, id) in self.sections.iter_mut() {
+            if let Some(id_val) = id {
+                if *id_val == to || *id_val == from {
+                    let ring_num = RingNum::try_new(label)?;
+                    output_string.push_str(&ring_num.to_string());
+                } 
+            }
+        }
+        
 
         Ok(())
     }
@@ -111,7 +114,7 @@ impl Visitor for RenderVisitor {
         _from: usize,
         _to: usize,
     ) -> Result<(), SmilesError> {
-        self.output.push('(');
+        self.sections.push(('('.to_string(), None));
         Ok(())
     }
 
@@ -121,7 +124,7 @@ impl Visitor for RenderVisitor {
         _from: usize,
         _to: usize,
     ) -> Result<(), SmilesError> {
-        self.output.push(')');
+        self.sections.push((')'.to_string(), None));
         Ok(())
     }
 
@@ -132,7 +135,7 @@ impl Visitor for RenderVisitor {
         component_index: usize,
     ) -> Result<(), SmilesError> {
         if component_index > 0 {
-            self.output.push('.');
+            self.sections.push(('.'.to_string(), None));
         }
         Ok(())
     }
