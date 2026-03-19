@@ -3,10 +3,11 @@
 use std::collections::HashMap;
 
 use crate::{
-    bond::{Bond, bond_edge::BondEdge, ring_num::RingNum}, errors::SmilesError, smiles::Smiles, traversal::visitor_trait::Visitor
+    bond::{Bond, bond_edge::BondEdge, ring_num::RingNum},
+    errors::SmilesError,
+    smiles::Smiles,
+    traversal::visitor_trait::Visitor,
 };
-
-
 
 /// Structure used for implementing node visits and building output SMILES
 /// `String`
@@ -85,25 +86,25 @@ impl Visitor for RenderVisitor {
         bond: Bond,
     ) -> Result<(), SmilesError> {
         let label = self.ring_label_for_edge(from, to);
-
-        match bond {
-            Bond::Single | Bond::Aromatic=> {}
-            Bond::Double => self.sections.push(('='.to_string(), None)),
-            Bond::Triple => self.sections.push(('#'.to_string(), None)),
-            Bond::Quadruple => self.sections.push(('$'.to_string(), None)),
-            Bond::Up => self.sections.push(('/'.to_string(), None)),
-            Bond::Down => self.sections.push(('\\'.to_string(), None)),
-        }
+        let ring_text = RingNum::try_new(label)?.to_string();
+        let closure_text = match bond {
+            Bond::Single | Bond::Aromatic => ring_text.clone(),
+            Bond::Double => format!("={ring_text}"),
+            Bond::Triple => format!("#{ring_text}"),
+            Bond::Quadruple => format!("${ring_text}"),
+            Bond::Up => format!("/{ring_text}"),
+            Bond::Down => format!("\\{ring_text}"),
+        };
 
         for (output_string, id) in self.sections.iter_mut() {
             if let Some(id_val) = id {
-                if *id_val == to || *id_val == from {
-                    let ring_num = RingNum::try_new(label)?;
-                    output_string.push_str(&ring_num.to_string());
-                } 
+                if *id_val == to {
+                    output_string.push_str(&ring_text);
+                } else if *id_val == from {
+                    output_string.push_str(&closure_text);
+                }
             }
         }
-        
 
         Ok(())
     }

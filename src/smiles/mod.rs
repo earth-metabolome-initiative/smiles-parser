@@ -4,7 +4,7 @@ use std::{fmt, usize};
 
 use crate::{
     atom::atom_node::AtomNode,
-    bond::{Bond, bond_edge::BondEdge},
+    bond::{Bond, bond_edge::BondEdge, ring_num::RingNum},
     errors::SmilesError,
     traversal::{render_visitor::RenderVisitor, walker::walk},
 };
@@ -45,6 +45,7 @@ impl Smiles {
         node_a: usize,
         node_b: usize,
         bond: Bond,
+        ring_num: Option<RingNum>,
     ) -> Result<(), SmilesError> {
         if !self.contains_node_id(node_a) {
             return Err(SmilesError::NodeIdInvalid(node_a));
@@ -52,7 +53,7 @@ impl Smiles {
         if !self.contains_node_id(node_b) {
             return Err(SmilesError::NodeIdInvalid(node_b));
         }
-        self.bond_edges.push(BondEdge::new(node_a, node_b, bond));
+        self.bond_edges.push(BondEdge::new(node_a, node_b, bond, ring_num));
         Ok(())
     }
     /// Returns `bool` for if the `AtomNode` `id` exists in the set

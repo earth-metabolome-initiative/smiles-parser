@@ -2,7 +2,7 @@
 
 use std::{fmt, ops::Range};
 
-use crate::{atom::Atom, bond::ring_num::RingNum};
+use crate::atom::Atom;
 /// Contains information about atom parsed from the SMILES string
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AtomNode {
@@ -12,15 +12,13 @@ pub struct AtomNode {
     atom: Atom,
     /// Span for the atom from the original string
     span: Range<usize>,
-    /// Possible Ring Number for this node
-    ring_num: Option<RingNum>,
 }
 
 impl AtomNode {
     /// Creates a new node
     #[must_use]
-    pub fn new(atom: Atom, id: usize, span: Range<usize>, ring_num: Option<RingNum>) -> Self {
-        Self { id, atom, span, ring_num }
+    pub fn new(atom: Atom, id: usize, span: Range<usize>) -> Self {
+        Self { id, atom, span }
     }
     /// returns the id
     #[must_use]
@@ -31,20 +29,6 @@ impl AtomNode {
     #[must_use]
     pub fn atom(&self) -> &Atom {
         &self.atom
-    }
-    /// returns the borrowed `Option<RingNum>`
-    #[must_use]
-    pub fn ring_num(&self) -> Option<RingNum> {
-        self.ring_num
-    }
-    /// Updates the [`RingNum`] value
-    pub fn set_ring_num(&mut self, ring_num: Option<RingNum>) {
-        self.ring_num = ring_num
-    }
-    /// returns the [`RingNum`] value
-    #[must_use]
-    pub fn ring_num_val(&self) -> Option<u8> {
-        self.ring_num.map(|num| num.get())
     }
     /// returns the [`Span`] of the node
     #[must_use]
@@ -65,15 +49,12 @@ mod tests {
 
     use elements_rs::Element;
 
-    use crate::{
-        atom::{
-            Atom,
-            atom_node::AtomNode,
-            atom_symbol::AtomSymbol,
-            bracketed::{BracketAtom, charge::Charge, hydrogen_count::HydrogenCount},
-            unbracketed::UnbracketedAtom,
-        },
-        bond::ring_num::RingNum,
+    use crate::atom::{
+        Atom,
+        atom_node::AtomNode,
+        atom_symbol::AtomSymbol,
+        bracketed::{BracketAtom, charge::Charge, hydrogen_count::HydrogenCount},
+        unbracketed::UnbracketedAtom,
     };
 
     #[test]
@@ -81,31 +62,26 @@ mod tests {
         let atom: Atom =
             BracketAtom::builder().with_symbol(AtomSymbol::Element(Element::C)).build().into();
         let span = Range { start: 2, end: 5 };
-        let ring_num = Some(RingNum::try_new(7).unwrap());
 
-        let node = AtomNode::new(atom.clone(), 42, span.clone(), ring_num);
+        let node = AtomNode::new(atom.clone(), 42, span.clone());
 
         assert_eq!(node.id(), 42);
         assert_eq!(node.atom(), &atom);
         assert_eq!(node.span(), &span);
-        assert_eq!(node.ring_num(), Some(RingNum::try_new(7).unwrap()));
-        assert_eq!(node.ring_num_val(), Some(7));
     }
 
     #[test]
     fn test_atom_node_ring_num_none() {
         let atom: Atom = UnbracketedAtom::new(AtomSymbol::Element(Element::C), false).into();
-        let node = AtomNode::new(atom, 0, 0..1, None);
+        let node = AtomNode::new(atom, 0, 0..1);
 
         assert_eq!(node.span(), &(0..1));
-        assert_eq!(node.ring_num(), None);
-        assert_eq!(node.ring_num_val(), None);
     }
 
     #[test]
     fn test_atom_node_display_delegates_to_atom_unbracketed() {
         let atom: Atom = UnbracketedAtom::new(AtomSymbol::Element(Element::C), true).into();
-        let node = AtomNode::new(atom, 0, 0..1, None);
+        let node = AtomNode::new(atom, 0, 0..1);
 
         assert_eq!(node.to_string(), "c");
     }
@@ -120,7 +96,7 @@ mod tests {
             .build()
             .into();
 
-        let node = AtomNode::new(atom, 1, 3..9, Some(RingNum::try_new(1).unwrap()));
+        let node = AtomNode::new(atom, 1, 3..9);
 
         assert_eq!(node.to_string(), "[13CH2-]");
     }
@@ -129,9 +105,9 @@ mod tests {
     fn test_atom_node_equality_uses_all_fields() {
         let atom: Atom = UnbracketedAtom::new(AtomSymbol::Element(Element::C), false).into();
 
-        let a = AtomNode::new(atom.clone(), 1, 0..1, None);
-        let b = AtomNode::new(atom.clone(), 1, 0..1, None);
-        let c = AtomNode::new(atom, 1, 1..2, None);
+        let a = AtomNode::new(atom.clone(), 1, 0..1);
+        let b = AtomNode::new(atom.clone(), 1, 0..1);
+        let c = AtomNode::new(atom, 1, 1..2);
 
         assert_eq!(a, b);
         assert_ne!(a, c);

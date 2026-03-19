@@ -116,13 +116,13 @@ impl<'a> SmilesParser<'a> {
                     let id = next_id;
                     next_id += 1;
 
-                    let node = AtomNode::new(atom, id, token_with_span.span(), None);
+                    let node = AtomNode::new(atom, id, token_with_span.span());
                     smiles.push_node(node).map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
 
                     if let Some(prev) = last_atom {
                         let bond = pending_bond.unwrap_or_else(|| default_bond(&smiles, prev, id));
                         smiles
-                            .push_edge(prev, id, bond)
+                            .push_edge(prev, id, bond, None)
                             .map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
                     }
                     last_atom = Some(id);
@@ -133,13 +133,13 @@ impl<'a> SmilesParser<'a> {
                     let id = next_id;
                     next_id += 1;
 
-                    let node = AtomNode::new(atom, id, token_with_span.span(), None);
+                    let node = AtomNode::new(atom, id, token_with_span.span());
                     smiles.push_node(node).map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
 
                     if let Some(prev) = last_atom {
                         let bond = pending_bond.unwrap_or_else(|| default_bond(&smiles, prev, id));
                         smiles
-                            .push_edge(prev, id, bond)
+                            .push_edge(prev, id, bond, None)
                             .map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
                     }
 
@@ -181,27 +181,11 @@ impl<'a> SmilesParser<'a> {
                             .unwrap_or_else(|| default_bond(&smiles, current, other));
 
                         smiles
-                            .push_edge(current, other, bond)
+                            .push_edge(current, other, bond, Some(ring_num))
                             .map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
-
-                        let current_node = smiles
-                            .nodes_mut()
-                            .iter_mut()
-                            .find(|node| node.id() == current)
-                            .unwrap();
-
-                        current_node.set_ring_num(Some(ring_num));
 
                         pending_bond = None;
                     } else {
-                        let current_node = smiles
-                            .nodes_mut()
-                            .iter_mut()
-                            .find(|node| node.id() == current)
-                            .unwrap();
-
-                        current_node.set_ring_num(Some(ring_num));
-
                         ring_open.insert(ring_num, (current, pending_bond));
                         pending_bond = None;
                     }

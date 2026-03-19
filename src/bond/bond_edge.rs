@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::bond::Bond;
+use crate::bond::{Bond, ring_num::RingNum};
 
 /// Contains the two ID's of the `AtomNode` that are connected via the
 /// [`Bond`]
@@ -14,13 +14,15 @@ pub struct BondEdge {
     node_b: usize,
     /// The bond between the nodes
     bond: Bond,
+    /// Possible Ring Number for this edge
+    ring_num: Option<RingNum>,
 }
 
 impl BondEdge {
     /// Creates a new edge
     #[must_use]
-    pub fn new(node_a: usize, node_b: usize, bond: Bond) -> Self {
-        Self { node_a, node_b, bond }
+    pub fn new(node_a: usize, node_b: usize, bond: Bond, ring_num: Option<RingNum>) -> Self {
+        Self { node_a, node_b, bond, ring_num }
     }
     /// Returns the specified [`Bond`]
     #[must_use]
@@ -58,6 +60,20 @@ impl BondEdge {
             None
         }
     }
+    /// Returns the ring number assigned to this edge, if any.
+    #[must_use]
+    pub fn ring_num(&self) -> Option<RingNum> {
+        self.ring_num
+    }
+    /// Updates the [`RingNum`] value
+    pub fn set_ring_num(&mut self, ring_num: Option<RingNum>) {
+        self.ring_num = ring_num
+    }
+    /// returns the [`RingNum`] value
+    #[must_use]
+    pub fn ring_num_val(&self) -> Option<u8> {
+        self.ring_num.map(|num| num.get())
+    }
 }
 
 impl fmt::Display for BondEdge {
@@ -71,28 +87,29 @@ impl fmt::Display for BondEdge {
 
 #[cfg(test)]
 mod tests {
-    use crate::bond::{Bond, bond_edge::BondEdge};
+    use crate::bond::{Bond, bond_edge::BondEdge, ring_num::RingNum};
 
     #[test]
     fn test_bond_edge_new_and_accessors() {
-        let edge = BondEdge::new(3, 7, Bond::Double);
+        let edge = BondEdge::new(3, 7, Bond::Double, None);
 
         assert_eq!(edge.node_a(), 3);
         assert_eq!(edge.node_b(), 7);
         assert_eq!(edge.vertices(), (3, 7));
         assert_eq!(edge.bond(), Bond::Double);
+        assert_eq!(edge.ring_num(), None);
     }
 
     #[test]
     fn test_bond_edge_fmt_all_arms() {
         let cases = [
-            (BondEdge::new(0, 1, Bond::Single), ""),
-            (BondEdge::new(0, 1, Bond::Double), "="),
-            (BondEdge::new(0, 1, Bond::Triple), "#"),
-            (BondEdge::new(0, 1, Bond::Quadruple), "$"),
-            (BondEdge::new(0, 1, Bond::Aromatic), ":"),
-            (BondEdge::new(0, 1, Bond::Up), "/"),
-            (BondEdge::new(0, 1, Bond::Down), "\\"),
+            (BondEdge::new(0, 1, Bond::Single, Some(RingNum::try_new(2).unwrap())), ""),
+            (BondEdge::new(0, 1, Bond::Double, Some(RingNum::try_new(2).unwrap())), "="),
+            (BondEdge::new(0, 1, Bond::Triple, Some(RingNum::try_new(2).unwrap())), "#"),
+            (BondEdge::new(0, 1, Bond::Quadruple, Some(RingNum::try_new(2).unwrap())), "$"),
+            (BondEdge::new(0, 1, Bond::Aromatic, Some(RingNum::try_new(2).unwrap())), ":"),
+            (BondEdge::new(0, 1, Bond::Up, Some(RingNum::try_new(2).unwrap())), "/"),
+            (BondEdge::new(0, 1, Bond::Down, Some(RingNum::try_new(2).unwrap())), "\\"),
         ];
 
         for (edge, expected) in cases {
@@ -102,7 +119,7 @@ mod tests {
 
     #[test]
     fn test_bond_edge_vertices_preserve_order() {
-        let edge = BondEdge::new(10, 2, Bond::Single);
+        let edge = BondEdge::new(10, 2, Bond::Single, None);
         assert_eq!(edge.vertices(), (10, 2));
     }
 }

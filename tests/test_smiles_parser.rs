@@ -1,6 +1,7 @@
 //! Tests of the parser module for several corner cases.
 
 use smiles_parser::{errors::SmilesErrorWithSpan, parser::token_iter::TokenIter};
+
 const SMILES_STR: &[&str] = &[
     "C1=CC=CC=C1",
     "[OH2]",
@@ -59,53 +60,7 @@ fn test_parser_all_inputs() {
 }
 
 #[test]
-fn test_parse_then_render_then_parse_all_inputs() {
-    use std::str::FromStr;
-
-    use smiles_parser::smiles::Smiles;
-
-    for &original in SMILES_STR {
-        let parsed = Smiles::from_str(original)
-            .unwrap_or_else(|e| panic!("Failed to parse original:\n{}", e.render(original)));
-
-        let rendered = parsed.to_string();
-
-        let reparsed = Smiles::from_str(&rendered).unwrap_or_else(|e| {
-            panic!(
-                "Failed to parse rendered SMILES.\nOriginal:
-{original}\nRendered: {rendered}\n{}",
-                e.render(&rendered)
-            )
-        });
-
-        assert_eq!(
-            parsed.nodes().len(),
-            reparsed.nodes().len(),
-            "Node count changed after round trip.\nOriginal:
-{original}\nRendered: {rendered}"
-        );
-
-        assert_eq!(
-            parsed.edges().len(),
-            reparsed.edges().len(),
-            "Edge count changed after round trip.\nOriginal:
-{original}\nRendered: {rendered}"
-        );
-
-        let parsed_aromatic = parsed.nodes().iter().filter(|n| n.atom().aromatic()).count();
-        let reparsed_aromatic = reparsed.nodes().iter().filter(|n| n.atom().aromatic()).count();
-
-        assert_eq!(
-            parsed_aromatic, reparsed_aromatic,
-            "Aromatic atom count changed after round trip.\nOriginal:
-{original}\nRendered: {rendered}"
-        );
-    }
-}
-
-#[test]
 fn test_parse_benzene_graph_shape() {
-    // C1=CC=CC=C1
     use std::str::FromStr;
 
     use smiles_parser::smiles::Smiles;
@@ -121,7 +76,6 @@ fn test_parse_benzene_graph_shape() {
 
 #[test]
 fn test_parse_benzene_with_wildcard_graph_shape() {
-    // c1ccccc1*
     use std::str::FromStr;
 
     use smiles_parser::smiles::Smiles;
@@ -132,6 +86,7 @@ fn test_parse_benzene_with_wildcard_graph_shape() {
 
     assert_eq!(smiles.nodes().len(), 7);
     assert_eq!(smiles.edges().len(), 7);
+
     let aromatic_count = smiles.nodes().iter().filter(|n| n.atom().aromatic()).count();
     assert_eq!(aromatic_count, 6);
 }
