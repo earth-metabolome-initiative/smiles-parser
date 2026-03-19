@@ -16,7 +16,7 @@ pub enum SmilesError {
     ChargeOverflow(i8),
     /// A charge is below allowed minimum (-15)
     ChargeUnderflow(i8),
-    /// A Duplicate [`AtomNode`] id was found
+    /// A Duplicate [`crate::atom::atom_node::AtomNode`] id was found
     DuplicateNodeId(usize),
     /// A non bare element found outside of brackets
     ElementRequiresBrackets,

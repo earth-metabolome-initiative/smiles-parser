@@ -30,7 +30,7 @@ impl AtomNode {
     pub fn atom(&self) -> &Atom {
         &self.atom
     }
-    /// returns the [`Span`] of the node
+    /// returns the `Span` of the node
     #[must_use]
     pub fn span(&self) -> &Range<usize> {
         &self.span
