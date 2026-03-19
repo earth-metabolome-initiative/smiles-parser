@@ -5,7 +5,7 @@
 //! To run this test (validates SMILES in the PubChem dataset), ensure that:
 //!
 //! ```
-//! cargo test --release --test validate_pubchem_smiles -- --ignored --nocapture
+//! cargo test --release validate_pubchem_smiles
 //! ```
 
 use std::{fs::File, io::BufReader};
@@ -29,7 +29,6 @@ struct SmilesPubChemCompound {
 #[ignore = "This test downloads a ~6.79 GB file and is time-consuming."]
 fn validate_pubchem_smiles() -> Result<(), Box<dyn std::error::Error>> {
     let file = File::open("tests/CID-SMILES.gz")?;
-    // let file = File::open(file_path)?;
     let decoder = GzDecoder::new(file);
     let reader = BufReader::new(decoder);
 
@@ -53,8 +52,29 @@ fn validate_pubchem_smiles() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let smiles_str = &result.smiles;
-        if let Err(err) = smiles_str.parse::<Smiles>() {
-            panic!("{}\n{}", result.id, err.render(smiles_str));
+        let smiles = smiles_str.parse::<Smiles>();
+        match smiles {
+            Ok(smiles) => {
+                let rendered = smiles.render().unwrap_or_else(|e| {
+                    panic!(
+                        "Failed to render SMILES.\nRecord: {}\nPubChem ID: {}\nOriginal:\n{}\n{:?}",
+                        count, result.id, smiles_str, e
+                    )
+                });
+
+                let reparsed = rendered.parse::<Smiles>().unwrap_or_else(|e| {
+                    panic!(
+                        "Failed to parse rendered SMILES.\nPubChem ID: {}\nOriginal:\n{}\nRendered:\n{}\n{}",
+                        result.id,
+                        smiles_str,
+                        rendered,
+                        e.render(&rendered)
+                    )
+                });
+                assert_eq!(smiles.nodes().len(), reparsed.nodes().len());
+                assert_eq!(smiles.edges().len(), reparsed.edges().len());
+            }
+            Err(err) => panic!("{}\n{}", result.id, err.render(smiles_str)),
         }
     }
     Ok(())

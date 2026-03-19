@@ -1,9 +1,13 @@
 //! Module rendering a SMILES string from the [`Smiles`] graph
 
-use std::collections::HashMap;
+use std::collections::BTreeSet;
 
 use crate::{
-    bond::{Bond, bond_edge::BondEdge, ring_num::RingNum},
+    bond::{
+        Bond,
+        bond_edge::BondEdge,
+        ring_num::RingNum,
+    },
     errors::SmilesError,
     smiles::Smiles,
     traversal::visitor_trait::Visitor,
@@ -14,18 +18,15 @@ use crate::{
 pub struct RenderVisitor {
     /// Vector of the outputs generated from the [`Smiles`] graph
     sections: Vec<(String, Option<usize>)>,
-    /// [`HashMap`] used to track the ring number assigned to an edge between
-    /// nodes
-    ring_labels: HashMap<(usize, usize), u8>,
-    /// The next available ring number label to assign for a ring
-    next_ring_num: u8,
+    /// A pool of ring numbers that can be used
+    available_ring_nums: BTreeSet<u8>,
 }
 
 impl RenderVisitor {
     /// Generates a new `RenderVisitor`
     #[must_use]
     pub fn new() -> Self {
-        Self { sections: Vec::new(), ring_labels: HashMap::new(), next_ring_num: 1 }
+        Self { sections: Vec::new(), available_ring_nums: (0..=99).collect() }
     }
     /// Builds and returns the string from the section's `String` value
     #[must_use]
@@ -36,18 +37,20 @@ impl RenderVisitor {
         }
         output
     }
-    /// Returns the ring label for an edge, assigning a new one if needed.
-    fn ring_label_for_edge(&mut self, a: usize, b: usize) -> u8 {
-        let pair = Smiles::edge_key(a, b);
-
-        if let Some(&label) = self.ring_labels.get(&pair) {
-            return label;
-        }
-
-        let label = self.next_ring_num;
-        self.ring_labels.insert(pair, label);
-        self.next_ring_num += 1;
-        label
+    /// Returns the next available ring number
+    ///
+    /// # Errors
+    /// - Returns [`SmilesError::RingNumberOverflow`] if ring number is over 99
+    fn take_ring_num(&mut self) -> Result<u8, SmilesError> {
+        let Some(&ring_num) = self.available_ring_nums.iter().next() else {
+            return Err(SmilesError::RingNumberOverflow(100));
+        };
+        self.available_ring_nums.remove(&ring_num);
+        Ok(ring_num)
+    }
+    /// Recycles a ring number after its finished being used
+    fn release_ring_num(&mut self, ring_num: u8) {
+        self.available_ring_nums.insert(ring_num);
     }
 }
 
@@ -91,7 +94,7 @@ impl Visitor for RenderVisitor {
         to: usize,
         bond: Bond,
     ) -> Result<(), SmilesError> {
-        let label = self.ring_label_for_edge(from, to);
+        let label = self.take_ring_num()?;
         let ring_text = RingNum::try_new(label)?.to_string();
         let closure_text = match bond {
             Bond::Single | Bond::Aromatic => ring_text.clone(),
@@ -111,7 +114,7 @@ impl Visitor for RenderVisitor {
                 }
             }
         }
-
+        self.release_ring_num(label);
         Ok(())
     }
     fn open_branch(
