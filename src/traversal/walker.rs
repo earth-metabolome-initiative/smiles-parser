@@ -5,6 +5,9 @@ use std::collections::HashSet;
 use crate::{errors::SmilesError, smiles::Smiles, traversal::visitor_trait::Visitor};
 
 /// Traverses the [`Smiles`] graph via a depth first search
+///
+/// # Errors
+/// - Will return [`SmilesError::NodeIdInvalid`] if a node is unable to be found
 pub fn walk<V: Visitor>(smiles: &Smiles, visitor: &mut V) -> Result<(), SmilesError> {
     let mut visited_nodes: HashSet<usize> = HashSet::new();
     let mut visited_edges: HashSet<(usize, usize)> = HashSet::new();

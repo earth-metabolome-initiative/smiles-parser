@@ -1,6 +1,6 @@
 //! Represents a SMILES structure.
 
-use std::{fmt, usize};
+use std::fmt;
 
 use crate::{
     atom::atom_node::AtomNode,

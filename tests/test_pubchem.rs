@@ -48,7 +48,7 @@ fn validate_pubchem_smiles() -> Result<(), Box<dyn std::error::Error>> {
     for result in csv_reader.deserialize::<SmilesPubChemCompound>() {
         count += 1;
         let result = result?;
-        if count % 10_000 == 0 {
+        if count.is_multiple_of(10_000) {
             pb.set_position(count);
         }
 

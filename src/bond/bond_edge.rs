@@ -67,7 +67,7 @@ impl BondEdge {
     }
     /// Updates the [`RingNum`] value
     pub fn set_ring_num(&mut self, ring_num: Option<RingNum>) {
-        self.ring_num = ring_num
+        self.ring_num = ring_num;
     }
     /// returns the [`RingNum`] value
     #[must_use]

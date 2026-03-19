@@ -51,6 +51,12 @@ impl RenderVisitor {
     }
 }
 
+impl Default for RenderVisitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Visitor for RenderVisitor {
     fn enter_node(&mut self, smiles: &Smiles, node_id: usize) -> Result<(), SmilesError> {
         if let Some(node) = smiles.node_by_id(node_id) {
@@ -96,7 +102,7 @@ impl Visitor for RenderVisitor {
             Bond::Down => format!("\\{ring_text}"),
         };
 
-        for (output_string, id) in self.sections.iter_mut() {
+        for (output_string, id) in &mut self.sections {
             if let Some(id_val) = id {
                 if *id_val == to {
                     output_string.push_str(&ring_text);

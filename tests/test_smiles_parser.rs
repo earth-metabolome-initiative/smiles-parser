@@ -1,7 +1,10 @@
 //! Tests of the parser module for several corner cases.
 
-use smiles_parser::{errors::SmilesErrorWithSpan, parser::token_iter::TokenIter};
+use std::str::FromStr;
 
+use smiles_parser::{
+    bond::Bond, errors::SmilesErrorWithSpan, parser::token_iter::TokenIter, smiles::Smiles,
+};
 const SMILES_STR: &[&str] = &[
     "C1=CC=CC=C1",
     "[OH2]",
@@ -93,24 +96,12 @@ fn test_parse_benzene_with_wildcard_graph_shape() {
 
 #[test]
 fn test_parse_tribenzo_annulene_variant() {
-    use std::str::FromStr;
-
-    use smiles_parser::{bond::Bond, smiles::Smiles};
-
     let smiles_string = r"c1=c\c2ccc(cc2)-c2ccccc2-c2ccc/1cc2";
     let smiles = Smiles::from_str(smiles_string)
         .unwrap_or_else(|e| panic!("Failed to parse:\n{}", e.render(smiles_string)));
 
     assert_eq!(smiles.nodes().len(), 20);
     assert_eq!(smiles.edges().len(), 23);
-
-    fn has_edge(smiles: &Smiles, a: usize, b: usize, bond: Bond) -> bool {
-        smiles.edges().iter().any(|edge| {
-            ((edge.node_a() == a && edge.node_b() == b)
-                || (edge.node_a() == b && edge.node_b() == a))
-                && edge.bond() == bond
-        })
-    }
 
     assert!(has_edge(&smiles, 0, 1, Bond::Double));
     assert!(has_edge(&smiles, 1, 2, Bond::Down));
@@ -127,4 +118,11 @@ fn test_parse_tribenzo_annulene_variant() {
 
     assert_eq!(degrees.iter().filter(|&&d| d == 3).count(), 6);
     assert_eq!(degrees.iter().filter(|&&d| d == 2).count(), 14);
+}
+
+fn has_edge(smiles: &Smiles, a: usize, b: usize, bond: Bond) -> bool {
+    smiles.edges().iter().any(|edge| {
+        ((edge.node_a() == a && edge.node_b() == b) || (edge.node_a() == b && edge.node_b() == a))
+            && edge.bond() == bond
+    })
 }
