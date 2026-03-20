@@ -101,6 +101,38 @@ mod tests {
     }
 
     #[test]
+    fn test_bond_edge_bool_content() {
+        let edge = BondEdge::new(3,7, Bond::Single, None);
+        assert!(edge.contains(3));
+        assert!(edge.contains(7));
+        assert!(!edge.contains(5));
+    }
+
+    #[test]
+    fn test_bond_edge_other() {
+        let edge = BondEdge::new(10, 2, Bond::Single, None);
+        assert_eq!(edge.other(10), Some(2));
+        assert_eq!(edge.other(2), Some(10));
+        assert_eq!(edge.other(5), None);
+    }
+
+    #[test]
+    fn test_bond_edge_num_setter() {
+        let mut edge = BondEdge::new(0,1, Bond::Single, None);
+        assert_eq!(edge.ring_num(), None);
+        assert_eq!(edge.ring_num_val(), None);
+
+        let ring_num = RingNum::try_new(2).unwrap();
+        edge.set_ring_num(Some(ring_num));
+        assert_eq!(edge.ring_num(), Some(ring_num));
+        assert_eq!(edge.ring_num_val(), Some(2));
+
+        edge.set_ring_num(None);
+        assert_eq!(edge.ring_num(), None);
+        assert_eq!(edge.ring_num_val(), None);
+    }
+
+    #[test]
     fn test_bond_edge_fmt_all_arms() {
         let cases = [
             (BondEdge::new(0, 1, Bond::Single, Some(RingNum::try_new(2).unwrap())), ""),
