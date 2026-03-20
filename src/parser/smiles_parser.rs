@@ -320,7 +320,7 @@ mod tests {
         assert_eq!(p.peek_n(2), Some(&tokens[2]));
         assert_eq!(p.peek_last(), None);
     }
-
+    
     #[test]
     fn smiles_parser_advance_moves_position() {
         let tokens = test_tokens();
