@@ -44,6 +44,8 @@ impl fmt::Display for Charge {
 
 #[cfg(test)]
 mod tests {
+    use std::panic::catch_unwind;
+
     use super::Charge;
     use crate::errors::SmilesError;
 
@@ -104,5 +106,16 @@ mod tests {
             assert_eq!(expected, charge.to_string());
         }
         Ok(())
+    }
+
+    #[test]
+    fn test_unreachable_fmt() {
+    let unreachable_charge = Charge(17);
+
+    let result = catch_unwind(|| {
+        let _ = unreachable_charge.to_string();
+    });
+
+    assert!(result.is_err());
     }
 }
