@@ -80,4 +80,26 @@ mod tests {
         assert_eq!(smiles.edges()[5], expected.bond_edges[5]);
         assert_eq!(smiles.edges()[5].ring_num_val(), Some(1));
     }
+    #[test]
+    fn from_str_propagates_token_iter_error() {
+        let err = Smiles::from_str("Ac").expect_err("expected tokenization to fail");
+
+        assert_eq!(
+            err.smiles_error(),
+            crate::errors::SmilesError::InvalidUnbracketedAtom(AtomSymbol::Element(Element::Ac))
+        );
+        assert_eq!(err.start(), 0);
+        assert_eq!(err.end(), 2);
+        assert_eq!(err.to_string(), "Invalid unbracketed atom: Ac at 0..2");
+    }
+
+    #[test]
+    fn from_str_propagates_parser_error() {
+        let err = Smiles::from_str("C(").expect_err("expected parsing to fail");
+
+        assert_eq!(err.smiles_error(), crate::errors::SmilesError::UnclosedBranch);
+        assert_eq!(err.start(), 1);
+        assert_eq!(err.end(), 2);
+        assert_eq!(err.to_string(), "Branch not closed at 1..2");
+    }
 }

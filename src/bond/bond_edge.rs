@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     fn test_bond_edge_bool_content() {
-        let edge = BondEdge::new(3,7, Bond::Single, None);
+        let edge = BondEdge::new(3, 7, Bond::Single, None);
         assert!(edge.contains(3));
         assert!(edge.contains(7));
         assert!(!edge.contains(5));
@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     fn test_bond_edge_num_setter() {
-        let mut edge = BondEdge::new(0,1, Bond::Single, None);
+        let mut edge = BondEdge::new(0, 1, Bond::Single, None);
         assert_eq!(edge.ring_num(), None);
         assert_eq!(edge.ring_num_val(), None);
 

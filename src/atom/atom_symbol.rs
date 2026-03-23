@@ -87,7 +87,11 @@ mod tests {
 
     #[test]
     fn test_atom_symbol_fmt_all_arms() {
-        let cases = [(AtomSymbol::Element(Element::H), "H"), (AtomSymbol::WildCard, "*"), (AtomSymbol::new(None), "*")];
+        let cases = [
+            (AtomSymbol::Element(Element::H), "H"),
+            (AtomSymbol::WildCard, "*"),
+            (AtomSymbol::new(None), "*"),
+        ];
 
         for (symbol, expected) in cases {
             assert_eq!(expected, symbol.to_string());

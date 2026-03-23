@@ -127,3 +127,164 @@ impl fmt::Display for Smiles {
         write!(f, "{rendered_smiles}")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use elements_rs::Element;
+
+    use super::Smiles;
+    use crate::{
+        atom::{atom_node::AtomNode, atom_symbol::AtomSymbol, unbracketed::UnbracketedAtom},
+        bond::{Bond, bond_edge::BondEdge, ring_num::RingNum},
+        errors::SmilesError,
+    };
+
+    fn node(id: usize, element: Element, start: usize, end: usize) -> AtomNode {
+        AtomNode::new(
+            UnbracketedAtom::new(AtomSymbol::Element(element), false).into(),
+            id,
+            start..end,
+        )
+    }
+
+    #[test]
+    fn smiles_new_and_default_create_empty_graph() {
+        let smiles = Smiles::new();
+        assert!(smiles.nodes().is_empty());
+        assert!(smiles.edges().is_empty());
+
+        let default_smiles = Smiles::default();
+        assert!(default_smiles.nodes().is_empty());
+        assert!(default_smiles.edges().is_empty());
+    }
+
+    #[test]
+    fn push_node_adds_node_and_duplicate_id_errors() {
+        let mut smiles = Smiles::new();
+
+        let n0 = node(0, Element::C, 0, 1);
+        let duplicate = node(0, Element::O, 1, 2);
+
+        smiles.push_node(n0).expect("first node should insert");
+        assert_eq!(smiles.nodes().len(), 1);
+        assert_eq!(smiles.node_by_id(0), Some(&node(0, Element::C, 0, 1)));
+
+        let err = smiles.push_node(duplicate).expect_err("duplicate id should fail");
+
+        assert_eq!(err, SmilesError::DuplicateNodeId(0));
+        assert_eq!(smiles.nodes().len(), 1);
+    }
+
+    #[test]
+    fn push_edge_adds_edge_and_validates_node_ids() {
+        let mut smiles = Smiles::new();
+        smiles.push_node(node(0, Element::C, 0, 1)).unwrap();
+        smiles.push_node(node(1, Element::O, 1, 2)).unwrap();
+
+        smiles.push_edge(0, 1, Bond::Double, None).unwrap();
+
+        assert_eq!(smiles.edges().len(), 1);
+        assert_eq!(smiles.edges()[0], BondEdge::new(0, 1, Bond::Double, None));
+
+        let err_a = smiles
+            .push_edge(9, 1, Bond::Single, None)
+            .expect_err("invalid first node id should fail");
+        assert_eq!(err_a, SmilesError::NodeIdInvalid(9));
+
+        let err_b = smiles
+            .push_edge(0, 8, Bond::Single, None)
+            .expect_err("invalid second node id should fail");
+        assert_eq!(err_b, SmilesError::NodeIdInvalid(8));
+    }
+
+    #[test]
+    fn nodes_mut_and_node_by_id_work() {
+        let mut smiles = Smiles::new();
+        smiles.push_node(node(0, Element::C, 0, 1)).unwrap();
+        smiles.push_node(node(1, Element::O, 1, 2)).unwrap();
+
+        assert_eq!(smiles.node_by_id(0), Some(&node(0, Element::C, 0, 1)));
+        assert_eq!(smiles.node_by_id(1), Some(&node(1, Element::O, 1, 2)));
+        assert_eq!(smiles.node_by_id(99), None);
+
+        smiles.nodes_mut()[1] = node(1, Element::N, 1, 2);
+
+        assert_eq!(smiles.node_by_id(1), Some(&node(1, Element::N, 1, 2)));
+        assert_eq!(smiles.nodes()[1], node(1, Element::N, 1, 2));
+    }
+
+    #[test]
+    fn edge_key_normalizes_node_order() {
+        assert_eq!(Smiles::edge_key(1, 4), (1, 4));
+        assert_eq!(Smiles::edge_key(4, 1), (1, 4));
+        assert_eq!(Smiles::edge_key(3, 3), (3, 3));
+    }
+
+    #[test]
+    fn edge_lookup_helpers_and_edges_mut_work() {
+        let mut smiles = Smiles::new();
+        smiles.push_node(node(0, Element::C, 0, 1)).unwrap();
+        smiles.push_node(node(1, Element::O, 1, 2)).unwrap();
+        smiles.push_node(node(2, Element::N, 2, 3)).unwrap();
+
+        let ring = RingNum::try_new(1).unwrap();
+
+        smiles.push_edge(0, 1, Bond::Single, None).unwrap();
+        smiles.push_edge(1, 2, Bond::Double, Some(ring)).unwrap();
+
+        assert_eq!(smiles.edges().len(), 2);
+
+        assert_eq!(
+            smiles.edge_for_node_pair((0, 1)),
+            Some(&BondEdge::new(0, 1, Bond::Single, None))
+        );
+        assert_eq!(
+            smiles.edge_for_node_pair((1, 0)),
+            Some(&BondEdge::new(0, 1, Bond::Single, None))
+        );
+        assert_eq!(
+            smiles.edge_for_node_pair((1, 2)),
+            Some(&BondEdge::new(1, 2, Bond::Double, Some(ring)))
+        );
+        assert_eq!(smiles.edge_for_node_pair((0, 2)), None);
+
+        let edges_for_1 = smiles.edges_for_node(1);
+        assert_eq!(edges_for_1.len(), 2);
+        assert!(edges_for_1.contains(&&BondEdge::new(0, 1, Bond::Single, None)));
+        assert!(edges_for_1.contains(&&BondEdge::new(1, 2, Bond::Double, Some(ring))));
+
+        let edges_for_0 = smiles.edges_for_node(0);
+        assert_eq!(edges_for_0.len(), 1);
+        assert_eq!(edges_for_0[0], &BondEdge::new(0, 1, Bond::Single, None));
+
+        let edges_for_99 = smiles.edges_for_node(99);
+        assert!(edges_for_99.is_empty());
+
+        smiles.edges_mut()[0] = BondEdge::new(0, 1, Bond::Triple, None);
+        assert_eq!(smiles.edges()[0], BondEdge::new(0, 1, Bond::Triple, None));
+    }
+
+    #[test]
+    fn render_and_display_work_for_simple_valid_graph() {
+        let mut smiles = Smiles::new();
+        smiles.push_node(node(0, Element::C, 0, 1)).unwrap();
+        smiles.push_node(node(1, Element::O, 1, 2)).unwrap();
+        smiles.push_edge(0, 1, Bond::Double, None).unwrap();
+
+        let rendered = smiles.render().expect("simple graph should render");
+        assert_eq!(rendered, "C=O");
+
+        let displayed = format!("{smiles}");
+        assert_eq!(displayed, "C=O");
+    }
+
+    #[test]
+    fn render_smoke_from_parsed_smiles() {
+        let smiles = Smiles::from_str("CC").expect("should parse");
+        let rendered = smiles.render().expect("should render");
+        assert_eq!(rendered, "CC");
+        assert_eq!(format!("{smiles}"), "CC");
+    }
+}

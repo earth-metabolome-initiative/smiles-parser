@@ -110,12 +110,12 @@ mod tests {
 
     #[test]
     fn test_unreachable_fmt() {
-    let unreachable_charge = Charge(17);
+        let unreachable_charge = Charge(17);
 
-    let result = catch_unwind(|| {
-        let _ = unreachable_charge.to_string();
-    });
+        let result = catch_unwind(|| {
+            let _ = unreachable_charge.to_string();
+        });
 
-    assert!(result.is_err());
+        assert!(result.is_err());
     }
 }

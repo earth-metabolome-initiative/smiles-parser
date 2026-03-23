@@ -49,11 +49,7 @@ impl<'a> SmilesParser<'a> {
     pub fn peek_next(&self) -> Option<&TokenWithSpan> {
         self.tokens.get(self.position + 1)
     }
-    /// Returns the last token before the current one without changing position
-    #[must_use]
-    pub fn peek_last(&self) -> Option<&TokenWithSpan> {
-        self.position.checked_sub(1).and_then(|i| self.tokens.get(i))
-    }
+
     /// Consumes and returns the next token
     pub fn next_token(&mut self) -> Option<&TokenWithSpan> {
         let token = self.tokens.get(self.position);
@@ -318,9 +314,8 @@ mod tests {
         assert_eq!(p.current(), Some(&tokens[0]));
         assert_eq!(p.peek_next(), Some(&tokens[1]));
         assert_eq!(p.peek_n(2), Some(&tokens[2]));
-        assert_eq!(p.peek_last(), None);
     }
-    
+
     #[test]
     fn smiles_parser_advance_moves_position() {
         let tokens = test_tokens();
@@ -329,6 +324,18 @@ mod tests {
         p.advance();
         assert_eq!(p.position(), 1);
         assert_eq!(p.current(), Some(&tokens[1]));
+
+        let tokens = vec![TokenWithSpan::new(Token::NonBond, 0, 1)];
+        let mut single_token = SmilesParser::new(&tokens);
+        single_token.advance();
+        single_token.advance();
+        assert_eq!(single_token.position(), 1);
+
+        let tokens = vec![TokenWithSpan::new(Token::NonBond, 0, 1)];
+        let mut single_token = SmilesParser::new(&tokens);
+        single_token.next_token();
+        single_token.next_token();
+        assert_eq!(single_token.next_token(), None);
     }
 
     #[test]
@@ -367,5 +374,98 @@ mod tests {
 
         assert_eq!(smiles.nodes().len(), 10);
         assert!(!smiles.edges().is_empty());
+    }
+
+    #[test]
+    fn smiles_parser_errors() {
+        use crate::errors::SmilesError;
+
+        fn c(start: usize, end: usize) -> TokenWithSpan {
+            TokenWithSpan::new(
+                Token::UnbracketedAtom(UnbracketedAtom::new(
+                    AtomSymbol::Element(Element::C),
+                    false,
+                )),
+                start,
+                end,
+            )
+        }
+
+        fn ring(start: usize, end: usize, n: u8) -> TokenWithSpan {
+            TokenWithSpan::new(Token::RingClosure(RingNum::try_new(n).unwrap()), start, end)
+        }
+
+        fn bond(start: usize, end: usize, bond: Bond) -> TokenWithSpan {
+            TokenWithSpan::new(Token::Bond(bond), start, end)
+        }
+
+        fn lparen(start: usize, end: usize) -> TokenWithSpan {
+            TokenWithSpan::new(Token::LeftParentheses, start, end)
+        }
+
+        fn rparen(start: usize, end: usize) -> TokenWithSpan {
+            TokenWithSpan::new(Token::RightParentheses, start, end)
+        }
+
+        fn dot(start: usize, end: usize) -> TokenWithSpan {
+            TokenWithSpan::new(Token::NonBond, start, end)
+        }
+
+        fn assert_parse_error(
+            tokens: Vec<TokenWithSpan>,
+            expected_error: SmilesError,
+            expected_start: usize,
+            expected_end: usize,
+        ) {
+            let err = SmilesParser::new(&tokens).parse().expect_err("expected parser to fail");
+
+            assert_eq!(err.smiles_error(), expected_error);
+            assert_eq!(err.start(), expected_start);
+            assert_eq!(err.end(), expected_end);
+            assert_eq!(err.span(), (expected_start..expected_end));
+            assert_eq!(
+                err.to_string(),
+                format!("{expected_error} at {expected_start}..{expected_end}")
+            );
+        }
+
+        assert_parse_error(vec![lparen(0, 1)], SmilesError::UnexpectedLeftParentheses, 0, 1);
+
+        assert_parse_error(vec![rparen(0, 1)], SmilesError::UnexpectedRightParentheses, 0, 1);
+
+        assert_parse_error(vec![ring(0, 1, 1)], SmilesError::InvalidRingNumber, 0, 1);
+
+        assert_parse_error(
+            vec![c(0, 1), bond(1, 2, Bond::Triple), dot(2, 3)],
+            SmilesError::IncompleteBond(Bond::Triple),
+            2,
+            3,
+        );
+
+        assert_parse_error(
+            vec![c(0, 1), lparen(1, 2), dot(2, 3)],
+            SmilesError::UnclosedBranch,
+            2,
+            3,
+        );
+
+        assert_parse_error(
+            vec![c(0, 1), ring(1, 2, 1), dot(2, 3)],
+            SmilesError::UnclosedRing,
+            2,
+            3,
+        );
+
+        // parse_end_check branches
+        assert_parse_error(
+            vec![c(0, 1), bond(1, 2, Bond::Double)],
+            SmilesError::IncompleteBond(Bond::Double),
+            1,
+            2,
+        );
+
+        assert_parse_error(vec![c(0, 1), lparen(1, 2)], SmilesError::UnclosedBranch, 1, 2);
+
+        assert_parse_error(vec![c(0, 1), ring(1, 2, 1)], SmilesError::UnclosedRing, 1, 2);
     }
 }

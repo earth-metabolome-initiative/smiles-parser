@@ -466,3 +466,314 @@ fn try_bond(char: char, bracket: bool) -> Result<Token, SmilesError> {
     };
     Ok(bond)
 }
+
+#[cfg(test)]
+mod tests {
+    use elements_rs::Element;
+
+    use super::*;
+    use crate::{
+        atom::{
+            atom_symbol::AtomSymbol,
+            bracketed::{charge::Charge, chirality::Chirality, hydrogen_count::HydrogenCount},
+        },
+        bond::{Bond, ring_num::RingNum},
+        errors::SmilesError,
+        token::Token,
+    };
+
+    fn next_ok(input: &str) -> TokenWithSpan {
+        TokenIter::from(input).next().expect("expected one token").expect("expected token ok")
+    }
+
+    fn next_err(input: &str) -> SmilesErrorWithSpan {
+        TokenIter::from(input)
+            .next()
+            .expect("expected one token")
+            .expect_err("expected token error")
+    }
+
+    #[test]
+    fn parse_token_direct_bracket_state_errors() {
+        let mut iter = TokenIter::from(".");
+        iter.in_bracket = true;
+        assert_eq!(iter.parse_token('.'), Err(SmilesError::NonBondInBracket));
+
+        let mut iter = TokenIter::from("[");
+        iter.in_bracket = true;
+        assert_eq!(iter.parse_token('['), Err(SmilesError::UnexpectedLeftBracket));
+
+        let mut iter = TokenIter::from("C");
+        iter.in_bracket = true;
+        assert_eq!(iter.parse_token('C'), Err(SmilesError::UnexpectedBracketedState));
+
+        let mut iter = TokenIter::from("%");
+        iter.in_bracket = true;
+        assert_eq!(iter.parse_token('%'), Err(SmilesError::UnexpectedPercent));
+
+        let mut iter = TokenIter::from("(");
+        iter.in_bracket = true;
+        assert_eq!(iter.parse_token('('), Err(SmilesError::UnexpectedBracketedState));
+
+        let mut iter = TokenIter::from(")");
+        iter.in_bracket = true;
+        assert_eq!(iter.parse_token(')'), Err(SmilesError::UnexpectedBracketedState));
+    }
+
+    #[test]
+    fn parse_token_bracket_atom_covers_isotope_chirality_hydrogens_charge_and_class() {
+        let token = next_ok("[13C@H2+2:12]");
+        assert_eq!(token.start(), 0);
+        assert_eq!(token.end(), "[13C@H2+2:12]".len());
+        assert!(matches!(token.token(), Token::BracketedAtom(_)));
+    }
+
+    #[test]
+    fn parse_token_unbracketed_atom_errors() {
+        let err = next_err("Ac");
+        assert_eq!(
+            err.smiles_error(),
+            SmilesError::InvalidUnbracketedAtom(AtomSymbol::Element(Element::Ac))
+        );
+        assert_eq!(err.start(), 0);
+        assert_eq!(err.end(), 2);
+        assert_eq!(err.span().start, 0);
+        assert_eq!(err.span().end, 2);
+
+        let err = next_err("q");
+        assert_eq!(err.smiles_error(), SmilesError::InvalidElementName('q'));
+        assert_eq!(err.start(), 0);
+        assert_eq!(err.end(), 1);
+        assert_eq!(err.span().start, 0);
+        assert_eq!(err.span().end, 1);
+    }
+
+    #[test]
+    fn parse_token_ring_number_errors() {
+        let err = next_err("%");
+        assert_eq!(err.smiles_error(), SmilesError::InvalidRingNumber);
+        assert_eq!(err.start(), 0);
+        assert_eq!(err.end(), 1);
+        assert_eq!(err.span().start, 0);
+        assert_eq!(err.span().end, 1);
+
+        let err = next_err("%9");
+        assert_eq!(err.smiles_error(), SmilesError::InvalidRingNumber);
+        assert_eq!(err.start(), 0);
+        assert_eq!(err.end(), 2);
+        assert_eq!(err.span().start, 0);
+        assert_eq!(err.span().end, 2);
+    }
+
+    #[test]
+    fn parse_token_single_digit_ring_closure_success() {
+        let token = next_ok("1");
+        assert_eq!(token.token(), Token::RingClosure(RingNum::try_new(1).unwrap()));
+        assert_eq!(token.span(), 0..1);
+    }
+
+    #[test]
+    fn aromatic_from_element_branches() {
+        assert_eq!(aromatic_from_element(false, Element::C), Ok(true));
+        assert_eq!(aromatic_from_element(true, Element::Se), Ok(true));
+
+        assert_eq!(
+            aromatic_from_element(false, Element::Se),
+            Err(SmilesError::InvalidAromaticElement(Element::Se))
+        );
+
+        assert_eq!(
+            aromatic_from_element(true, Element::Cl),
+            Err(SmilesError::InvalidAromaticElement(Element::Cl))
+        );
+    }
+
+    #[test]
+    fn try_element_from_first_branches() {
+        let mut stream = TokenIter::from("");
+        assert_eq!(try_element_from_first(&mut stream, '*'), Ok((AtomSymbol::WildCard, false)));
+
+        let mut stream = TokenIter::from("");
+        assert_eq!(
+            try_element_from_first(&mut stream, 'c'),
+            Ok((AtomSymbol::Element(Element::C), true))
+        );
+
+        let mut stream = TokenIter::from("l");
+        assert_eq!(
+            try_element_from_first(&mut stream, 'C'),
+            Ok((AtomSymbol::Element(Element::Cl), false))
+        );
+
+        let mut stream = TokenIter::from("e");
+        stream.in_bracket = true;
+        assert_eq!(
+            try_element_from_first(&mut stream, 's'),
+            Ok((AtomSymbol::Element(Element::Se), true))
+        );
+
+        let mut stream = TokenIter::from("");
+        assert_eq!(try_element_from_first(&mut stream, '1'), Err(SmilesError::MissingElement));
+
+        let mut stream = TokenIter::from("");
+        assert_eq!(
+            try_element_from_first(&mut stream, 'q'),
+            Err(SmilesError::InvalidElementName('q'))
+        );
+    }
+
+    #[test]
+    fn valid_unbracketed_branches() {
+        assert!(valid_unbracketed(AtomSymbol::Element(Element::C)));
+        assert!(valid_unbracketed(AtomSymbol::Element(Element::Cl)));
+        assert!(valid_unbracketed(AtomSymbol::WildCard));
+        assert!(!valid_unbracketed(AtomSymbol::Element(Element::Ac)));
+    }
+
+    #[test]
+    fn try_chirality_branches() {
+        let mut stream = TokenIter::from("H");
+        assert_eq!(try_chirality(&mut stream), Ok(None));
+
+        let mut stream = TokenIter::from("@@");
+        assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::AtAt)));
+
+        let mut stream = TokenIter::from("@]");
+        assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::At)));
+
+        let mut stream = TokenIter::from("@H");
+        assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::At)));
+
+        let mut stream = TokenIter::from("@+");
+        assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::At)));
+
+        let mut stream = TokenIter::from("@AP1");
+        assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::try_sp(1).unwrap())));
+
+        let mut stream = TokenIter::from("@OH12");
+        assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::try_oh(12).unwrap())));
+
+        let mut stream = TokenIter::from("@");
+        assert_eq!(try_chirality(&mut stream), Err(SmilesError::UnexpectedEndOfString));
+
+        let mut stream = TokenIter::from("@Z");
+        assert_eq!(try_chirality(&mut stream), Err(SmilesError::InvalidChirality));
+
+        let mut stream = TokenIter::from("@AQ");
+        assert_eq!(try_chirality(&mut stream), Err(SmilesError::InvalidChirality));
+
+        let mut stream = TokenIter::from("@OQ");
+        assert_eq!(try_chirality(&mut stream), Err(SmilesError::InvalidChirality));
+
+        // This currently errors because the `T` branch does not consume `T`
+        // before checking for `H` or `B`.
+        let mut stream = TokenIter::from("@TH1");
+        assert_eq!(try_chirality(&mut stream), Err(SmilesError::InvalidChirality));
+    }
+
+    #[test]
+    fn try_fold_number_branches_including_overflow() {
+        let mut stream = TokenIter::from("123x");
+        assert_eq!(try_fold_number::<u16, 3>(&mut stream), Some(Ok(123)));
+
+        let mut stream = TokenIter::from("x");
+        assert_eq!(try_fold_number::<u16, 3>(&mut stream), None);
+
+        let mut stream = TokenIter::from("700000");
+        assert_eq!(try_fold_number::<u16, 6>(&mut stream), Some(Err(SmilesError::IntegerOverflow)));
+
+        let mut stream = TokenIter::from("300");
+        assert_eq!(try_fold_number::<u8, 3>(&mut stream), Some(Err(SmilesError::IntegerOverflow)));
+    }
+
+    #[test]
+    fn hydrogen_count_branches() {
+        let mut stream = TokenIter::from("H2");
+        assert_eq!(hydrogen_count(&mut stream), Ok(HydrogenCount::new(Some(2))));
+
+        let mut stream = TokenIter::from("H");
+        assert_eq!(hydrogen_count(&mut stream), Ok(HydrogenCount::new(Some(1))));
+
+        let mut stream = TokenIter::from("C");
+        assert_eq!(hydrogen_count(&mut stream), Ok(HydrogenCount::Unspecified));
+    }
+
+    #[test]
+    fn try_charge_branches() {
+        let mut stream = TokenIter::from("-");
+        assert_eq!(try_charge(&mut stream), Ok(Charge::try_new(-1).unwrap()));
+
+        let mut stream = TokenIter::from("--");
+        assert_eq!(try_charge(&mut stream), Ok(Charge::try_new(-2).unwrap()));
+
+        let mut stream = TokenIter::from("-15");
+        assert_eq!(try_charge(&mut stream), Ok(Charge::try_new(-15).unwrap()));
+
+        let mut stream = TokenIter::from("-16");
+        assert_eq!(try_charge(&mut stream), Err(SmilesError::ChargeUnderflow(-16)));
+
+        let mut stream = TokenIter::from("+");
+        assert_eq!(try_charge(&mut stream), Ok(Charge::try_new(1).unwrap()));
+
+        let mut stream = TokenIter::from("++");
+        assert_eq!(try_charge(&mut stream), Ok(Charge::try_new(2).unwrap()));
+
+        let mut stream = TokenIter::from("+15");
+        assert_eq!(try_charge(&mut stream), Ok(Charge::try_new(15).unwrap()));
+
+        let mut stream = TokenIter::from("+16");
+        assert_eq!(try_charge(&mut stream), Err(SmilesError::ChargeOverflow(16)));
+
+        let mut stream = TokenIter::from("C");
+        assert_eq!(try_charge(&mut stream), Ok(Charge::default()));
+    }
+
+    #[test]
+    fn try_class_branches() {
+        let mut stream = TokenIter::from(":12");
+        assert_eq!(try_class(&mut stream), Ok(12));
+
+        let mut stream = TokenIter::from(":");
+        assert_eq!(try_class(&mut stream), Err(SmilesError::InvalidClass));
+
+        let mut stream = TokenIter::from("C");
+        assert_eq!(try_class(&mut stream), Ok(0));
+    }
+
+    #[test]
+    fn try_bond_branches() {
+        let ok_cases = [
+            ('-', Token::Bond(Bond::Single)),
+            ('=', Token::Bond(Bond::Double)),
+            ('#', Token::Bond(Bond::Triple)),
+            ('$', Token::Bond(Bond::Quadruple)),
+            (':', Token::Bond(Bond::Aromatic)),
+            ('/', Token::Bond(Bond::Up)),
+            ('\\', Token::Bond(Bond::Down)),
+        ];
+
+        for (ch, expected) in ok_cases {
+            assert_eq!(try_bond(ch, false), Ok(expected));
+        }
+
+        assert_eq!(try_bond('-', true), Err(SmilesError::UnexpectedDash));
+        assert_eq!(try_bond(':', true), Err(SmilesError::UnexpectedColon));
+        assert_eq!(try_bond('=', true), Err(SmilesError::BondInBracket(Bond::Double)));
+        assert_eq!(try_bond('#', true), Err(SmilesError::BondInBracket(Bond::Triple)));
+        assert_eq!(try_bond('$', true), Err(SmilesError::BondInBracket(Bond::Quadruple)));
+        assert_eq!(try_bond('/', true), Err(SmilesError::BondInBracket(Bond::Up)));
+        assert_eq!(try_bond('\\', true), Err(SmilesError::BondInBracket(Bond::Down)));
+        assert_eq!(try_bond('x', false), Err(SmilesError::UnexpectedCharacter('x')));
+    }
+
+    #[test]
+    fn iterator_error_span_mapping_smoke_test() {
+        let err = next_err("Ac");
+        assert_eq!(
+            err.smiles_error(),
+            SmilesError::InvalidUnbracketedAtom(AtomSymbol::Element(Element::Ac))
+        );
+        assert_eq!(err.start(), 0);
+        assert_eq!(err.end(), 2);
+    }
+}

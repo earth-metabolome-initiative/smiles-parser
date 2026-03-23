@@ -183,8 +183,8 @@ impl SmilesErrorWithSpan {
 
     /// Returns the full span for the error
     #[must_use]
-    pub fn span(&self) -> &Range<usize> {
-        &self.span
+    pub fn span(&self) -> Range<usize> {
+        self.span.start..self.span.end
     }
 
     /// Render the error pointing back to location in the original string
@@ -207,7 +207,6 @@ impl fmt::Display for SmilesErrorWithSpan {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::num::TryFromIntError;
@@ -229,22 +228,10 @@ mod tests {
                 SmilesError::BondInBracket(Bond::Aromatic),
                 format!("Bond in bracket: {}", Bond::Aromatic),
             ),
-            (
-                SmilesError::ChargeOverflow(50),
-                "Charge overflow: 50".to_string(),
-            ),
-            (
-                SmilesError::ChargeUnderflow(-50),
-                "Charge underflow: -50".to_string(),
-            ),
-            (
-                SmilesError::DuplicateNodeId(2),
-                "Node ID: 2 duplicated".to_string(),
-            ),
-            (
-                SmilesError::ElementRequiresBrackets,
-                "Element requires brackets".to_string(),
-            ),
+            (SmilesError::ChargeOverflow(50), "Charge overflow: 50".to_string()),
+            (SmilesError::ChargeUnderflow(-50), "Charge underflow: -50".to_string()),
+            (SmilesError::DuplicateNodeId(2), "Node ID: 2 duplicated".to_string()),
+            (SmilesError::ElementRequiresBrackets, "Element requires brackets".to_string()),
             (
                 SmilesError::ElementsRs(elements_rs_error),
                 format!("Error Parsing Element: {elements_rs_error}"),
@@ -257,114 +244,36 @@ mod tests {
                 SmilesError::InvalidAromaticElement(Element::Ac),
                 format!("Invalid aromatic element: {}", Element::Ac),
             ),
-            (
-                SmilesError::InvalidChirality,
-                "Invalid chirality".to_string(),
-            ),
-            (
-                SmilesError::InvalidClass,
-                "Invalid class".to_string(),
-            ),
-            (
-                SmilesError::InvalidElementName('w'),
-                "Invalid element name: w".to_string(),
-            ),
-            (
-                SmilesError::InvalidIsotope,
-                "Invalid isotope".to_string(),
-            ),
-            (
-                SmilesError::InvalidNonBondToken,
-                "Invalid Non-bond '.' found".to_string(),
-            ),
-            (
-                SmilesError::InvalidNumber,
-                "Invalid number".to_string(),
-            ),
-            (
-                SmilesError::IntegerOverflow,
-                "Integer overflow".to_string(),
-            ),
+            (SmilesError::InvalidChirality, "Invalid chirality".to_string()),
+            (SmilesError::InvalidClass, "Invalid class".to_string()),
+            (SmilesError::InvalidElementName('w'), "Invalid element name: w".to_string()),
+            (SmilesError::InvalidIsotope, "Invalid isotope".to_string()),
+            (SmilesError::InvalidNonBondToken, "Invalid Non-bond '.' found".to_string()),
+            (SmilesError::InvalidNumber, "Invalid number".to_string()),
+            (SmilesError::IntegerOverflow, "Integer overflow".to_string()),
             (
                 SmilesError::InvalidUnbracketedAtom(AtomSymbol::WildCard),
                 format!("Invalid unbracketed atom: {}", AtomSymbol::WildCard),
             ),
-            (
-                SmilesError::InvalidRingNumber,
-                "Invalid ring number".to_string(),
-            ),
-            (
-                SmilesError::MissingBracketElement,
-                "Missing element inside brackets".to_string(),
-            ),
-            (
-                SmilesError::MissingElement,
-                "Missing element".to_string(),
-            ),
-            (
-                SmilesError::NodeIdInvalid(2),
-                "Invalid Atom Node ID: 2".to_string(),
-            ),
-            (
-                SmilesError::NonBondInBracket,
-                "Non-bond '.' in bracket".to_string(),
-            ),
-            (
-                SmilesError::RingNumberOverflow(100),
-                "Ring number overflow: 100".to_string(),
-            ),
-            (
-                SmilesError::UnexpectedBracketedState,
-                "Unexpected bracketed state".to_string(),
-            ),
-            (
-                SmilesError::UnexpectedEndOfString,
-                "Unexpected end of string".to_string(),
-            ),
-            (
-                SmilesError::UnexpectedCharacter('$'),
-                "Unexpected character: $".to_string(),
-            ),
-            (
-                SmilesError::UnexpectedColon,
-                "Unexpected ':'".to_string(),
-            ),
-            (
-                SmilesError::UnexpectedDash,
-                "Unexpected '-'".to_string(),
-            ),
-            (
-                SmilesError::UnexpectedPercent,
-                "Unexpected '%'".to_string(),
-            ),
-            (
-                SmilesError::UnexpectedLeftBracket,
-                "Unexpected '['".to_string(),
-            ),
-            (
-                SmilesError::UnexpectedLeftParentheses,
-                "Unexpected '('".to_string(),
-            ),
-            (
-                SmilesError::UnexpectedRightBracket,
-                "Unexpected ']'".to_string(),
-            ),
-            (
-                SmilesError::UnexpectedRightParentheses,
-                "Unexpected `)`".to_string(),
-            ),
-            (
-                SmilesError::UnclosedBracket,
-                "Unclosed '['".to_string(),
-            ),
-            (
-                SmilesError::UnclosedBranch,
-                "Branch not closed".to_string(),
-            ),
-            (
-                SmilesError::UnclosedRing,
-                "Ring not closed".to_string(),
-            ),
+            (SmilesError::InvalidRingNumber, "Invalid ring number".to_string()),
+            (SmilesError::MissingBracketElement, "Missing element inside brackets".to_string()),
+            (SmilesError::MissingElement, "Missing element".to_string()),
+            (SmilesError::NodeIdInvalid(2), "Invalid Atom Node ID: 2".to_string()),
+            (SmilesError::NonBondInBracket, "Non-bond '.' in bracket".to_string()),
+            (SmilesError::RingNumberOverflow(100), "Ring number overflow: 100".to_string()),
+            (SmilesError::UnexpectedBracketedState, "Unexpected bracketed state".to_string()),
+            (SmilesError::UnexpectedEndOfString, "Unexpected end of string".to_string()),
+            (SmilesError::UnexpectedCharacter('$'), "Unexpected character: $".to_string()),
+            (SmilesError::UnexpectedColon, "Unexpected ':'".to_string()),
+            (SmilesError::UnexpectedDash, "Unexpected '-'".to_string()),
+            (SmilesError::UnexpectedPercent, "Unexpected '%'".to_string()),
+            (SmilesError::UnexpectedLeftBracket, "Unexpected '['".to_string()),
+            (SmilesError::UnexpectedLeftParentheses, "Unexpected '('".to_string()),
+            (SmilesError::UnexpectedRightBracket, "Unexpected ']'".to_string()),
+            (SmilesError::UnexpectedRightParentheses, "Unexpected `)`".to_string()),
+            (SmilesError::UnclosedBracket, "Unclosed '['".to_string()),
+            (SmilesError::UnclosedBranch, "Branch not closed".to_string()),
+            (SmilesError::UnclosedRing, "Ring not closed".to_string()),
         ];
 
         for (error, expected) in cases {
@@ -390,25 +299,15 @@ mod tests {
 
     #[test]
     fn test_smiles_error_with_span() {
-        let error = SmilesErrorWithSpan::new(
-            SmilesError::UnexpectedCharacter('$'),
-            2,
-            3,
-        );
+        let error = SmilesErrorWithSpan::new(SmilesError::UnexpectedCharacter('$'), 2, 3);
 
         assert_eq!(error.smiles_error(), SmilesError::UnexpectedCharacter('$'));
         assert_eq!(error.start(), 2);
         assert_eq!(error.end(), 3);
-        assert_eq!(error.span(), &(2..3));
+        assert_eq!(error.span(), (2..3));
 
-        assert_eq!(
-            error.to_string(),
-            "Unexpected character: $ at 2..3"
-        );
+        assert_eq!(error.to_string(), "Unexpected character: $ at 2..3");
 
-        assert_eq!(
-            error.render("CC$O"),
-            "CC$O\n  ^\nUnexpected character: $"
-        );
+        assert_eq!(error.render("CC$O"), "CC$O\n  ^\nUnexpected character: $");
     }
 }
