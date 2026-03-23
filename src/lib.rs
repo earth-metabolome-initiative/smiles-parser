@@ -8,8 +8,10 @@ pub mod smiles;
 pub mod token;
 pub mod traversal;
 
-pub use crate::smiles::Smiles;
-pub use crate::errors::{SmilesError, SmilesErrorWithSpan};
+pub use crate::{
+    errors::{SmilesError, SmilesErrorWithSpan},
+    smiles::Smiles,
+};
 
 /// Common imports for working with this crate.
 pub mod prelude {

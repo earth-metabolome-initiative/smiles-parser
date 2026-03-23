@@ -39,7 +39,7 @@ pub struct Smiles {
 }
 
 impl Smiles {
-    /// creates a new instance of the `Smiles` struct. 
+    /// creates a new instance of the `Smiles` struct.
     #[must_use]
     pub fn new() -> Self {
         Self { atom_nodes: Vec::new(), bond_edges: Vec::new() }
@@ -55,7 +55,8 @@ impl Smiles {
         self.atom_nodes.push(node);
         Ok(())
     }
-    /// Adds a [`BondEdge`] from two nodes, includes ring number information (if present).
+    /// Adds a [`BondEdge`] from two nodes, includes ring number information (if
+    /// present).
     ///
     /// # Errors
     /// - Returns a [`SmilesError::NodeIdInvalid`] if a node cannot be found in
@@ -76,7 +77,8 @@ impl Smiles {
         self.bond_edges.push(BondEdge::new(node_a, node_b, bond, ring_num));
         Ok(())
     }
-    /// Returns `bool` for if the [`AtomNode`] `id` exists in the set of nodes parsed.
+    /// Returns `bool` for if the [`AtomNode`] `id` exists in the set of nodes
+    /// parsed.
     fn contains_node_id(&self, id: usize) -> bool {
         self.atom_nodes.iter().any(|node| node.id() == id)
     }
@@ -100,8 +102,9 @@ impl Smiles {
     pub fn edges(&self) -> &[BondEdge] {
         &self.bond_edges
     }
-    /// Returns a normalized edge key with node IDs in ascending order. Useful for walking graph. 
-    /// 
+    /// Returns a normalized edge key with node IDs in ascending order. Useful
+    /// for walking graph.
+    ///
     /// # Parameters:
     /// - a: the first node's `id`
     /// - b: the second node's `id`
@@ -109,10 +112,11 @@ impl Smiles {
     pub fn edge_key(a: usize, b: usize) -> (usize, usize) {
         if a < b { (a, b) } else { (b, a) }
     }
-    /// Returns the first [`BondEdge`] connecting the given pair of node IDs passed as a tuple.
-    /// 
+    /// Returns the first [`BondEdge`] connecting the given pair of node IDs
+    /// passed as a tuple.
+    ///
     /// # Parameters:
-    /// - nodes: A tuple of the two vertex id's. 
+    /// - nodes: A tuple of the two vertex id's.
     #[must_use]
     pub fn edge_for_node_pair(&self, nodes: (usize, usize)) -> Option<&BondEdge> {
         let target = Self::edge_key(nodes.0, nodes.1);
@@ -121,16 +125,19 @@ impl Smiles {
             Self::edge_key(a, c) == target
         })
     }
-    /// Returns a vector of all (borrowed) [`BondEdge`] for a given [`AtomNode`] `id`.
+    /// Returns a vector of all (borrowed) [`BondEdge`] for a given [`AtomNode`]
+    /// `id`.
     #[must_use]
     pub fn edges_for_node(&self, id: usize) -> Vec<&BondEdge> {
         self.bond_edges.iter().filter(|b| b.contains(id)).collect()
     }
-    /// Returns mutable slice of [BondEdge]. 
+    /// Returns mutable slice of [BondEdge].
     pub fn edges_mut(&mut self) -> &mut [BondEdge] {
         &mut self.bond_edges
     }
-    /// Renders the `Smiles` graph into a valid SMILES String. Rendered `String` may differ in order and notation from input `String` but still represent the same structure. 
+    /// Renders the `Smiles` graph into a valid SMILES String. Rendered `String`
+    /// may differ in order and notation from input `String` but still represent
+    /// the same structure.
     ///
     /// # Errors
     /// - Returns a [`SmilesError`] if the graph fails to walk
