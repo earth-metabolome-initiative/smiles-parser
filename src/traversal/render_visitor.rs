@@ -154,6 +154,7 @@ impl Visitor for RenderVisitor {
         Ok(())
     }
 }
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;

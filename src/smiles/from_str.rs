@@ -14,6 +14,7 @@ impl FromStr for Smiles {
         SmilesParser::new(&tokens).parse()
     }
 }
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
