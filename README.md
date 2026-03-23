@@ -4,9 +4,9 @@ A parser that checks the validity of SMILES strings and converts them into molec
 ## Parsing Specification
 This parser was designed by following the [OpenSMILES specification](http://opensmiles.org/opensmiles.html) and [Wikipedia Article](https://en.wikipedia.org/wiki/Simplified_Molecular_Input_Line_Entry_System).
 
-## Smiles Parsing Rules:
+## SMILES Parsing Rules:
 
-### Valid Smiles Characters:
+### Valid SMILES Characters:
 
 | Character | SMILES Purpose |
 | --------- | -------------- |

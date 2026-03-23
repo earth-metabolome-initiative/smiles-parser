@@ -147,7 +147,7 @@ impl From<TryFromIntError> for SmilesError {
     }
 }
 
-/// Wraps the Smiles error adding the location of where the error was found
+/// Wraps the `Smiles` error adding the location of where the error was found
 #[derive(Debug)]
 pub struct SmilesErrorWithSpan {
     /// The [`SmilesError`]

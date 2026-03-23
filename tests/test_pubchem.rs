@@ -21,7 +21,7 @@ use smiles_parser::smiles::Smiles;
 struct SmilesPubChemCompound {
     /// The id for the SMILES
     id: u64,
-    /// Smiles String
+    /// SMILES String
     smiles: String,
 }
 
