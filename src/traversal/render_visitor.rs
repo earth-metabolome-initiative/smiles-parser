@@ -156,6 +156,8 @@ impl Visitor for RenderVisitor {
 }
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use elements_rs::Element;
 
     use super::RenderVisitor;
@@ -234,7 +236,7 @@ mod tests {
     #[test]
     fn take_ring_num_errors_when_pool_is_empty() {
         let mut visitor =
-            RenderVisitor { sections: Vec::new(), available_ring_nums: Default::default() };
+            RenderVisitor { sections: Vec::new(), available_ring_nums: BTreeSet::default() };
 
         let err = visitor.take_ring_num().expect_err("expected ring number overflow");
         assert_eq!(err, SmilesError::RingNumberOverflow(100));

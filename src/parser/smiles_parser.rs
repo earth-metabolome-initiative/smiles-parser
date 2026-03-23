@@ -412,12 +412,12 @@ mod tests {
         }
 
         fn assert_parse_error(
-            tokens: Vec<TokenWithSpan>,
+            tokens: &[TokenWithSpan],
             expected_error: SmilesError,
             expected_start: usize,
             expected_end: usize,
         ) {
-            let err = SmilesParser::new(&tokens).parse().expect_err("expected parser to fail");
+            let err = SmilesParser::new(tokens).parse().expect_err("expected parser to fail");
 
             assert_eq!(err.smiles_error(), expected_error);
             assert_eq!(err.start(), expected_start);
@@ -429,28 +429,28 @@ mod tests {
             );
         }
 
-        assert_parse_error(vec![lparen(0, 1)], SmilesError::UnexpectedLeftParentheses, 0, 1);
+        assert_parse_error(&[lparen(0, 1)], SmilesError::UnexpectedLeftParentheses, 0, 1);
 
-        assert_parse_error(vec![rparen(0, 1)], SmilesError::UnexpectedRightParentheses, 0, 1);
+        assert_parse_error(&[rparen(0, 1)], SmilesError::UnexpectedRightParentheses, 0, 1);
 
-        assert_parse_error(vec![ring(0, 1, 1)], SmilesError::InvalidRingNumber, 0, 1);
+        assert_parse_error(&[ring(0, 1, 1)], SmilesError::InvalidRingNumber, 0, 1);
 
         assert_parse_error(
-            vec![c(0, 1), bond(1, 2, Bond::Triple), dot(2, 3)],
+            &[c(0, 1), bond(1, 2, Bond::Triple), dot(2, 3)],
             SmilesError::IncompleteBond(Bond::Triple),
             2,
             3,
         );
 
         assert_parse_error(
-            vec![c(0, 1), lparen(1, 2), dot(2, 3)],
+            &[c(0, 1), lparen(1, 2), dot(2, 3)],
             SmilesError::UnclosedBranch,
             2,
             3,
         );
 
         assert_parse_error(
-            vec![c(0, 1), ring(1, 2, 1), dot(2, 3)],
+            &[c(0, 1), ring(1, 2, 1), dot(2, 3)],
             SmilesError::UnclosedRing,
             2,
             3,
@@ -458,14 +458,14 @@ mod tests {
 
         // parse_end_check branches
         assert_parse_error(
-            vec![c(0, 1), bond(1, 2, Bond::Double)],
+            &[c(0, 1), bond(1, 2, Bond::Double)],
             SmilesError::IncompleteBond(Bond::Double),
             1,
             2,
         );
 
-        assert_parse_error(vec![c(0, 1), lparen(1, 2)], SmilesError::UnclosedBranch, 1, 2);
+        assert_parse_error(&[c(0, 1), lparen(1, 2)], SmilesError::UnclosedBranch, 1, 2);
 
-        assert_parse_error(vec![c(0, 1), ring(1, 2, 1)], SmilesError::UnclosedRing, 1, 2);
+        assert_parse_error(&[c(0, 1), ring(1, 2, 1)], SmilesError::UnclosedRing, 1, 2);
     }
 }
