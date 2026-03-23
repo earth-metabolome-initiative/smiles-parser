@@ -91,9 +91,6 @@ impl Smiles {
         &mut self.atom_nodes
     }
     /// Returns the node with the given `id`, if present.
-    /// 
-    /// # Parameters:
-    /// - `id`: The id for the node to be returned. 
     #[must_use]
     pub fn node_by_id(&self, id: usize) -> Option<&AtomNode> {
         self.atom_nodes.iter().find(|node| node.id() == id)
@@ -125,9 +122,6 @@ impl Smiles {
         })
     }
     /// Returns a vector of all (borrowed) [`BondEdge`] for a given [`AtomNode`] `id`.
-    /// 
-    /// # Parameters: 
-    /// - id: The `id` for the [`AtomNode`] being used.
     #[must_use]
     pub fn edges_for_node(&self, id: usize) -> Vec<&BondEdge> {
         self.bond_edges.iter().filter(|b| b.contains(id)).collect()
