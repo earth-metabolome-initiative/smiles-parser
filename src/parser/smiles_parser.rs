@@ -442,19 +442,9 @@ mod tests {
             3,
         );
 
-        assert_parse_error(
-            &[c(0, 1), lparen(1, 2), dot(2, 3)],
-            SmilesError::UnclosedBranch,
-            2,
-            3,
-        );
+        assert_parse_error(&[c(0, 1), lparen(1, 2), dot(2, 3)], SmilesError::UnclosedBranch, 2, 3);
 
-        assert_parse_error(
-            &[c(0, 1), ring(1, 2, 1), dot(2, 3)],
-            SmilesError::UnclosedRing,
-            2,
-            3,
-        );
+        assert_parse_error(&[c(0, 1), ring(1, 2, 1), dot(2, 3)], SmilesError::UnclosedRing, 2, 3);
 
         // parse_end_check branches
         assert_parse_error(

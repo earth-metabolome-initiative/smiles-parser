@@ -64,3 +64,82 @@ impl TokenWithSpan {
         self.span.end
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use elements_rs::Element;
+
+    use super::{Token, TokenWithSpan};
+    use crate::{
+        atom::{atom_symbol::AtomSymbol, bracketed::BracketAtom, unbracketed::UnbracketedAtom},
+        bond::{Bond, ring_num::RingNum},
+    };
+
+    #[test]
+    fn token_variants_can_be_constructed_and_compared() {
+        let bracket_atom =
+            BracketAtom::builder().with_symbol(AtomSymbol::Element(Element::C)).build();
+        let unbracketed_atom = UnbracketedAtom::new(AtomSymbol::Element(Element::O), false);
+        let ring_num = RingNum::try_new(12).unwrap();
+
+        let cases = [
+            Token::NonBond,
+            Token::BracketedAtom(bracket_atom),
+            Token::UnbracketedAtom(unbracketed_atom),
+            Token::Bond(Bond::Double),
+            Token::LeftParentheses,
+            Token::RightParentheses,
+            Token::RingClosure(ring_num),
+        ];
+
+        assert_eq!(cases[0], Token::NonBond);
+        assert_eq!(cases[1], Token::BracketedAtom(bracket_atom));
+        assert_eq!(cases[2], Token::UnbracketedAtom(unbracketed_atom));
+        assert_eq!(cases[3], Token::Bond(Bond::Double));
+        assert_eq!(cases[4], Token::LeftParentheses);
+        assert_eq!(cases[5], Token::RightParentheses);
+        assert_eq!(cases[6], Token::RingClosure(ring_num));
+    }
+
+    #[test]
+    fn token_with_span_new_and_accessors_work() {
+        let token = Token::Bond(Bond::Triple);
+        let token_with_span = TokenWithSpan::new(token, 3, 7);
+
+        assert_eq!(token_with_span.token(), Token::Bond(Bond::Triple));
+        assert_eq!(token_with_span.span(), 3..7);
+        assert_eq!(token_with_span.start(), 3);
+        assert_eq!(token_with_span.end(), 7);
+    }
+
+    #[test]
+    fn token_with_span_preserves_complex_token_variants() {
+        let bracket_atom =
+            BracketAtom::builder().with_symbol(AtomSymbol::Element(Element::N)).build();
+        let ring_num = RingNum::try_new(9).unwrap();
+
+        let bracketed = TokenWithSpan::new(Token::BracketedAtom(bracket_atom), 0, 3);
+        let ring = TokenWithSpan::new(Token::RingClosure(ring_num), 5, 6);
+        let non_bond = TokenWithSpan::new(Token::NonBond, 10, 11);
+
+        assert_eq!(bracketed.token(), Token::BracketedAtom(bracket_atom));
+        assert_eq!(bracketed.span(), 0..3);
+
+        assert_eq!(ring.token(), Token::RingClosure(ring_num));
+        assert_eq!(ring.start(), 5);
+        assert_eq!(ring.end(), 6);
+
+        assert_eq!(non_bond.token(), Token::NonBond);
+        assert_eq!(non_bond.span(), 10..11);
+    }
+
+    #[test]
+    fn token_with_span_clone_and_eq_behave_as_expected() {
+        let original = TokenWithSpan::new(Token::LeftParentheses, 2, 3);
+        let cloned = original.clone();
+
+        assert_eq!(original, cloned);
+        assert_eq!(original.token(), Token::LeftParentheses);
+        assert_eq!(cloned.span(), 2..3);
+    }
+}
