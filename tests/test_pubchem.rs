@@ -5,7 +5,7 @@
 //! To run this test (validates SMILES in the PubChem dataset), ensure that:
 //!
 //! ```
-//! cargo test --release validate_pubchem_smiles
+//! cargo test --release --test validate_pubchem_smiles
 //! ```
 
 use std::{fs::File, io::BufReader};

@@ -142,7 +142,16 @@ impl<'a> SmilesParser<'a> {
                     last_atom = Some(id);
                     pending_bond = None;
                 }
-                Token::Bond(bond) => pending_bond = Some(bond),
+                Token::Bond(bond) => {
+                    if last_atom.is_none() {
+                        return Err(SmilesErrorWithSpan::new(
+                            SmilesError::IncompleteBond(bond),
+                            start,
+                            end,
+                        ));
+                    }
+                    pending_bond = Some(bond);
+                }
                 Token::LeftParentheses => {
                     let Some(anchor) = last_atom else {
                         return Err(SmilesErrorWithSpan::new(

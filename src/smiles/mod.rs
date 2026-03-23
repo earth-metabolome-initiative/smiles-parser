@@ -32,7 +32,7 @@ use crate::{
 mod from_str;
 
 /// Represents a parsed SMILES graph.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Smiles {
     atom_nodes: Vec<AtomNode>,
     bond_edges: Vec<BondEdge>,
@@ -320,5 +320,12 @@ mod tests {
         let rendered = smiles.render().expect("should render");
         assert_eq!(rendered, "CC");
         assert_eq!(format!("{smiles}"), "CC");
+    }
+
+    #[test]
+    fn invalid_bonds_rejected() {
+        let invalid_lead = "-N".parse::<Smiles>();
+        dbg!(&invalid_lead);
+        assert!(invalid_lead.is_err());
     }
 }
