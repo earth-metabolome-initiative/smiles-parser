@@ -1,8 +1,6 @@
 # SMILES-parser
 A parser that checks the validity of SMILES strings and converts them into molecular graph representations.
 
-See [`docs/smiles.md`](docs/smiles.md) for details on the SMILES specification and supported features.
-
 ## Parsing Specification
 This parser was designed by following the [OpenSMILES specification](http://opensmiles.org/opensmiles.html) and [Wikipedia Article](https://en.wikipedia.org/wiki/Simplified_Molecular_Input_Line_Entry_System).
 
