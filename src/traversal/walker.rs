@@ -10,7 +10,7 @@ use crate::{errors::SmilesError, smiles::Smiles, traversal::visitor_trait::Visit
 /// - Will return [`SmilesError::NodeIdInvalid`] if a node is unable to be found
 pub fn walk<V: Visitor>(smiles: &Smiles, visitor: &mut V) -> Result<(), SmilesError> {
     let mut visited_nodes: HashSet<usize> = HashSet::new();
-    let mut visited_edges: HashSet<(usize, usize)> = HashSet::new();
+    let mut visited_edges: HashSet<usize> = HashSet::new();
     let mut component_index = 0;
 
     for node in smiles.nodes() {
@@ -30,7 +30,7 @@ fn dfs<V: Visitor>(
     visitor: &mut V,
     current_id: usize,
     visited_nodes: &mut HashSet<usize>,
-    visited_edges: &mut HashSet<(usize, usize)>,
+    visited_edges: &mut HashSet<usize>,
 ) -> Result<(), SmilesError> {
     if visited_nodes.contains(&current_id) {
         return Ok(());
@@ -39,42 +39,40 @@ fn dfs<V: Visitor>(
     visited_nodes.insert(current_id);
     visitor.enter_node(smiles, current_id)?;
 
-    let bonds = smiles.edges_for_node(current_id);
     let mut unvisited_bonds = Vec::new();
+    let mut queued_neighbors = HashSet::new();
 
-    for bond in bonds {
+    for (edge_index, bond) in smiles.edges().iter().enumerate() {
+        if !bond.contains(current_id) || visited_edges.contains(&edge_index) {
+            continue;
+        }
         if let Some(other_id) = bond.other(current_id) {
-            let edge_key = Smiles::edge_key(current_id, other_id);
-
-            if visited_edges.contains(&edge_key) {
-                continue;
-            }
             if visited_nodes.contains(&other_id) {
-                visited_edges.insert(edge_key);
+                visited_edges.insert(edge_index);
                 visitor.cycle_edge(smiles, current_id, other_id, bond.bond())?;
-            } else {
-                unvisited_bonds.push((bond, other_id));
+            } else if queued_neighbors.insert(other_id) {
+                unvisited_bonds.push((edge_index, bond, other_id));
             }
         }
     }
 
-    if let Some((main_bond, main_other_id)) = unvisited_bonds.first().copied() {
-        visited_edges.insert(Smiles::edge_key(current_id, main_other_id));
-        visitor.tree_edge(smiles, *main_bond)?;
-        dfs(smiles, visitor, main_other_id, visited_nodes, visited_edges)?;
-
-        for (branch_bond, branch_other_id) in unvisited_bonds.into_iter().skip(1) {
+    if let Some((main_edge_index, main_bond, main_other_id)) = unvisited_bonds.pop() {
+        for (branch_edge_index, branch_bond, branch_other_id) in unvisited_bonds {
             if visited_nodes.contains(&branch_other_id) {
                 continue;
             }
-            visited_edges.insert(Smiles::edge_key(current_id, branch_other_id));
+            visited_edges.insert(branch_edge_index);
             visitor.open_branch(smiles, current_id, branch_other_id)?;
             visitor.tree_edge(smiles, *branch_bond)?;
             dfs(smiles, visitor, branch_other_id, visited_nodes, visited_edges)?;
             visitor.close_branch(smiles, current_id, branch_other_id)?;
         }
+        if !visited_nodes.contains(&main_other_id) {
+            visited_edges.insert(main_edge_index);
+            visitor.tree_edge(smiles, *main_bond)?;
+            dfs(smiles, visitor, main_other_id, visited_nodes, visited_edges)?;
+        }
     }
 
-    visitor.exit_node(smiles, current_id)?;
     Ok(())
 }

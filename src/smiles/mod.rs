@@ -328,4 +328,61 @@ mod tests {
         dbg!(&invalid_lead);
         assert!(invalid_lead.is_err());
     }
+
+    #[test]
+    fn edge_cases_branches() {
+        let case_1 = "B(s)s";
+        let case_1_smiles =
+            case_1.parse::<Smiles>().unwrap_or_else(|_| panic!("This is a valid SMILES"));
+        let case_1_smiles_rerendered = case_1_smiles.to_string();
+        let case_1_smiles_reparsed = case_1_smiles_rerendered
+            .parse::<Smiles>()
+            .unwrap_or_else(|_| panic!("Failed to reparse B(s)s"));
+        assert_eq!(case_1_smiles_reparsed.to_string(), case_1_smiles_rerendered);
+    }
+    #[test]
+    fn branch_render_regression_non_aromatic() {
+        let smiles: Smiles = "C(O)N".parse().unwrap();
+        let rendered = smiles.to_string();
+        assert_eq!(rendered, "C(O)N");
+    }
+
+    #[test]
+    fn parse_b_s_branch_shape_is_correct() {
+        let smiles: Smiles = "B(s)s".parse().unwrap();
+
+        assert_eq!(smiles.nodes().len(), 3);
+        assert_eq!(smiles.edges().len(), 2);
+
+        let mut edges = smiles
+            .edges()
+            .iter()
+            .map(|edge| {
+                let (a, b) = edge.vertices();
+                let key = if a < b { (a, b) } else { (b, a) };
+                (key, edge.bond())
+            })
+            .collect::<Vec<_>>();
+
+        edges.sort_by_key(|((a, b), _)| (*a, *b));
+
+        assert_eq!(edges, vec![((0, 1), Bond::Single), ((0, 2), Bond::Single),]);
+    }
+
+    #[test]
+    fn render_b_s_branch_should_preserve_branch_origin() {
+        let smiles: Smiles = "B(s)s".parse().unwrap();
+        assert_eq!(smiles.to_string(), "B(s)s");
+    }
+    #[test]
+    fn edge_case_rings() {
+        let input = "P1P1";
+        let smiles: Smiles = input.parse().unwrap();
+
+        let rendered = smiles.to_string();
+        let reparsed: Smiles = rendered.parse().unwrap();
+        let rerendered = reparsed.to_string();
+
+        assert_eq!(rendered, rerendered);
+    }
 }
