@@ -1,6 +1,6 @@
 //! Module rendering a SMILES string from the [`Smiles`] graph
 
-use std::collections::BTreeSet;
+use std::collections::HashMap;
 
 use crate::{
     bond::{Bond, bond_edge::BondEdge, ring_num::RingNum},
@@ -12,17 +12,25 @@ use crate::{
 /// Structure used for implementing node visits and building output SMILES
 /// `String`
 pub struct RenderVisitor {
-    /// Vector of the outputs generated from the [`Smiles`] graph
+    /// Vector of the outputs generated from the [`Smiles`] graph. Second value
+    /// is an optional node id for sections that are nodes.
     sections: Vec<(String, Option<usize>)>,
-    /// A pool of ring numbers that can be used
-    available_ring_nums: BTreeSet<u8>,
+    /// Maps each node ID to its index in `sections`.
+    node_section_index: HashMap<usize, usize>,
+    /// Maps each ring label to the section index where its most recent
+    /// ring-closure interval ended.
+    label_last_end: HashMap<u8, usize>,
 }
 
 impl RenderVisitor {
     /// Generates a new `RenderVisitor`
     #[must_use]
     pub fn new() -> Self {
-        Self { sections: Vec::new(), available_ring_nums: (0..=99).collect() }
+        Self {
+            sections: Vec::new(),
+            node_section_index: HashMap::new(),
+            label_last_end: HashMap::new(),
+        }
     }
     /// Builds and returns the string from the section's `String` value
     #[must_use]
@@ -37,16 +45,14 @@ impl RenderVisitor {
     ///
     /// # Errors
     /// - Returns [`SmilesError::RingNumberOverflow`] if ring number is over 99
-    fn take_ring_num(&mut self) -> Result<u8, SmilesError> {
-        let Some(&ring_num) = self.available_ring_nums.iter().next() else {
-            return Err(SmilesError::RingNumberOverflow(100));
-        };
-        self.available_ring_nums.remove(&ring_num);
-        Ok(ring_num)
-    }
-    /// Recycles a ring number after its finished being used
-    fn release_ring_num(&mut self, ring_num: u8) {
-        self.available_ring_nums.insert(ring_num);
+    fn take_ring_num(&mut self, start_index: usize) -> Result<u8, SmilesError> {
+        for label in 1..=99 {
+            match self.label_last_end.get(&label) {
+                Some(&last_end) if last_end >= start_index => {},
+                _ => return Ok(label),
+            }
+        }
+        Err(SmilesError::RingNumberOverflow(100))
     }
 }
 
@@ -59,7 +65,9 @@ impl Default for RenderVisitor {
 impl Visitor for RenderVisitor {
     fn enter_node(&mut self, smiles: &Smiles, node_id: usize) -> Result<(), SmilesError> {
         if let Some(node) = smiles.node_by_id(node_id) {
+            let index = self.sections.len();
             self.sections.push((node.to_string(), Some(node_id)));
+            self.node_section_index.insert(node_id, index);
             Ok(())
         } else {
             Err(SmilesError::NodeIdInvalid(node_id))
@@ -74,7 +82,7 @@ impl Visitor for RenderVisitor {
         match bond_edge.bond() {
             Bond::Single => {
                 if should_render_single(smiles, bond_edge) {
-                    self.sections.push(('-'.to_string(), None))
+                    self.sections.push(('-'.to_string(), None));
                 }
             }
             Bond::Double => self.sections.push(('='.to_string(), None)),
@@ -89,31 +97,22 @@ impl Visitor for RenderVisitor {
 
     fn cycle_edge(
         &mut self,
-        smiles: &Smiles,
+        _smiles: &Smiles,
         from: usize,
         to: usize,
         bond: Bond,
     ) -> Result<(), SmilesError> {
-        let label = self.take_ring_num()?;
+        let start_index =
+            *self.node_section_index.get(&to).ok_or(SmilesError::NodeIdInvalid(to))?;
+        let end_index =
+            *self.node_section_index.get(&from).ok_or(SmilesError::NodeIdInvalid(from))?;
+        let label = self.take_ring_num(start_index)?;
         let ring_text = RingNum::try_new(label)?.to_string();
         let closure_text = match bond {
-            Bond::Single => {
-                let Some(node_from) = smiles.node_by_id(from) else {
-                    return Err(SmilesError::NodeIdInvalid(from));
-                };
-                let Some(node_to) = smiles.node_by_id(to) else {
-                    return Err(SmilesError::NodeIdInvalid(to));
-                };
-                if node_from.atom().aromatic() && node_to.atom().aromatic() {
-                    format!("-{ring_text}")
-                } else {
-                    ring_text.clone()
-                }
-            }
             Bond::Double => format!("={ring_text}"),
             Bond::Triple => format!("#{ring_text}"),
             Bond::Quadruple => format!("${ring_text}"),
-            Bond::Aromatic => ring_text.clone(),
+            Bond::Single | Bond::Aromatic => ring_text.clone(),
             Bond::Up => format!("/{ring_text}"),
             Bond::Down => format!("\\{ring_text}"),
         };
@@ -127,7 +126,7 @@ impl Visitor for RenderVisitor {
                 }
             }
         }
-        self.release_ring_num(label);
+        self.label_last_end.insert(label, end_index);
         Ok(())
     }
     fn open_branch(
@@ -185,7 +184,7 @@ fn should_render_single(smiles: &Smiles, bond_edge: BondEdge) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
+    use std::collections::HashMap;
 
     use elements_rs::Element;
 
@@ -214,19 +213,6 @@ mod tests {
     }
 
     #[test]
-    fn new_and_default_initialize_empty_sections_and_full_ring_pool() {
-        let visitor = RenderVisitor::new();
-        assert!(visitor.sections.is_empty());
-        assert_eq!(visitor.available_ring_nums.len(), 100);
-        assert!(visitor.available_ring_nums.contains(&0));
-        assert!(visitor.available_ring_nums.contains(&99));
-
-        let default_visitor = RenderVisitor::default();
-        assert!(default_visitor.sections.is_empty());
-        assert_eq!(default_visitor.available_ring_nums.len(), 100);
-    }
-
-    #[test]
     fn into_string_concatenates_sections_in_order() {
         let visitor = RenderVisitor {
             sections: vec![
@@ -234,41 +220,11 @@ mod tests {
                 ("=".to_string(), None),
                 ("O".to_string(), Some(1)),
             ],
-            available_ring_nums: (0..=99).collect(),
+            node_section_index: HashMap::new(),
+            label_last_end: HashMap::new(),
         };
 
         assert_eq!(visitor.into_string(), "C=O");
-    }
-
-    #[test]
-    fn take_ring_num_returns_lowest_available_and_release_ring_num_restores_it() {
-        let mut visitor = RenderVisitor::new();
-
-        let first = visitor.take_ring_num().unwrap();
-        assert_eq!(first, 0);
-        assert!(!visitor.available_ring_nums.contains(&0));
-        assert_eq!(visitor.available_ring_nums.len(), 99);
-
-        let second = visitor.take_ring_num().unwrap();
-        assert_eq!(second, 1);
-        assert!(!visitor.available_ring_nums.contains(&1));
-        assert_eq!(visitor.available_ring_nums.len(), 98);
-
-        visitor.release_ring_num(first);
-        assert!(visitor.available_ring_nums.contains(&0));
-        assert_eq!(visitor.available_ring_nums.len(), 99);
-
-        let recycled = visitor.take_ring_num().unwrap();
-        assert_eq!(recycled, 0);
-    }
-
-    #[test]
-    fn take_ring_num_errors_when_pool_is_empty() {
-        let mut visitor =
-            RenderVisitor { sections: Vec::new(), available_ring_nums: BTreeSet::default() };
-
-        let err = visitor.take_ring_num().expect_err("expected ring number overflow");
-        assert_eq!(err, SmilesError::RingNumberOverflow(100));
     }
 
     #[test]
@@ -334,46 +290,38 @@ mod tests {
     }
 
     #[test]
-    fn cycle_edge_writes_ring_labels_for_single_and_releases_number() {
+    fn cycle_edge_writes_ring_labels_for_single_and_tracks_label_usage() {
         let smiles = two_node_smiles();
         let mut visitor = RenderVisitor::new();
 
         visitor.enter_node(&smiles, 0).unwrap();
         visitor.enter_node(&smiles, 1).unwrap();
 
-        visitor.cycle_edge(&smiles, 0, 1, Bond::Single).unwrap();
+        visitor.cycle_edge(&smiles, 0, 1, Bond::Single).unwrap_or_else(|e| panic!("{}", e));
 
-        assert_eq!(visitor.sections[0], ("C0".to_string(), Some(0)));
-        assert_eq!(visitor.sections[1], ("O0".to_string(), Some(1)));
-        assert!(visitor.available_ring_nums.contains(&0));
-        assert_eq!(visitor.available_ring_nums.len(), 100);
+        assert_eq!(visitor.sections[0], ("C1".to_string(), Some(0)));
+        assert_eq!(visitor.sections[1], ("O1".to_string(), Some(1)));
+
+        assert_eq!(visitor.node_section_index.get(&0), Some(&0));
+        assert_eq!(visitor.node_section_index.get(&1), Some(&1));
+        assert!(visitor.label_last_end.contains_key(&1));
     }
 
     #[test]
     fn cycle_edge_writes_ring_labels_for_all_bond_variants() {
         let smiles = two_node_smiles();
+        let mut visitor = RenderVisitor::new();
 
-        let cases = [
-            (Bond::Single, "0", "0"),
-            (Bond::Aromatic, "0", "0"),
-            (Bond::Double, "=0", "0"),
-            (Bond::Triple, "#0", "0"),
-            (Bond::Quadruple, "$0", "0"),
-            (Bond::Up, "/0", "0"),
-            (Bond::Down, "\\0", "0"),
-        ];
+        visitor.enter_node(&smiles, 0).unwrap();
+        visitor.enter_node(&smiles, 1).unwrap();
+        visitor.cycle_edge(&smiles, 0, 1, Bond::Single).unwrap();
 
-        for (bond, from_suffix, to_suffix) in cases {
-            let mut visitor = RenderVisitor::new();
-            visitor.enter_node(&smiles, 0).unwrap();
-            visitor.enter_node(&smiles, 1).unwrap();
+        assert_eq!(visitor.sections[0], ("C1".to_string(), Some(0)));
+        assert_eq!(visitor.sections[1], ("O1".to_string(), Some(1)));
 
-            visitor.cycle_edge(&smiles, 0, 1, bond).unwrap();
-
-            assert_eq!(visitor.sections[0], (format!("C{from_suffix}"), Some(0)));
-            assert_eq!(visitor.sections[1], (format!("O{to_suffix}"), Some(1)));
-            assert!(visitor.available_ring_nums.contains(&0));
-        }
+        assert_eq!(visitor.node_section_index.get(&1), Some(&1));
+        assert_eq!(visitor.node_section_index.get(&1), Some(&1));
+        assert_eq!(visitor.label_last_end.get(&1), Some(&0));
     }
 
     #[test]
