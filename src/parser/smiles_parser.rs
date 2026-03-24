@@ -181,6 +181,20 @@ impl<'a> SmilesParser<'a> {
                         ));
                     };
                     if let Some((other, stored_bond)) = ring_open.remove(&ring_num) {
+                        if current == other {
+                            return Err(SmilesErrorWithSpan::new(
+                                SmilesError::InvalidRingNumber,
+                                start,
+                                end,
+                            ));
+                        }
+                        if smiles.edge_for_node_pair((current, other)).is_some() {
+                            return Err(SmilesErrorWithSpan::new(
+                                SmilesError::InvalidRingNumber,
+                                start,
+                                end,
+                            ));
+                        }
                         let bond = pending_bond
                             .or(stored_bond)
                             .unwrap_or_else(|| default_bond(&smiles, current, other));

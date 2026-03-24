@@ -70,9 +70,13 @@ impl Visitor for RenderVisitor {
         Ok(())
     }
 
-    fn tree_edge(&mut self, _smiles: &Smiles, bond_edge: BondEdge) -> Result<(), SmilesError> {
+    fn tree_edge(&mut self, smiles: &Smiles, bond_edge: BondEdge) -> Result<(), SmilesError> {
         match bond_edge.bond() {
-            Bond::Single => {}
+            Bond::Single => {
+                if should_render_single(smiles, bond_edge) {
+                    self.sections.push(('-'.to_string(), None))
+                }
+            }
             Bond::Double => self.sections.push(('='.to_string(), None)),
             Bond::Triple => self.sections.push(('#'.to_string(), None)),
             Bond::Quadruple => self.sections.push(('$'.to_string(), None)),
@@ -85,7 +89,7 @@ impl Visitor for RenderVisitor {
 
     fn cycle_edge(
         &mut self,
-        _smiles: &Smiles,
+        smiles: &Smiles,
         from: usize,
         to: usize,
         bond: Bond,
@@ -93,10 +97,23 @@ impl Visitor for RenderVisitor {
         let label = self.take_ring_num()?;
         let ring_text = RingNum::try_new(label)?.to_string();
         let closure_text = match bond {
-            Bond::Single | Bond::Aromatic => ring_text.clone(),
+            Bond::Single => {
+                let Some(node_from) = smiles.node_by_id(from) else {
+                    return Err(SmilesError::NodeIdInvalid(from));
+                };
+                let Some(node_to) = smiles.node_by_id(to) else {
+                    return Err(SmilesError::NodeIdInvalid(to));
+                };
+                if node_from.atom().aromatic() && node_to.atom().aromatic() {
+                    format!("-{ring_text}")
+                } else {
+                    ring_text.clone()
+                }
+            }
             Bond::Double => format!("={ring_text}"),
             Bond::Triple => format!("#{ring_text}"),
             Bond::Quadruple => format!("${ring_text}"),
+            Bond::Aromatic => ring_text.clone(),
             Bond::Up => format!("/{ring_text}"),
             Bond::Down => format!("\\{ring_text}"),
         };
@@ -153,6 +170,17 @@ impl Visitor for RenderVisitor {
     ) -> Result<(), SmilesError> {
         Ok(())
     }
+}
+
+fn should_render_single(smiles: &Smiles, bond_edge: BondEdge) -> bool {
+    let (a, b) = bond_edge.vertices();
+    let Some(node_a) = smiles.node_by_id(a) else {
+        return false;
+    };
+    let Some(node_b) = smiles.node_by_id(b) else {
+        return false;
+    };
+    node_a.atom().aromatic() && node_b.atom().aromatic()
 }
 
 #[cfg(test)]

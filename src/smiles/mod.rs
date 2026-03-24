@@ -374,9 +374,18 @@ mod tests {
         let smiles: Smiles = "B(s)s".parse().unwrap();
         assert_eq!(smiles.to_string(), "B(s)s");
     }
+
     #[test]
-    fn edge_case_rings() {
-        let input = "P1P1";
+    fn edge_case_rings_is_invalid() {
+        let err = "P1P1".parse::<Smiles>().expect_err("P1P1 should be invalid");
+        assert_eq!(err.smiles_error(), SmilesError::InvalidRingNumber);
+        assert_eq!(err.start(), 3);
+        assert_eq!(err.end(), 4);
+    }
+
+    #[test]
+    fn edge_case_wildcard_carbon_bond() {
+        let input = "*c-c";
         let smiles: Smiles = input.parse().unwrap();
 
         let rendered = smiles.to_string();
@@ -384,5 +393,37 @@ mod tests {
         let rerendered = reparsed.to_string();
 
         assert_eq!(rendered, rerendered);
+    }
+
+    #[test]
+    fn explicit_single_ring_closure_between_aromatic_atoms_is_preserved() {
+        let smiles: Smiles = "c1-c-c-c-c-c1".parse().unwrap();
+        let rendered = smiles.to_string();
+        let reparsed: Smiles = rendered.parse().unwrap();
+        assert_eq!(rendered, reparsed.to_string());
+    }
+
+    #[test]
+    fn explicit_single_between_aromatic_atoms_is_preserved() {
+        let smiles: Smiles = "*c-c".parse().unwrap();
+        assert_eq!(smiles.to_string(), "*c-c");
+    }
+
+    #[test]
+    fn parser_rejects_self_loop_ring() {
+        let err = "C11".parse::<Smiles>().expect_err("C11 should be invalid");
+        assert_eq!(err.smiles_error(), SmilesError::InvalidRingNumber);
+    }
+
+    #[test]
+    fn parser_rejects_repeated_ring_number_on_same_atom() {
+        let err = "C88SC88".parse::<Smiles>().expect_err("C88SC88 should be invalid");
+        assert_eq!(err.smiles_error(), SmilesError::InvalidRingNumber);
+    }
+
+    #[test]
+    fn parser_rejects_parallel_ring_bond_between_same_atoms() {
+        let err = "C12CCCCC12".parse::<Smiles>().expect_err("parallel edge should be invalid");
+        assert_eq!(err.smiles_error(), SmilesError::InvalidRingNumber);
     }
 }
