@@ -11,7 +11,6 @@ fuzz_target!(|data: &str| {
             let rerendered = reparsed.to_string();
             assert_eq!(
                 &rendered, &rerendered,
-                "semantic mismatch\ninput: {data:?}\nrendered: {rendered:?}"
             );
         }
     }

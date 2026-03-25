@@ -48,7 +48,7 @@ impl RenderVisitor {
     fn take_ring_num(&mut self, start_index: usize) -> Result<u8, SmilesError> {
         for label in 1..=99 {
             match self.label_last_end.get(&label) {
-                Some(&last_end) if last_end >= start_index => {},
+                Some(&last_end) if last_end >= start_index => {}
                 _ => return Ok(label),
             }
         }

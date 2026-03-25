@@ -1,6 +1,6 @@
 //! Second pass that parses the [`TokenWithSpan`]
 
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Range};
 
 use crate::{
     atom::{Atom, atom_node::AtomNode},
@@ -9,6 +9,155 @@ use crate::{
     smiles::Smiles,
     token::{Token, TokenWithSpan},
 };
+
+/// Structure for containing the Parser State
+pub struct ParserState {
+    smiles: Smiles,
+    next_id: usize,
+    last_atom: Option<usize>,
+    pending_bond: Option<Bond>,
+    branch_stack: Vec<usize>,
+    ring_open: HashMap<RingNum, (usize, Option<Bond>)>,
+    last_span: (usize, usize),
+}
+impl ParserState {
+    /// Creates a new initial state for the parser.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            smiles: Smiles::new(),
+            next_id: 0,
+            last_atom: None,
+            pending_bond: None,
+            branch_stack: Vec::new(),
+            ring_open: HashMap::new(),
+            last_span: (0, 0),
+        }
+    }
+    /// Returns the last span stored.
+    #[must_use]
+    pub fn last_span(&self) -> (usize, usize) {
+        self.last_span
+    }
+    /// Updates the last span field.
+    pub fn update_last_span(&mut self, last_span: (usize, usize)) {
+        self.last_span = last_span;
+    }
+    /// Returns the next id field.
+    #[must_use]
+    pub fn next_id(&self) -> usize {
+        self.next_id
+    }
+    /// Updates the next available id by incrementing.
+    pub fn increment_next_id(&mut self) {
+        self.next_id += 1;
+    }
+    /// Returns the previous atom id if there is one.
+    #[must_use]
+    pub fn last_atom(&self) -> Option<usize> {
+        self.last_atom
+    }
+    /// Updates the last item id.
+    pub fn update_last_atom(&mut self, id: Option<usize>) {
+        self.last_atom = id;
+    }
+    /// Returns the pending bond if present
+    #[must_use]
+    pub fn pending_bond(&self) -> Option<Bond> {
+        self.pending_bond
+    }
+    /// Updates the pending bond field.
+    pub fn update_pending_bond(&mut self, bond: Option<Bond>) {
+        self.pending_bond = bond;
+    }
+    /// Returns a borrowed slice of the current branch stack.
+    #[must_use]
+    pub fn branch_stack(&self) -> &[usize] {
+        &self.branch_stack
+    }
+    /// Pops a value off the the branch stack and returns it.
+    pub fn pop_branch_stack(&mut self) -> Option<usize> {
+        self.branch_stack.pop()
+    }
+    /// Pushes a branch anchor to the branch stack.
+    pub fn push_stack(&mut self, anchor: usize) {
+        self.branch_stack.push(anchor);
+    }
+    /// Checks if the branch stack is empty.
+    #[must_use]
+    pub fn stack_empty(&self) -> bool {
+        self.branch_stack.is_empty()
+    }
+    /// Removes and returns the specified ring open field entry if present.
+    pub fn remove_ring_open(&mut self, ring_num: &RingNum) -> Option<(usize, Option<Bond>)> {
+        self.ring_open.remove(ring_num)
+    }
+    /// Checks if the ring open field is currently empty.
+    #[must_use]
+    pub fn ring_open_empty(&self) -> bool {
+        self.ring_open.is_empty()
+    }
+    /// Iserts the give ring ito the ring open field
+    pub fn insert_ring(&mut self, ring_num: RingNum, pending: (usize, Option<Bond>)) {
+        self.ring_open.insert(ring_num, pending);
+    }
+    /// Returns a borrowed reference of the smiles field.
+    #[must_use]
+    pub fn smiles(&self) -> &Smiles {
+        &self.smiles
+    }
+    /// Consumes the parser state and returns the parsed SMILES graph.
+    #[must_use]
+    pub fn into_smiles(self) -> Smiles {
+        self.smiles
+    }
+    /// Returns whether there is an edge for the given pair of nodes.
+    #[must_use]
+    pub fn edge_for_node_pair_exists(&self, nodes: (usize, usize)) -> bool {
+        self.smiles.edge_for_node_pair(nodes).is_some()
+    }
+    /// Pushes an [`AtomNode`] into the parsed [`Smiles`] graph.
+    ///
+    /// # Errors
+    /// - Returns [`SmilesError::DuplicateNodeId`] if node id already exists
+    pub fn push_node(&mut self, node: AtomNode) -> Result<(), SmilesError> {
+        self.smiles.push_node(node)
+    }
+    /// Pushes an [`BondEdge`] into the parsed [`Smiles`] graph.
+    ///
+    /// # Errors
+    /// - Returns a [`SmilesError::NodeIdInvalid`] if a node cannot be found in
+    ///   the edge list
+    pub fn push_edge(
+        &mut self,
+        node_a: usize,
+        node_b: usize,
+        bond: Bond,
+        ring_num: Option<RingNum>,
+    ) -> Result<(), SmilesError> {
+        self.smiles.push_edge(node_a, node_b, bond, ring_num)
+    }
+    /// Adds an atom to the smiles graph, either bracketed or unbracketed. 
+    pub fn add_atom(&mut self, atom: Atom, token_span: Range<usize>, start: usize, end: usize) -> Result<(), SmilesErrorWithSpan>{
+        let id = self.next_id();
+        self.increment_next_id();
+        let node = AtomNode::new(atom, id, token_span);
+        self.push_node(node).map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
+        if let Some(prev) = self.last_atom() {
+            let bond = self.pending_bond().unwrap_or_else(|| default_bond(self.smiles(), prev, id));
+            self.push_edge(prev, id, bond, None).map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
+        }
+        self.update_last_atom(Some(id));
+        self.update_pending_bond(None);
+        Ok(())
+    }
+}
+
+impl Default for ParserState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Contains the slice of tokens being iterated on and current position in that
 /// slice
@@ -93,94 +242,57 @@ impl<'a> SmilesParser<'a> {
     ///
     /// - Any other error will be emitted as a  [`SmilesErrorWithSpan`]
     pub fn parse(mut self) -> Result<Smiles, SmilesErrorWithSpan> {
-        let mut smiles = Smiles::new();
-
-        let mut next_id: usize = 0;
-        let mut last_atom: Option<usize> = None;
-        let mut pending_bond: Option<Bond> = None;
-        let mut branch_stack: Vec<usize> = Vec::new();
-        let mut ring_open: HashMap<RingNum, (usize, Option<Bond>)> = HashMap::new();
-        let mut last_span: (usize, usize) = (0, 0);
+        let mut parser_state = ParserState::new();
 
         while let Some(token_with_span) = self.current() {
-            let start = token_with_span.start();
-            let end = token_with_span.end();
-            last_span = (start, end);
+            let (start, end) = (token_with_span.start(), token_with_span.end());
+            parser_state.update_last_span((start, end));
             match token_with_span.token() {
                 Token::UnbracketedAtom(atom) => {
-                    let atom: Atom = Atom::Unbracketed(atom);
-                    let id = next_id;
-                    next_id += 1;
-
-                    let node = AtomNode::new(atom, id, token_with_span.span());
-                    smiles.push_node(node).map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
-
-                    if let Some(prev) = last_atom {
-                        let bond = pending_bond.unwrap_or_else(|| default_bond(&smiles, prev, id));
-                        smiles
-                            .push_edge(prev, id, bond, None)
-                            .map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
-                    }
-                    last_atom = Some(id);
-                    pending_bond = None;
+                    parser_state.add_atom(Atom::Unbracketed(atom), token_with_span.span(), start, end)?;
                 }
                 Token::BracketedAtom(atom) => {
-                    let atom: Atom = Atom::from(atom);
-                    let id = next_id;
-                    next_id += 1;
-
-                    let node = AtomNode::new(atom, id, token_with_span.span());
-                    smiles.push_node(node).map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
-
-                    if let Some(prev) = last_atom {
-                        let bond = pending_bond.unwrap_or_else(|| default_bond(&smiles, prev, id));
-                        smiles
-                            .push_edge(prev, id, bond, None)
-                            .map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
-                    }
-
-                    last_atom = Some(id);
-                    pending_bond = None;
+                    parser_state.add_atom(Atom::Bracketed(atom), token_with_span.span(), start, end)?;
                 }
                 Token::Bond(bond) => {
-                    if last_atom.is_none() {
+                    if parser_state.last_atom().is_none() {
                         return Err(SmilesErrorWithSpan::new(
                             SmilesError::IncompleteBond(bond),
                             start,
                             end,
                         ));
                     }
-                    pending_bond = Some(bond);
+                    parser_state.update_pending_bond(Some(bond));
                 }
                 Token::LeftParentheses => {
-                    let Some(anchor) = last_atom else {
+                    let Some(anchor) = parser_state.last_atom() else {
                         return Err(SmilesErrorWithSpan::new(
                             SmilesError::UnexpectedLeftParentheses,
                             start,
                             end,
                         ));
                     };
-                    branch_stack.push(anchor);
+                    parser_state.push_stack(anchor);
                 }
                 Token::NonBond => {
                     validate_non_bond(
-                        pending_bond,
-                        branch_stack.is_empty(),
-                        ring_open.is_empty(),
-                        last_span,
+                        parser_state.pending_bond(),
+                        parser_state.branch_stack().is_empty(),
+                        parser_state.ring_open_empty(),
+                        parser_state.last_span(),
                     )?;
-                    last_atom = None;
-                    pending_bond = None;
+                    parser_state.update_last_atom(None);
+                    parser_state.update_pending_bond(None);
                 }
                 Token::RingClosure(ring_num) => {
-                    let Some(current) = last_atom else {
+                    let Some(current) = parser_state.last_atom() else {
                         return Err(SmilesErrorWithSpan::new(
                             SmilesError::InvalidRingNumber,
                             start,
                             end,
                         ));
                     };
-                    if let Some((other, stored_bond)) = ring_open.remove(&ring_num) {
+                    if let Some((other, stored_bond)) = parser_state.remove_ring_open(&ring_num) {
                         if current == other {
                             return Err(SmilesErrorWithSpan::new(
                                 SmilesError::InvalidRingNumber,
@@ -188,43 +300,49 @@ impl<'a> SmilesParser<'a> {
                                 end,
                             ));
                         }
-                        if smiles.edge_for_node_pair((current, other)).is_some() {
+                        if parser_state.edge_for_node_pair_exists((current, other)) {
                             return Err(SmilesErrorWithSpan::new(
                                 SmilesError::InvalidRingNumber,
                                 start,
                                 end,
                             ));
                         }
-                        let bond = pending_bond
+                        let bond = parser_state
+                            .pending_bond()
                             .or(stored_bond)
-                            .unwrap_or_else(|| default_bond(&smiles, current, other));
+                            .unwrap_or_else(|| default_bond(parser_state.smiles(), current, other));
 
-                        smiles
+                        parser_state
                             .push_edge(current, other, bond, Some(ring_num))
                             .map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
 
-                        pending_bond = None;
+                        parser_state.update_pending_bond(None);
                     } else {
-                        ring_open.insert(ring_num, (current, pending_bond));
-                        pending_bond = None;
+                        parser_state.insert_ring(ring_num, (current, parser_state.pending_bond));
+                        parser_state.update_pending_bond(None);
                     }
                 }
                 Token::RightParentheses => {
-                    let Some(anchor) = branch_stack.pop() else {
+                    let Some(anchor) = parser_state.pop_branch_stack() else {
                         return Err(SmilesErrorWithSpan::new(
                             SmilesError::UnexpectedRightParentheses,
                             start,
                             end,
                         ));
                     };
-                    last_atom = Some(anchor);
+                    parser_state.update_last_atom(Some(anchor));
                 }
             }
             self.advance();
         }
-        parse_end_check(pending_bond, branch_stack.is_empty(), ring_open.is_empty(), last_span)?;
+        parse_end_check(
+            parser_state.pending_bond(),
+            parser_state.stack_empty(),
+            parser_state.ring_open_empty(),
+            parser_state.last_span(),
+        )?;
 
-        Ok(smiles)
+        Ok(parser_state.into_smiles())
     }
 }
 
