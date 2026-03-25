@@ -123,7 +123,7 @@ impl ParserState {
     pub fn push_node(&mut self, node: AtomNode) -> Result<(), SmilesError> {
         self.smiles.push_node(node)
     }
-    /// Pushes an [`BondEdge`] into the parsed [`Smiles`] graph.
+    /// Pushes an [`Bond`] into the parsed [`Smiles`] graph.
     ///
     /// # Errors
     /// - Returns a [`SmilesError::NodeIdInvalid`] if a node cannot be found in
@@ -138,7 +138,7 @@ impl ParserState {
         self.smiles.push_edge(node_a, node_b, bond, ring_num)
     }
     /// Adds an atom to the smiles graph, either bracketed or unbracketed.
-    /// 
+    ///
     /// # Errors
     /// - Returns [`SmilesError::DuplicateNodeId`] if node id already exists
     pub fn add_atom(
@@ -159,6 +159,55 @@ impl ParserState {
         }
         self.update_last_atom(Some(id));
         self.update_pending_bond(None);
+        Ok(())
+    }
+    /// Checks wether the parsing ends in a valid state.
+    ///
+    /// # Errors
+    /// - Returns [`SmilesError::IncompleteBond`] if a bond was left open.
+    /// - Returns [`SmilesError::UnclosedBranch`] if a branch isn't closed with
+    ///   a `)`.
+    /// - Returns [`SmilesError::UnclosedRing`] if a ring number is detected
+    ///   once but never closed.
+    pub fn parse_end_check(&self) -> Result<(), SmilesErrorWithSpan> {
+        let (start, end) = self.last_span;
+        let start = start.min(end.saturating_sub(1));
+        let end = end.max(start.saturating_add(1));
+
+        if let Some(bond) = self.pending_bond {
+            return Err(SmilesErrorWithSpan::new(SmilesError::IncompleteBond(bond), start, end));
+        }
+        if !self.stack_empty() {
+            return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedBranch, start, end));
+        }
+        if !self.ring_open_empty() {
+            return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedRing, start, end));
+        }
+        Ok(())
+    }
+    /// Validates a non bond has no hanging bonds, branches, or ring closures
+    ///
+    /// # Errors
+    /// - Returns [`SmilesError::IncompleteBond`] if a bond is left open at the
+    ///   non bond.
+    /// - Returns [`SmilesError::UnclosedBranch`] if a branch is left open at
+    ///   the non bond.
+    /// - Returns [`SmilesError::UnclosedRing`] if a ring is left open at the
+    ///   non bond.
+    pub fn validate_non_bond(&self) -> Result<(), SmilesErrorWithSpan> {
+        let (start, end) = self.last_span;
+        let start = start.min(end.saturating_sub(1));
+        let end = end.max(start.saturating_add(1));
+
+        if let Some(bond) = self.pending_bond {
+            return Err(SmilesErrorWithSpan::new(SmilesError::IncompleteBond(bond), start, end));
+        }
+        if !self.stack_empty() {
+            return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedBranch, start, end));
+        }
+        if !self.ring_open_empty() {
+            return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedRing, start, end));
+        }
         Ok(())
     }
 }
@@ -295,12 +344,7 @@ impl<'a> SmilesParser<'a> {
                     parser_state.push_stack(anchor);
                 }
                 Token::NonBond => {
-                    validate_non_bond(
-                        parser_state.pending_bond(),
-                        parser_state.branch_stack().is_empty(),
-                        parser_state.ring_open_empty(),
-                        parser_state.last_span(),
-                    )?;
+                    parser_state.validate_non_bond()?;
                     parser_state.update_last_atom(None);
                     parser_state.update_pending_bond(None);
                 }
@@ -355,59 +399,10 @@ impl<'a> SmilesParser<'a> {
             }
             self.advance();
         }
-        parse_end_check(
-            parser_state.pending_bond(),
-            parser_state.stack_empty(),
-            parser_state.ring_open_empty(),
-            parser_state.last_span(),
-        )?;
+        parser_state.parse_end_check()?;
 
         Ok(parser_state.into_smiles())
     }
-}
-
-fn parse_end_check(
-    pending_bond: Option<Bond>,
-    branch_stack_empty: bool,
-    ring_open_empty: bool,
-    last_span: (usize, usize),
-) -> Result<(), SmilesErrorWithSpan> {
-    let (start, end) = last_span;
-    let start = start.min(end.saturating_sub(1));
-    let end = end.max(start.saturating_add(1));
-
-    if let Some(bond) = pending_bond {
-        return Err(SmilesErrorWithSpan::new(SmilesError::IncompleteBond(bond), start, end));
-    }
-    if !branch_stack_empty {
-        return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedBranch, start, end));
-    }
-    if !ring_open_empty {
-        return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedRing, start, end));
-    }
-    Ok(())
-}
-
-fn validate_non_bond(
-    pending_bond: Option<Bond>,
-    branch_stack_empty: bool,
-    ring_open_empty: bool,
-    last_span: (usize, usize),
-) -> Result<(), SmilesErrorWithSpan> {
-    let (start, end) = last_span;
-    let start = start.min(end.saturating_sub(1));
-    let end = end.max(start.saturating_add(1));
-
-    if let Some(bond) = pending_bond {
-        return Err(SmilesErrorWithSpan::new(SmilesError::IncompleteBond(bond), start, end));
-    }
-    if !branch_stack_empty {
-        return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedBranch, start, end));
-    }
-    if !ring_open_empty {
-        return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedRing, start, end));
-    }
-    Ok(())
 }
 
 fn default_bond(smiles: &Smiles, id_a: usize, id_b: usize) -> Bond {
