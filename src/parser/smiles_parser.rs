@@ -137,15 +137,25 @@ impl ParserState {
     ) -> Result<(), SmilesError> {
         self.smiles.push_edge(node_a, node_b, bond, ring_num)
     }
-    /// Adds an atom to the smiles graph, either bracketed or unbracketed. 
-    pub fn add_atom(&mut self, atom: Atom, token_span: Range<usize>, start: usize, end: usize) -> Result<(), SmilesErrorWithSpan>{
+    /// Adds an atom to the smiles graph, either bracketed or unbracketed.
+    /// 
+    /// # Errors
+    /// - Returns [`SmilesError::DuplicateNodeId`] if node id already exists
+    pub fn add_atom(
+        &mut self,
+        atom: Atom,
+        token_span: Range<usize>,
+        start: usize,
+        end: usize,
+    ) -> Result<(), SmilesErrorWithSpan> {
         let id = self.next_id();
         self.increment_next_id();
         let node = AtomNode::new(atom, id, token_span);
         self.push_node(node).map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
         if let Some(prev) = self.last_atom() {
             let bond = self.pending_bond().unwrap_or_else(|| default_bond(self.smiles(), prev, id));
-            self.push_edge(prev, id, bond, None).map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
+            self.push_edge(prev, id, bond, None)
+                .map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
         }
         self.update_last_atom(Some(id));
         self.update_pending_bond(None);
@@ -249,10 +259,20 @@ impl<'a> SmilesParser<'a> {
             parser_state.update_last_span((start, end));
             match token_with_span.token() {
                 Token::UnbracketedAtom(atom) => {
-                    parser_state.add_atom(Atom::Unbracketed(atom), token_with_span.span(), start, end)?;
+                    parser_state.add_atom(
+                        Atom::Unbracketed(atom),
+                        token_with_span.span(),
+                        start,
+                        end,
+                    )?;
                 }
                 Token::BracketedAtom(atom) => {
-                    parser_state.add_atom(Atom::Bracketed(atom), token_with_span.span(), start, end)?;
+                    parser_state.add_atom(
+                        Atom::Bracketed(atom),
+                        token_with_span.span(),
+                        start,
+                        end,
+                    )?;
                 }
                 Token::Bond(bond) => {
                     if parser_state.last_atom().is_none() {
