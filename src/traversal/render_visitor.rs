@@ -116,14 +116,20 @@ impl Visitor for RenderVisitor {
             Bond::Up => format!("/{ring_text}"),
             Bond::Down => format!("\\{ring_text}"),
         };
-
-        for (output_string, id) in &mut self.sections {
-            if let Some(id_val) = id {
-                if *id_val == to {
-                    output_string.push_str(&ring_text);
-                } else if *id_val == from {
-                    output_string.push_str(&closure_text);
-                }
+        match start_index.cmp(&end_index) {
+            std::cmp::Ordering::Less => {
+                let (left, right) = self.sections.split_at_mut(end_index);
+                left[start_index].0.push_str(&ring_text);
+                right[0].0.push_str(&closure_text);
+            }
+            std::cmp::Ordering::Equal => {
+                self.sections[start_index].0.push_str(&ring_text);
+                self.sections[start_index].0.push_str(&closure_text);
+            }
+            std::cmp::Ordering::Greater => {
+                let (left, right) = self.sections.split_at_mut(start_index);
+                left[end_index].0.push_str(&closure_text);
+                right[0].0.push_str(&ring_text);
             }
         }
         self.label_last_end.insert(label, end_index);

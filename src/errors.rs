@@ -18,6 +18,8 @@ pub enum SmilesError {
     ChargeUnderflow(i8),
     /// A Duplicate [`crate::atom::atom_node::AtomNode`] id was found
     DuplicateNodeId(usize),
+    /// A duplicate edge between two nodes has been found
+    DuplicateEdge(usize, usize),
     /// A non bare element found outside of brackets
     ElementRequiresBrackets,
     /// Wrapper for `element_rs` errors
@@ -54,6 +56,8 @@ pub enum SmilesError {
     NonBondInBracket,
     /// Ring Number Overflow (greater than 99)
     RingNumberOverflow(u8),
+    /// An edge connects a node to itself
+    SelfLoopEdge(usize),
     /// Unexpectedly inside of brackets
     UnexpectedBracketedState,
     /// Unexpected end of string
@@ -85,15 +89,16 @@ pub enum SmilesError {
 impl fmt::Display for SmilesError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use SmilesError::{
-            BondInBracket, ChargeOverflow, ChargeUnderflow, DuplicateNodeId,
+            BondInBracket, ChargeOverflow, ChargeUnderflow, DuplicateEdge, DuplicateNodeId,
             ElementRequiresBrackets, ElementsRs, IncompleteBond, IntegerOverflow,
             InvalidAromaticElement, InvalidChirality, InvalidClass, InvalidElementName,
             InvalidIsotope, InvalidNonBondToken, InvalidNumber, InvalidRingNumber,
             InvalidUnbracketedAtom, MissingBracketElement, MissingElement, NodeIdInvalid,
-            NonBondInBracket, RingNumberOverflow, UnclosedBracket, UnclosedBranch, UnclosedRing,
-            UnexpectedBracketedState, UnexpectedCharacter, UnexpectedColon, UnexpectedDash,
-            UnexpectedEndOfString, UnexpectedLeftBracket, UnexpectedLeftParentheses,
-            UnexpectedPercent, UnexpectedRightBracket, UnexpectedRightParentheses,
+            NonBondInBracket, RingNumberOverflow, SelfLoopEdge, UnclosedBracket, UnclosedBranch,
+            UnclosedRing, UnexpectedBracketedState, UnexpectedCharacter, UnexpectedColon,
+            UnexpectedDash, UnexpectedEndOfString, UnexpectedLeftBracket,
+            UnexpectedLeftParentheses, UnexpectedPercent, UnexpectedRightBracket,
+            UnexpectedRightParentheses,
         };
         match self {
             MissingElement => write!(f, "Missing element"),
@@ -131,6 +136,12 @@ impl fmt::Display for SmilesError {
             UnclosedRing => write!(f, "Ring not closed"),
             UnexpectedRightParentheses => write!(f, "Unexpected `)`"),
             DuplicateNodeId(id) => write!(f, "Node ID: {id} duplicated"),
+            DuplicateEdge(id_a, id_b) => {
+                write!(f, "Node A: {id_a} has multiple edges with Node B: {id_b}")
+            }
+            SelfLoopEdge(id) => {
+                write!(f, "Node: {id} has an edge that goes from itself and to itself")
+            }
         }
     }
 }
@@ -274,6 +285,14 @@ mod tests {
             (SmilesError::UnclosedBracket, "Unclosed '['".to_string()),
             (SmilesError::UnclosedBranch, "Branch not closed".to_string()),
             (SmilesError::UnclosedRing, "Ring not closed".to_string()),
+            (
+                SmilesError::SelfLoopEdge(1),
+                "Node: 1 has an edge that goes from itself and to itself".to_string(),
+            ),
+            (
+                SmilesError::DuplicateEdge(0, 1),
+                "Node A: 0 has multiple edges with Node B: 1".to_string(),
+            ),
         ];
 
         for (error, expected) in cases {

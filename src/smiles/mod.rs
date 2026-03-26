@@ -74,6 +74,14 @@ impl Smiles {
         if !self.contains_node_id(node_b) {
             return Err(SmilesError::NodeIdInvalid(node_b));
         }
+        // reject self edges
+        if node_a == node_b {
+            return Err(SmilesError::SelfLoopEdge(node_a));
+        }
+        // reject duplicate edges
+        if self.edge_for_node_pair((node_a, node_b)).is_some() {
+            return Err(SmilesError::DuplicateEdge(node_a, node_b));
+        }
         self.bond_edges.push(BondEdge::new(node_a, node_b, bond, ring_num));
         Ok(())
     }

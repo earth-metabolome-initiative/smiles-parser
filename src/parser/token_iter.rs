@@ -774,19 +774,19 @@ mod tests {
     }
 
     #[test]
-fn try_chirality_th_form_should_parse() {
-    let mut stream = TokenIter::from("@TH1");
-    assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::try_th(1).unwrap())));
-}
+    fn try_chirality_th_form_should_parse() {
+        let mut stream = TokenIter::from("@TH1");
+        assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::try_th(1).unwrap())));
+    }
 
-#[test]
-fn try_chirality_tb_form_should_parse() {
-    let mut stream = TokenIter::from("@TB10");
-    assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::try_tb(10).unwrap())));
-}
-#[test]
-fn token_iter_parses_bracket_atom_with_th_chirality() {
-    let token = next_ok("[C@TH1]");
-    assert!(matches!(token.token(), Token::BracketedAtom(_)));
-}
+    #[test]
+    fn try_chirality_tb_form_should_parse() {
+        let mut stream = TokenIter::from("@TB10");
+        assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::try_tb(10).unwrap())));
+    }
+    #[test]
+    fn token_iter_parses_bracket_atom_with_th_chirality() {
+        let token = next_ok("[C@TH1]");
+        assert!(matches!(token.token(), Token::BracketedAtom(_)));
+    }
 }
