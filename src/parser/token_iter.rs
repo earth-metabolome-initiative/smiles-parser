@@ -274,6 +274,7 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
             Chirality::AtAt
         }
         'T' => {
+            stream.chars.next();
             match stream.peek_char().ok_or(SmilesError::UnexpectedEndOfString)? {
                 'H' => {
                     stream.chars.next();
@@ -664,11 +665,6 @@ mod tests {
 
         let mut stream = TokenIter::from("@OQ");
         assert_eq!(try_chirality(&mut stream), Err(SmilesError::InvalidChirality));
-
-        // This currently errors because the `T` branch does not consume `T`
-        // before checking for `H` or `B`.
-        let mut stream = TokenIter::from("@TH1");
-        assert_eq!(try_chirality(&mut stream), Err(SmilesError::InvalidChirality));
     }
 
     #[test]
@@ -776,4 +772,21 @@ mod tests {
         assert_eq!(err.start(), 0);
         assert_eq!(err.end(), 2);
     }
+
+    #[test]
+fn try_chirality_th_form_should_parse() {
+    let mut stream = TokenIter::from("@TH1");
+    assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::try_th(1).unwrap())));
+}
+
+#[test]
+fn try_chirality_tb_form_should_parse() {
+    let mut stream = TokenIter::from("@TB10");
+    assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::try_tb(10).unwrap())));
+}
+#[test]
+fn token_iter_parses_bracket_atom_with_th_chirality() {
+    let token = next_ok("[C@TH1]");
+    assert!(matches!(token.token(), Token::BracketedAtom(_)));
+}
 }

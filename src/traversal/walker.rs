@@ -73,6 +73,6 @@ fn dfs<V: Visitor>(
             dfs(smiles, visitor, main_other_id, visited_nodes, visited_edges)?;
         }
     }
-
+    visitor.exit_node(smiles, current_id)?;
     Ok(())
 }
