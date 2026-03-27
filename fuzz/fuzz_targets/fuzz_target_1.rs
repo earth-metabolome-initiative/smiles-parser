@@ -9,9 +9,7 @@ fuzz_target!(|data: &str| {
 
         if let Ok(reparsed) = rendered.parse::<Smiles>() {
             let rerendered = reparsed.to_string();
-            assert_eq!(
-                &rendered, &rerendered,
-            );
+            assert_eq!(&rendered, &rerendered,);
         }
     }
 });

@@ -190,7 +190,7 @@ fn should_render_single(smiles: &Smiles, bond_edge: BondEdge) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{collections::HashMap, str::FromStr};
 
     use elements_rs::Element;
 
@@ -370,5 +370,27 @@ mod tests {
         visitor.finish_component(&smiles, 0, 0).unwrap();
 
         assert_eq!(visitor.sections, before);
+    }
+
+    #[test]
+    fn edge_case_branch_with_ring_num() {
+        let input = "Ns((Ns(N)0N)N)0";
+
+        let smiles = Smiles::from_str(input)
+            .unwrap_or_else(|e| panic!("Failed to parse:\n{}", e.render(input)));
+
+        let rendered = smiles.to_string();
+
+        let reparsed = Smiles::from_str(&rendered).unwrap_or_else(|e| {
+            panic!(
+                "Failed to parse rendered SMILES.\nOriginal:\n{input}\nRendered:\n{rendered}\n{}",
+                e.render(&rendered)
+            )
+        });
+
+        let rerendered = reparsed.to_string();
+        dbg!(&smiles);
+        dbg!(&reparsed);
+        assert_eq!(rendered, rerendered);
     }
 }

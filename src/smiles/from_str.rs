@@ -29,6 +29,8 @@ mod tests {
 
     #[test]
     fn parse_benzene_with_ring_nums() {
+        use std::collections::HashMap;
+
         let smiles = Smiles::from_str("C1=CC=CC=C1")
             .unwrap_or_else(|e| panic!("Failed to tokenize:\n{}", e.render("C1=CC=CC=C1")));
 
@@ -73,6 +75,7 @@ mod tests {
                 BondEdge::new(4, 5, Bond::Double, None),
                 BondEdge::new(5, 0, Bond::Single, Some(RingNum::try_new(1).unwrap())),
             ],
+            node_index_by_id: HashMap::from([(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]),
         };
 
         assert_eq!(smiles.nodes()[0], expected.atom_nodes[0]);
@@ -80,7 +83,10 @@ mod tests {
 
         assert_eq!(smiles.edges()[5], expected.bond_edges[5]);
         assert_eq!(smiles.edges()[5].ring_num_val(), Some(1));
+        assert_eq!(smiles.node_by_id(0), expected.node_by_id(0));
+        assert_eq!(smiles.node_by_id(5), expected.node_by_id(5));
     }
+
     #[test]
     fn from_str_propagates_token_iter_error() {
         let err = Smiles::from_str("Ac").expect_err("expected tokenization to fail");

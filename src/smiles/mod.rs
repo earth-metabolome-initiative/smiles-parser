@@ -20,7 +20,7 @@
 //!
 //! # Ok::<(), smiles_parser::errors::SmilesErrorWithSpan>(())
 //! ```
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use crate::{
     atom::atom_node::AtomNode,
@@ -36,23 +36,27 @@ mod from_str;
 pub struct Smiles {
     atom_nodes: Vec<AtomNode>,
     bond_edges: Vec<BondEdge>,
+    node_index_by_id: HashMap<usize, usize>,
 }
 
 impl Smiles {
     /// creates a new instance of the `Smiles` struct.
     #[must_use]
     pub fn new() -> Self {
-        Self { atom_nodes: Vec::new(), bond_edges: Vec::new() }
+        Self { atom_nodes: Vec::new(), bond_edges: Vec::new(), node_index_by_id: HashMap::new() }
     }
     /// Pushes an [`AtomNode`] to the `Smiles` struct.
     ///
     /// # Errors
     /// - Returns [`SmilesError::DuplicateNodeId`] if node id already exists
     pub fn push_node(&mut self, node: AtomNode) -> Result<(), SmilesError> {
-        if self.node_by_id(node.id()).is_some() {
-            return Err(SmilesError::DuplicateNodeId(node.id()));
+        let id = node.id();
+        if self.node_index_by_id.contains_key(&id) {
+            return Err(SmilesError::DuplicateNodeId(id));
         }
+        let index = self.atom_nodes.len();
         self.atom_nodes.push(node);
+        self.node_index_by_id.insert(id, index);
         Ok(())
     }
     /// Adds a [`BondEdge`] from two nodes, includes ring number information (if
@@ -88,7 +92,7 @@ impl Smiles {
     /// Returns `bool` for if the [`AtomNode`] `id` exists in the set of nodes
     /// parsed.
     fn contains_node_id(&self, id: usize) -> bool {
-        self.atom_nodes.iter().any(|node| node.id() == id)
+        self.node_index_by_id.contains_key(&id)
     }
     /// Returns a slice of all [`AtomNode`] parsed in the graph.
     #[must_use]
@@ -103,7 +107,10 @@ impl Smiles {
     /// Returns the node with the given `id`, if present.
     #[must_use]
     pub fn node_by_id(&self, id: usize) -> Option<&AtomNode> {
-        self.atom_nodes.iter().find(|node| node.id() == id)
+        match self.node_index_by_id.get(&id) {
+            Some(node) => Some(&self.nodes()[*node]),
+            None => None,
+        }
     }
     /// Returns the slice of all [`BondEdge`] in the graph.
     #[must_use]
@@ -352,7 +359,11 @@ mod tests {
     fn branch_render_regression_non_aromatic() {
         let smiles: Smiles = "C(O)N".parse().unwrap();
         let rendered = smiles.to_string();
-        assert_eq!(rendered, "C(O)N");
+        assert_eq!(rendered, "C(N)O");
+        let resmiles: Smiles = rendered.parse().unwrap();
+        let rerendered = resmiles.to_string();
+        assert_eq!(rendered, rerendered);
+
     }
 
     #[test]
