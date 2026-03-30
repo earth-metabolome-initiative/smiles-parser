@@ -35,9 +35,8 @@ fn documented_rdkit_sanitization_rejects_should_fail_here_too() {
     let mut unexpected_accepts = Vec::new();
 
     for input in RD_KIT_SANITIZATION_REJECTS {
-        match Smiles::from_str(&input) {
-            Ok(smiles) => unexpected_accepts.push(format!("{input:?} parsed as {}", smiles)),
-            Err(_) => {}
+        if let Ok(smiles) = Smiles::from_str(input) {
+            unexpected_accepts.push(format!("{input:?} parsed as {smiles}"));
         }
     }
 

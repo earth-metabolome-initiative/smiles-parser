@@ -377,6 +377,6 @@ mod tests {
         let input = "Ns((Ns(N)0N)N)0";
 
         let smiles = Smiles::from_str(input);
-        assert!(smiles.is_err())
+        assert!(smiles.is_err());
     }
 }

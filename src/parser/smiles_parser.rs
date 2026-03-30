@@ -242,14 +242,14 @@ impl ParserState {
         end: usize,
         next_token: Option<&TokenWithSpan>,
     ) -> Result<(), SmilesErrorWithSpan> {
-        if let Some(token) = next_token {
-            if token.token() == Token::LeftParentheses {
-                return Err(SmilesErrorWithSpan::new(
-                    SmilesError::UnexpectedLeftParentheses,
-                    start,
-                    end,
-                ));
-            }
+        if let Some(token) = next_token
+            && token.token() == Token::LeftParentheses
+        {
+            return Err(SmilesErrorWithSpan::new(
+                SmilesError::UnexpectedLeftParentheses,
+                start,
+                end,
+            ));
         }
         let Some(anchor) = self.last_atom() else {
             return Err(SmilesErrorWithSpan::new(
