@@ -51,3 +51,4 @@ assert_eq!(
 
 // You can also inspect the rendered graph again as a SMILES string.
 assert_eq!(smiles.render().unwrap(), "CCO");
+```
