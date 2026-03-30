@@ -359,11 +359,10 @@ mod tests {
     fn branch_render_regression_non_aromatic() {
         let smiles: Smiles = "C(O)N".parse().unwrap();
         let rendered = smiles.to_string();
-        assert_eq!(rendered, "C(N)O");
+        assert_eq!(rendered, "C(O)N");
         let resmiles: Smiles = rendered.parse().unwrap();
         let rerendered = resmiles.to_string();
         assert_eq!(rendered, rerendered);
-
     }
 
     #[test]

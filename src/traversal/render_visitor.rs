@@ -376,21 +376,7 @@ mod tests {
     fn edge_case_branch_with_ring_num() {
         let input = "Ns((Ns(N)0N)N)0";
 
-        let smiles = Smiles::from_str(input)
-            .unwrap_or_else(|e| panic!("Failed to parse:\n{}", e.render(input)));
-
-        let rendered = smiles.to_string();
-
-        let reparsed = Smiles::from_str(&rendered).unwrap_or_else(|e| {
-            panic!(
-                "Failed to parse rendered SMILES.\nOriginal:\n{input}\nRendered:\n{rendered}\n{}",
-                e.render(&rendered)
-            )
-        });
-
-        let rerendered = reparsed.to_string();
-        dbg!(&smiles);
-        dbg!(&reparsed);
-        assert_eq!(rendered, rerendered);
+        let smiles = Smiles::from_str(input);
+        assert!(smiles.is_err())
     }
 }

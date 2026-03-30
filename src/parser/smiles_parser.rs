@@ -240,7 +240,17 @@ impl ParserState {
         &mut self,
         start: usize,
         end: usize,
+        next_token: Option<&TokenWithSpan>,
     ) -> Result<(), SmilesErrorWithSpan> {
+        if let Some(token) = next_token {
+            if token.token() == Token::LeftParentheses {
+                return Err(SmilesErrorWithSpan::new(
+                    SmilesError::UnexpectedLeftParentheses,
+                    start,
+                    end,
+                ));
+            }
+        }
         let Some(anchor) = self.last_atom() else {
             return Err(SmilesErrorWithSpan::new(
                 SmilesError::UnexpectedLeftParentheses,
@@ -336,7 +346,6 @@ impl<'a> SmilesParser<'a> {
     pub fn peek_next(&self) -> Option<&TokenWithSpan> {
         self.tokens.get(self.position + 1)
     }
-
     /// Consumes and returns the next token
     pub fn next_token(&mut self) -> Option<&TokenWithSpan> {
         let token = self.tokens.get(self.position);
@@ -396,7 +405,7 @@ impl<'a> SmilesParser<'a> {
                     parser_state.validate_and_add_bond(start, end, bond)?;
                 }
                 Token::LeftParentheses => {
-                    parser_state.validate_branch_open(start, end)?;
+                    parser_state.validate_branch_open(start, end, self.peek_next())?;
                 }
                 Token::NonBond => {
                     parser_state.validate_all_closed()?;
@@ -892,7 +901,7 @@ mod tests {
         let mut state = ParserState::new();
         state.update_last_atom(Some(5));
 
-        state.validate_branch_open(1, 2).unwrap();
+        state.validate_branch_open(1, 2, None).unwrap();
         assert_eq!(state.branch_stack(), &[5]);
 
         state.validate_branch_close(2, 3).unwrap();
@@ -904,7 +913,7 @@ mod tests {
     fn parser_state_validate_branch_open_errors_without_anchor() {
         let mut state = ParserState::new();
 
-        let err = state.validate_branch_open(3, 4).expect_err("expected missing anchor");
+        let err = state.validate_branch_open(3, 4, None).expect_err("expected missing anchor");
 
         assert_eq!(err.smiles_error(), SmilesError::UnexpectedLeftParentheses);
         assert_eq!(err.start(), 3);
