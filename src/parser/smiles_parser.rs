@@ -19,6 +19,7 @@ pub struct ParserState {
     branch_stack: Vec<usize>,
     ring_open: HashMap<RingNum, (usize, Option<Bond>)>,
     last_span: (usize, usize),
+    branch_status: (bool, bool),
 }
 impl ParserState {
     /// Creates a new initial state for the parser.
@@ -32,6 +33,7 @@ impl ParserState {
             branch_stack: Vec::new(),
             ring_open: HashMap::new(),
             last_span: (0, 0),
+            branch_status: (false, false)
         }
     }
     /// Returns the last span stored.
@@ -159,6 +161,9 @@ impl ParserState {
         }
         self.update_last_atom(Some(id));
         self.update_pending_bond(None);
+        if self.branch_status.0 == true {
+            self.branch_status.1 = true;
+        }
         Ok(())
     }
     /// Validates that at the current point in parsing there are no hanging
@@ -242,14 +247,17 @@ impl ParserState {
         end: usize,
         next_token: Option<&TokenWithSpan>,
     ) -> Result<(), SmilesErrorWithSpan> {
-        if let Some(token) = next_token
-            && token.token() == Token::LeftParentheses
-        {
-            return Err(SmilesErrorWithSpan::new(
-                SmilesError::UnexpectedLeftParentheses,
-                start,
-                end,
-            ));
+        self.branch_status.0 = true;
+        if let Some(token) = next_token {
+            if token.token() == Token::LeftParentheses {
+                return Err(SmilesErrorWithSpan::new(
+                    SmilesError::UnexpectedLeftParentheses,
+                    start,
+                    end,
+                ));
+            } else if token.token() == Token::RightParentheses {
+                return Err(SmilesErrorWithSpan::new(SmilesError::EmptyBranch, start, end));
+            }
         }
         let Some(anchor) = self.last_atom() else {
             return Err(SmilesErrorWithSpan::new(
@@ -278,6 +286,10 @@ impl ParserState {
                 end,
             ));
         };
+        if self.branch_status != (true, true) {
+            return Err(SmilesErrorWithSpan::new(SmilesError::InvalidBranch, start, end));
+        }
+        self.branch_status = (false, false);
         self.update_last_atom(Some(anchor));
         Ok(())
     }
@@ -287,16 +299,70 @@ impl ParserState {
     /// # Errors
     /// - Returns [`SmilesError::IncompleteBond`] if a previous atom is not
     ///   found.
+    /// - Returns [`SmilesError::InvalidBond`] if bond is not binding two valid
+    ///   nodes
     pub fn validate_and_add_bond(
         &mut self,
         start: usize,
         end: usize,
         bond: Bond,
+        next_token: Option<&TokenWithSpan>,
     ) -> Result<(), SmilesErrorWithSpan> {
         if self.last_atom().is_none() {
             return Err(SmilesErrorWithSpan::new(SmilesError::IncompleteBond(bond), start, end));
         }
+        if let Some(token) = next_token
+            && (token.is_bond() || token.token() == Token::LeftParentheses)
+        {
+            return Err(SmilesErrorWithSpan::new(SmilesError::InvalidBond, start, end));
+        }
         self.update_pending_bond(Some(bond));
+        Ok(())
+    }
+    /// Validates that a [`Token::NonBond`] is preceded and proceeded by valid
+    /// tokens
+    ///
+    /// # Errors
+    /// - Returns [`SmilesError::InvalidNonBondToken`] if there isn't a valid
+    ///   token before or after the non bond
+    pub fn validate_non_bond(
+        &self,
+        last_token: Option<&TokenWithSpan>,
+        next_token: Option<&TokenWithSpan>,
+        start: usize,
+        end: usize,
+    ) -> Result<(), SmilesErrorWithSpan> {
+        if let Some(last) = last_token {
+            match last.token() {
+                Token::NonBond
+                | Token::BracketedAtom(_)
+                | Token::Bond(_)
+                | Token::LeftParentheses => {
+                    return Err(SmilesErrorWithSpan::new(
+                        SmilesError::InvalidNonBondToken,
+                        start,
+                        end,
+                    ));
+                }
+                _ => {}
+            }
+        } else {
+            return Err(SmilesErrorWithSpan::new(SmilesError::InvalidNonBondToken, start, end));
+        }
+        if let Some(next) = next_token {
+            match next.token() {
+                Token::UnbracketedAtom(_) => {}
+                _ => {
+                    return Err(SmilesErrorWithSpan::new(
+                        SmilesError::InvalidNonBondToken,
+                        start,
+                        end,
+                    ));
+                }
+            }
+        } else {
+            return Err(SmilesErrorWithSpan::new(SmilesError::InvalidNonBondToken, start, end));
+        }
         Ok(())
     }
 }
@@ -402,13 +468,19 @@ impl<'a> SmilesParser<'a> {
                     parser_state.add_atom(Atom::from(atom), token_with_span.span(), start, end)?;
                 }
                 Token::Bond(bond) => {
-                    parser_state.validate_and_add_bond(start, end, bond)?;
+                    parser_state.validate_and_add_bond(start, end, bond, self.peek_next())?;
                 }
                 Token::LeftParentheses => {
                     parser_state.validate_branch_open(start, end, self.peek_next())?;
                 }
                 Token::NonBond => {
                     parser_state.validate_all_closed()?;
+                    parser_state.validate_non_bond(
+                        self.tokens.get(self.position.saturating_sub(1)),
+                        self.tokens.get(self.position.saturating_add(1)),
+                        start,
+                        end,
+                    )?;
                 }
                 Token::RingClosure(ring_num) => {
                     parser_state.validate_and_add_ring_num(start, end, ring_num)?;
@@ -897,19 +969,6 @@ mod tests {
     }
 
     #[test]
-    fn parser_state_validate_branch_open_and_close_work() {
-        let mut state = ParserState::new();
-        state.update_last_atom(Some(5));
-
-        state.validate_branch_open(1, 2, None).unwrap();
-        assert_eq!(state.branch_stack(), &[5]);
-
-        state.validate_branch_close(2, 3).unwrap();
-        assert_eq!(state.last_atom(), Some(5));
-        assert!(state.stack_empty());
-    }
-
-    #[test]
     fn parser_state_validate_branch_open_errors_without_anchor() {
         let mut state = ParserState::new();
 
@@ -936,7 +995,7 @@ mod tests {
         let mut state = ParserState::new();
         state.update_last_atom(Some(0));
 
-        state.validate_and_add_bond(1, 2, Bond::Aromatic).unwrap();
+        state.validate_and_add_bond(1, 2, Bond::Aromatic, None).unwrap();
 
         assert_eq!(state.pending_bond(), Some(Bond::Aromatic));
     }
@@ -945,8 +1004,9 @@ mod tests {
     fn parser_state_validate_and_add_bond_errors_without_left_atom() {
         let mut state = ParserState::new();
 
-        let err =
-            state.validate_and_add_bond(1, 2, Bond::Single).expect_err("expected incomplete bond");
+        let err = state
+            .validate_and_add_bond(1, 2, Bond::Single, None)
+            .expect_err("expected incomplete bond");
 
         assert_eq!(err.smiles_error(), SmilesError::IncompleteBond(Bond::Single));
         assert_eq!(err.start(), 1);

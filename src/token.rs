@@ -63,6 +63,11 @@ impl TokenWithSpan {
     pub fn end(&self) -> usize {
         self.span.end
     }
+    /// Returns whether the token is a bond
+    #[must_use]
+    pub fn is_bond(&self) -> bool {
+        matches!(self.token, Token::Bond(_))
+    }
 }
 
 #[cfg(test)]

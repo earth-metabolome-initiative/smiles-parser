@@ -24,10 +24,17 @@ pub enum SmilesError {
     ElementRequiresBrackets,
     /// Wrapper for `element_rs` errors
     ElementsRs(elements_rs::errors::Error),
+    /// A branch without any nodes has been parsed
+    EmptyBranch,
     /// A bond was not able to bind two atoms
     IncompleteBond(Bond),
     /// Element forbidden to be written as aromatic here
     InvalidAromaticElement(Element),
+    /// A bond is not in a valid position, such as outside of a branch start or
+    /// next to another bond
+    InvalidBond,
+    /// A branch is invalid, missing an atom
+    InvalidBranch,
     /// Specified Chirality is not a valid form
     InvalidChirality,
     /// The class is not valid
@@ -90,13 +97,13 @@ impl fmt::Display for SmilesError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use SmilesError::{
             BondInBracket, ChargeOverflow, ChargeUnderflow, DuplicateEdge, DuplicateNodeId,
-            ElementRequiresBrackets, ElementsRs, IncompleteBond, IntegerOverflow,
-            InvalidAromaticElement, InvalidChirality, InvalidClass, InvalidElementName,
-            InvalidIsotope, InvalidNonBondToken, InvalidNumber, InvalidRingNumber,
-            InvalidUnbracketedAtom, MissingBracketElement, MissingElement, NodeIdInvalid,
-            NonBondInBracket, RingNumberOverflow, SelfLoopEdge, UnclosedBracket, UnclosedBranch,
-            UnclosedRing, UnexpectedBracketedState, UnexpectedCharacter, UnexpectedColon,
-            UnexpectedDash, UnexpectedEndOfString, UnexpectedLeftBracket,
+            ElementRequiresBrackets, ElementsRs, EmptyBranch, IncompleteBond, IntegerOverflow,
+            InvalidAromaticElement, InvalidBond, InvalidBranch, InvalidChirality, InvalidClass,
+            InvalidElementName, InvalidIsotope, InvalidNonBondToken, InvalidNumber,
+            InvalidRingNumber, InvalidUnbracketedAtom, MissingBracketElement, MissingElement,
+            NodeIdInvalid, NonBondInBracket, RingNumberOverflow, SelfLoopEdge, UnclosedBracket,
+            UnclosedBranch, UnclosedRing, UnexpectedBracketedState, UnexpectedCharacter,
+            UnexpectedColon, UnexpectedDash, UnexpectedEndOfString, UnexpectedLeftBracket,
             UnexpectedLeftParentheses, UnexpectedPercent, UnexpectedRightBracket,
             UnexpectedRightParentheses,
         };
@@ -142,6 +149,9 @@ impl fmt::Display for SmilesError {
             SelfLoopEdge(id) => {
                 write!(f, "Node: {id} has an edge that goes from itself and to itself")
             }
+            InvalidBond => write!(f, "A bond has been found in a non valid location"),
+            EmptyBranch => write!(f, "A branch without any nodes has been found"),
+            InvalidBranch => write!(f, "An invalid branch has been found"),
         }
     }
 }
