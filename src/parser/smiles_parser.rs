@@ -335,7 +335,6 @@ impl ParserState {
         if let Some(last) = last_token {
             match last.token() {
                 Token::NonBond
-                | Token::BracketedAtom(_)
                 | Token::Bond(_)
                 | Token::LeftParentheses => {
                     return Err(SmilesErrorWithSpan::new(
@@ -351,7 +350,7 @@ impl ParserState {
         }
         if let Some(next) = next_token {
             match next.token() {
-                Token::UnbracketedAtom(_) => {}
+                Token::UnbracketedAtom(_) | Token::BracketedAtom(_) => {}
                 _ => {
                     return Err(SmilesErrorWithSpan::new(
                         SmilesError::InvalidNonBondToken,
