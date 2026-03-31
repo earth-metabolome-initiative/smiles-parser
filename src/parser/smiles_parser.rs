@@ -22,9 +22,10 @@ pub struct ParserState {
     pending_bond: Option<Bond>,
     /// The stack of branch anchor atoms
     branch_stack: Vec<usize>,
-    /// A hashmap with the RingNum as the key and a tuple of the atom id and the bond (if present)
+    /// A hashmap with the RingNum as the key and a tuple of the atom id and the
+    /// bond (if present)
     ring_open: HashMap<RingNum, (usize, Option<Bond>)>,
-    /// The last used span 
+    /// The last used span
     last_span: (usize, usize),
 }
 impl ParserState {
@@ -287,7 +288,9 @@ impl ParserState {
                 end,
             ));
         };
-        if let Some(last_atom) = self.last_atom && last_atom == anchor{
+        if let Some(last_atom) = self.last_atom
+            && last_atom == anchor
+        {
             return Err(SmilesErrorWithSpan::new(SmilesError::InvalidBranch, start, end));
         }
         self.update_last_atom(Some(anchor));
@@ -334,9 +337,7 @@ impl ParserState {
     ) -> Result<(), SmilesErrorWithSpan> {
         if let Some(last) = last_token {
             match last.token() {
-                Token::NonBond
-                | Token::Bond(_)
-                | Token::LeftParentheses => {
+                Token::NonBond | Token::Bond(_) | Token::LeftParentheses => {
                     return Err(SmilesErrorWithSpan::new(
                         SmilesError::InvalidNonBondToken,
                         start,

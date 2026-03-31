@@ -1,3 +1,5 @@
 target/
 tests/CID-SMILES.gz
+tests/CID-SMILES
 .vscode/*
+fuzzer_pub_chem_corpus/

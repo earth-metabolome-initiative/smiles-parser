@@ -379,4 +379,17 @@ mod tests {
         let smiles = Smiles::from_str(input);
         assert!(smiles.is_err());
     }
+    #[test]
+    fn edge_case_large_oxygen_molecule() {
+        let source = "C(C(F)(F)I)(CC1=CC=CC=C1N=C=NC2=CC=CC=OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOF)(F)FOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOC2C";
+        let smiles = source.parse::<Smiles>();
+        let rerender = smiles.unwrap_or_else(|e| panic!("{}", e.render(source))).to_string();
+        let second_smiles = rerender.parse::<Smiles>();
+        let second_rerender =
+            second_smiles.unwrap_or_else(|e| panic!("{}", e.render(source))).to_string();
+        let third_smiles = second_rerender.parse::<Smiles>();
+        let third_rerender =
+            third_smiles.unwrap_or_else(|e| panic!("{}", e.render(source))).to_string();
+        assert_eq!(third_rerender, second_rerender);
+    }
 }

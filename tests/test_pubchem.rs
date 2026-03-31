@@ -11,7 +11,6 @@
 use std::{fs::File, io::BufReader};
 
 use csv::ReaderBuilder;
-use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::Deserialize;
 use smiles_parser::smiles::Smiles;
@@ -28,9 +27,8 @@ struct SmilesPubChemCompound {
 #[test]
 #[ignore = "This test downloads a ~6.79 GB file and is time-consuming."]
 fn validate_pubchem_smiles() -> Result<(), Box<dyn std::error::Error>> {
-    let file = File::open("tests/CID-SMILES.gz")?;
-    let decoder = GzDecoder::new(file);
-    let reader = BufReader::new(decoder);
+    let file = File::open("tests/CID-SMILES")?;
+    let reader = BufReader::new(file);
 
     let mut csv_reader =
         ReaderBuilder::new().delimiter(b'\t').has_headers(false).from_reader(reader);

@@ -13,3 +13,4 @@ fuzz_target!(|data: &str| {
         }
     }
 });
+
