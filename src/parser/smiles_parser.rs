@@ -12,14 +12,20 @@ use crate::{
 
 /// Structure containing parser state.
 pub struct ParserState {
+    /// The smiles struct being built
     smiles: Smiles,
+    /// The next available id to use
     next_id: usize,
+    /// The last seen atom if present  
     last_atom: Option<usize>,
+    /// A pending bond that needs to be connected to a second atom
     pending_bond: Option<Bond>,
+    /// The stack of branch anchor atoms
     branch_stack: Vec<usize>,
+    /// A hashmap with the RingNum as the key and a tuple of the atom id and the bond (if present)
     ring_open: HashMap<RingNum, (usize, Option<Bond>)>,
+    /// The last used span 
     last_span: (usize, usize),
-    branch_status: (bool, bool),
 }
 impl ParserState {
     /// Creates a new initial state for the parser.
@@ -33,7 +39,6 @@ impl ParserState {
             branch_stack: Vec::new(),
             ring_open: HashMap::new(),
             last_span: (0, 0),
-            branch_status: (false, false)
         }
     }
     /// Returns the last span stored.
@@ -161,9 +166,6 @@ impl ParserState {
         }
         self.update_last_atom(Some(id));
         self.update_pending_bond(None);
-        if self.branch_status.0 == true {
-            self.branch_status.1 = true;
-        }
         Ok(())
     }
     /// Validates that at the current point in parsing there are no hanging
@@ -247,7 +249,6 @@ impl ParserState {
         end: usize,
         next_token: Option<&TokenWithSpan>,
     ) -> Result<(), SmilesErrorWithSpan> {
-        self.branch_status.0 = true;
         if let Some(token) = next_token {
             if token.token() == Token::LeftParentheses {
                 return Err(SmilesErrorWithSpan::new(
@@ -286,10 +287,9 @@ impl ParserState {
                 end,
             ));
         };
-        if self.branch_status != (true, true) {
+        if let Some(last_atom) = self.last_atom && last_atom == anchor{
             return Err(SmilesErrorWithSpan::new(SmilesError::InvalidBranch, start, end));
         }
-        self.branch_status = (false, false);
         self.update_last_atom(Some(anchor));
         Ok(())
     }
