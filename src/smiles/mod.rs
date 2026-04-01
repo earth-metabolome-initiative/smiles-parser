@@ -444,4 +444,9 @@ mod tests {
         let err = "C12CCCCC12".parse::<Smiles>().expect_err("parallel edge should be invalid");
         assert_eq!(err.smiles_error(), SmilesError::InvalidRingNumber);
     }
+    #[test]
+    fn hydrogen_with_explicit_hydrogen_invalid() {
+        let invalid = "[HH]".parse::<Smiles>().expect_err("Hydrogens cannot have explicit hydrogens");
+        assert_eq!(invalid.smiles_error(), SmilesError::InvalidUnbracketedAtom(AtomSymbol::Element(Element::H)));
+    }
 }
