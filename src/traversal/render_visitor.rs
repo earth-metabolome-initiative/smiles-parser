@@ -387,9 +387,6 @@ mod tests {
         let second_smiles = rerender.parse::<Smiles>();
         let second_rerender =
             second_smiles.unwrap_or_else(|e| panic!("{}", e.render(source))).to_string();
-        let third_smiles = second_rerender.parse::<Smiles>();
-        let third_rerender =
-            third_smiles.unwrap_or_else(|e| panic!("{}", e.render(source))).to_string();
-        assert_eq!(third_rerender, second_rerender);
+        assert_eq!(rerender, second_rerender);
     }
 }
