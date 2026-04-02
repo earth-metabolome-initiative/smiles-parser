@@ -17,18 +17,8 @@ fn corpus_smiles() -> Vec<&'static str> {
     CORPUS.lines().map(str::trim).filter(|line| !line.is_empty()).collect()
 }
 
-fn benchmark_corpus() -> Vec<&'static str> {
-    corpus_smiles()
-        .into_iter()
-        // Keep the benchmark aligned with the parser's currently supported raw
-        // SMILES surface instead of panicking if the checked-in corpus drifts.
-        .filter(|smiles| Smiles::from_str(smiles).is_ok())
-        .collect()
-}
-
 fn bench_parse_only(c: &mut Criterion) {
-    let corpus = benchmark_corpus();
-    assert!(!corpus.is_empty(), "benchmark corpus should contain parsable SMILES");
+    let corpus = corpus_smiles();
     let mut group = c.benchmark_group("smiles_parse");
     group.throughput(Throughput::Elements(corpus.len() as u64));
 
@@ -47,11 +37,11 @@ fn bench_parse_only(c: &mut Criterion) {
 }
 
 fn bench_implicit_only(c: &mut Criterion) {
-    let parsed = benchmark_corpus()
-        .into_iter()
-        .map(|smiles| Smiles::from_str(smiles).expect("benchmark corpus was prevalidated"))
+    let corpus = corpus_smiles();
+    let parsed = corpus
+        .iter()
+        .map(|smiles| Smiles::from_str(smiles).expect("fixture should parse"))
         .collect::<Vec<_>>();
-    assert!(!parsed.is_empty(), "benchmark corpus should contain parsable SMILES");
 
     let mut group = c.benchmark_group("implicit_hydrogens");
     group.throughput(Throughput::Elements(parsed.len() as u64));

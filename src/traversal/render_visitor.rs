@@ -382,18 +382,11 @@ mod tests {
     #[test]
     fn edge_case_large_oxygen_molecule() {
         let source = "C(C(F)(F)I)(CC1=CC=CC=C1N=C=NC2=CC=CC=OOF)(F)FOOC2C";
-        let first_smiles = source.parse::<Smiles>();
-        let first_render =
-            first_smiles.unwrap_or_else(|e| panic!("{}", e.render(source))).to_string();
-        let second_smiles = first_render.parse::<Smiles>();
-        let second_render =
+        let smiles = source.parse::<Smiles>();
+        let rerender = smiles.unwrap_or_else(|e| panic!("{}", e.render(source))).to_string();
+        let second_smiles = rerender.parse::<Smiles>();
+        let second_rerender =
             second_smiles.unwrap_or_else(|e| panic!("{}", e.render(source))).to_string();
-        let third_smiles = second_render.parse::<Smiles>();
-        let third_render =
-            third_smiles.unwrap_or_else(|e| panic!("{}", e.render(source))).to_string();
-
-        // Rendering is not currently canonical in one pass for this graph, but
-        // it should converge to a stable equivalent encoding.
-        assert_eq!(second_render, third_render);
+        assert_eq!(rerender, second_rerender);
     }
 }
