@@ -30,6 +30,7 @@ use crate::{
 };
 
 mod from_str;
+mod implicit_hydrogens;
 
 /// Represents a parsed SMILES graph.
 #[derive(Debug, PartialEq)]
