@@ -9,7 +9,7 @@ description = "A SMILES parser in Rust"
 readme = "README.md"
 
 [dependencies]
-elements_rs = "0.1.1"
+elements_rs = "0.2.0"
 geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", branch = "main" }
 thiserror = "2.0.18"
 
