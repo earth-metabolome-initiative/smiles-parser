@@ -154,7 +154,7 @@ impl fmt::Display for SmilesError {
             InvalidBond => write!(f, "A bond has been found in a non valid location"),
             EmptyBranch => write!(f, "A branch without any nodes has been found"),
             InvalidBranch => write!(f, "An invalid branch has been found"),
-            InvalidHydrogenWithExplicitHydrogensFound => write!(f, "Hydrogen found as brackted atom with a listed explicit hydrogen count"),
+            InvalidHydrogenWithExplicitHydrogensFound => write!(f, "Hydrogen found as bracketed atom with a listed explicit hydrogen count"),
         }
     }
 }

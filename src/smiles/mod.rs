@@ -20,7 +20,7 @@
 //!
 //! # Ok::<(), smiles_parser::errors::SmilesErrorWithSpan>(())
 //! ```
-use std::{collections::HashMap, fmt};
+use std::fmt;
 
 use crate::{
     atom::atom_node::AtomNode,
@@ -36,14 +36,13 @@ mod from_str;
 pub struct Smiles {
     atom_nodes: Vec<AtomNode>,
     bond_edges: Vec<BondEdge>,
-    node_index_by_id: HashMap<usize, usize>,
 }
 
 impl Smiles {
     /// creates a new instance of the `Smiles` struct.
     #[must_use]
     pub fn new() -> Self {
-        Self { atom_nodes: Vec::new(), bond_edges: Vec::new(), node_index_by_id: HashMap::new() }
+        Self { atom_nodes: Vec::new(), bond_edges: Vec::new() }
     }
     /// Pushes an [`AtomNode`] to the `Smiles` struct.
     ///
@@ -51,12 +50,10 @@ impl Smiles {
     /// - Returns [`SmilesError::DuplicateNodeId`] if node id already exists
     pub fn push_node(&mut self, node: AtomNode) -> Result<(), SmilesError> {
         let id = node.id();
-        if self.node_index_by_id.contains_key(&id) {
+        if self.atom_nodes.get(id).is_some() {
             return Err(SmilesError::DuplicateNodeId(id));
         }
-        let index = self.atom_nodes.len();
         self.atom_nodes.push(node);
-        self.node_index_by_id.insert(id, index);
         Ok(())
     }
     /// Adds a [`BondEdge`] from two nodes, includes ring number information (if
@@ -92,7 +89,7 @@ impl Smiles {
     /// Returns `bool` for if the [`AtomNode`] `id` exists in the set of nodes
     /// parsed.
     fn contains_node_id(&self, id: usize) -> bool {
-        self.node_index_by_id.contains_key(&id)
+        self.atom_nodes.get(id).is_some()
     }
     /// Returns a slice of all [`AtomNode`] parsed in the graph.
     #[must_use]
@@ -107,10 +104,7 @@ impl Smiles {
     /// Returns the node with the given `id`, if present.
     #[must_use]
     pub fn node_by_id(&self, id: usize) -> Option<&AtomNode> {
-        match self.node_index_by_id.get(&id) {
-            Some(node) => Some(&self.nodes()[*node]),
-            None => None,
-        }
+        self.atom_nodes.get(id)
     }
     /// Returns the slice of all [`BondEdge`] in the graph.
     #[must_use]

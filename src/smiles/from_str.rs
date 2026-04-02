@@ -29,7 +29,6 @@ mod tests {
 
     #[test]
     fn parse_benzene_with_ring_nums() {
-        use std::collections::HashMap;
 
         let smiles = Smiles::from_str("C1=CC=CC=C1")
             .unwrap_or_else(|e| panic!("Failed to tokenize:\n{}", e.render("C1=CC=CC=C1")));
@@ -75,7 +74,6 @@ mod tests {
                 BondEdge::new(4, 5, Bond::Double, None),
                 BondEdge::new(5, 0, Bond::Single, Some(RingNum::try_new(1).unwrap())),
             ],
-            node_index_by_id: HashMap::from([(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]),
         };
 
         assert_eq!(smiles.nodes()[0], expected.atom_nodes[0]);
