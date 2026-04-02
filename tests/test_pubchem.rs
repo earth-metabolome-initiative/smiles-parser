@@ -73,7 +73,7 @@ fn validate_pubchem_smiles() -> Result<(), Box<dyn std::error::Error>> {
                 assert_eq!(smiles.edges().len(), reparsed.edges().len());
             }
 
-            Err(err) => {
+            Err(_) => {
                 let id = result.id;
                 // panic!("id: {}\n SMILES:\n{}", result.id, err.render(smiles_str))
                 rejects.push_str(&format!("{id}, {smiles_str}\n"));
