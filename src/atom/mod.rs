@@ -118,13 +118,12 @@ impl Atom {
             Self::Bracketed(bracket_atom) => bracket_atom.isotope(),
         }
     }
-    /// Returns the element parsed for the atom or None if the atom is a wildcard (*) 
+    /// Returns the element parsed for the atom or None if the atom is a
+    /// wildcard (*)
     #[must_use]
     pub fn element(&self) -> Option<Element> {
         match self {
-            Atom::Unbracketed(unbracketed_atom) => {
-                unbracketed_atom.element()
-            },
+            Atom::Unbracketed(unbracketed_atom) => unbracketed_atom.element(),
             Atom::Bracketed(bracket_atom) => bracket_atom.element(),
         }
     }

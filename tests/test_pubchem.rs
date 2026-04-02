@@ -8,7 +8,11 @@
 //! cargo test --release --test validate_pubchem_smiles
 //! ```
 
-use std::{fs::File, io::{BufReader, Write}};
+use std::{
+    fmt::Write as _,
+    fs::File,
+    io::{BufReader, Write},
+};
 
 use csv::ReaderBuilder;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -51,34 +55,32 @@ fn validate_pubchem_smiles() -> Result<(), Box<dyn std::error::Error>> {
         }
         let smiles_str = &result.smiles;
         let smiles = smiles_str.parse::<Smiles>();
-        match smiles {
-            Ok(smiles) => {
-                let rendered = smiles.render().unwrap_or_else(|e| {
-                    panic!(
-                        "Failed to render SMILES.\nRecord: {}\nPubChem ID: {}\nOriginal:\n{}\n{:?}",
-                        count, result.id, smiles_str, e
-                    )
-                });
+        if let Ok(smiles) = smiles {
+            let rendered = smiles.render().unwrap_or_else(|e| {
+                panic!(
+                    "Failed to render SMILES.\nRecord: {}\nPubChem ID: {}\nOriginal:\n{}\n{:?}",
+                    count, result.id, smiles_str, e
+                )
+            });
 
-                let reparsed = rendered.parse::<Smiles>().unwrap_or_else(|e| {
-                    panic!(
-                        "Failed to parse rendered SMILES.\nPubChem ID: {}\nOriginal:\n{}\nRendered:\n{}\n{}",
-                        result.id,
-                        smiles_str,
-                        rendered,
-                        e.render(&rendered)
-                    )
-                });
-                assert_eq!(smiles.nodes().len(), reparsed.nodes().len());
-                assert_eq!(smiles.edges().len(), reparsed.edges().len());
-            }
-
-            Err(_) => {
-                let id = result.id;
-                // panic!("id: {}\n SMILES:\n{}", result.id, err.render(smiles_str))
-                rejects.push_str(&format!("{id}, {smiles_str}\n"));
-                //rejects.push(format!("id: {} SMILES:\n{}\n", result.id, smiles_str));
-            },
+            let reparsed = rendered.parse::<Smiles>().unwrap_or_else(|e| {
+                panic!(
+                    "Failed to parse rendered SMILES.\nPubChem ID: {}\nOriginal:\n{}\nRendered:\n{}\n{}",
+                    result.id,
+                    smiles_str,
+                    rendered,
+                    e.render(&rendered)
+                )
+            });
+            assert_eq!(smiles.nodes().len(), reparsed.nodes().len());
+            assert_eq!(smiles.edges().len(), reparsed.edges().len());
+        } else {
+            let id = result.id;
+            // panic!("id: {}\n SMILES:\n{}", result.id, err.render(smiles_str))
+            writeln!(&mut rejects, "{id}, {smiles_str}")
+                .expect("writing to String should not fail");
+            // rejects.push(format!("id: {} SMILES:\n{}\n", result.id,
+            // smiles_str));
         }
     }
     let mut file = File::create("invalid_hydrogens.csv")?;

@@ -161,8 +161,14 @@ impl ParserState {
         let id = self.next_id();
         self.increment_next_id();
         let node = AtomNode::new(atom, id, token_span);
-        if matches!(node.atom().element(), Some(Element::H)) && node.atom().hydrogen_count() > Some(0) {
-            return Err(SmilesErrorWithSpan::new(SmilesError::InvalidHydrogenWithExplicitHydrogensFound, start, end));
+        if matches!(node.atom().element(), Some(Element::H))
+            && node.atom().hydrogen_count() > Some(0)
+        {
+            return Err(SmilesErrorWithSpan::new(
+                SmilesError::InvalidHydrogenWithExplicitHydrogensFound,
+                start,
+                end,
+            ));
         }
         self.push_node(node).map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
         if let Some(prev) = self.last_atom() {

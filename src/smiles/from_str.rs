@@ -29,7 +29,6 @@ mod tests {
 
     #[test]
     fn parse_benzene_with_ring_nums() {
-
         let smiles = Smiles::from_str("C1=CC=CC=C1")
             .unwrap_or_else(|e| panic!("Failed to tokenize:\n{}", e.render("C1=CC=CC=C1")));
 
