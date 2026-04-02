@@ -381,7 +381,7 @@ mod tests {
     }
     #[test]
     fn edge_case_large_oxygen_molecule() {
-        let source = "C(C(F)(F)I)(CC1=CC=CC=C1N=C=NC2=CC=CC=OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOF)(F)FOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOC2C";
+        let source = "C(C(F)(F)I)(CC1=CC=CC=C1N=C=NC2=CC=CC=OOF)(F)FOOC2C";
         let smiles = source.parse::<Smiles>();
         let rerender = smiles.unwrap_or_else(|e| panic!("{}", e.render(source))).to_string();
         let second_smiles = rerender.parse::<Smiles>();

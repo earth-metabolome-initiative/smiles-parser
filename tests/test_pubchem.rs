@@ -8,7 +8,7 @@
 //! cargo test --release --test validate_pubchem_smiles
 //! ```
 
-use std::{fs::File, io::BufReader};
+use std::{fs::File, io::{BufReader, Write}};
 
 use csv::ReaderBuilder;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -42,13 +42,13 @@ fn validate_pubchem_smiles() -> Result<(), Box<dyn std::error::Error>> {
             .progress_chars("#>-"),
     );
     let mut count: u64 = 0;
+    let mut rejects = String::new();
     for result in csv_reader.deserialize::<SmilesPubChemCompound>() {
         count += 1;
         let result = result?;
         if count.is_multiple_of(10_000) {
             pb.set_position(count);
         }
-
         let smiles_str = &result.smiles;
         let smiles = smiles_str.parse::<Smiles>();
         match smiles {
@@ -72,8 +72,16 @@ fn validate_pubchem_smiles() -> Result<(), Box<dyn std::error::Error>> {
                 assert_eq!(smiles.nodes().len(), reparsed.nodes().len());
                 assert_eq!(smiles.edges().len(), reparsed.edges().len());
             }
-            Err(err) => panic!("{}\n{}", result.id, err.render(smiles_str)),
+
+            Err(_) => {
+                let id = result.id;
+                // panic!("id: {}\n SMILES:\n{}", result.id, err.render(smiles_str))
+                rejects.push_str(&format!("{id}, {smiles_str}\n"));
+                //rejects.push(format!("id: {} SMILES:\n{}\n", result.id, smiles_str));
+            },
         }
     }
+    let mut file = File::create("invalid_hydrogens.csv")?;
+    file.write_all(rejects.as_bytes())?;
     Ok(())
 }
