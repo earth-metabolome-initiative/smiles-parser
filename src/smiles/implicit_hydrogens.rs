@@ -176,11 +176,7 @@ fn target_valence(element: Element, explicit_valence: u8) -> Option<u8> {
 /// `H0` unless an explicit hydrogen count is written.
 #[inline]
 fn aromatic_implicit_hydrogens(element: Element, explicit_valence: u8) -> u8 {
-    match element {
-        Element::C => 3_u8.saturating_sub(explicit_valence),
-        Element::B | Element::N | Element::O | Element::P | Element::S => 0,
-        _ => 0,
-    }
+    if element == Element::C { 3_u8.saturating_sub(explicit_valence) } else { 0 }
 }
 
 #[cfg(test)]

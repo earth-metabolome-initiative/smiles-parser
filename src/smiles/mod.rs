@@ -447,7 +447,11 @@ mod tests {
     }
     #[test]
     fn hydrogen_with_explicit_hydrogen_invalid() {
-        let invalid = "[HH]".parse::<Smiles>().expect_err("Hydrogens cannot have explicit hydrogens");
-        assert_eq!(invalid.smiles_error(), SmilesError::InvalidUnbracketedAtom(AtomSymbol::Element(Element::H)));
+        let invalid =
+            "[HH]".parse::<Smiles>().expect_err("Hydrogens cannot have explicit hydrogens");
+        assert_eq!(
+            invalid.smiles_error(),
+            SmilesError::InvalidUnbracketedAtom(AtomSymbol::Element(Element::H))
+        );
     }
 }

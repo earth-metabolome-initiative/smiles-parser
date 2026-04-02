@@ -30,7 +30,7 @@ fn bench_parse_only(c: &mut Criterion) {
                 atom_total += parsed.nodes().len();
             }
             black_box(atom_total)
-        })
+        });
     });
 
     group.finish();
@@ -55,7 +55,7 @@ fn bench_implicit_only(c: &mut Criterion) {
                 hydrogen_total += black_box(per_molecule_total);
             }
             black_box(hydrogen_total)
-        })
+        });
     });
 
     group.finish();
