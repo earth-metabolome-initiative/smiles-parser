@@ -722,7 +722,6 @@ C(CO)C(C(=O)O)N
 C1=CC(=C(C=C1O)CC(=O)O)O
 C(#N)S
 C(CC(=O)O)C1C(=O)NC(=O)N1
-[HH]
 OO
 C1=CC(=CC=C1O)O
 CC(=CCOP(=O)(O)OP(=O)(O)O)CO
