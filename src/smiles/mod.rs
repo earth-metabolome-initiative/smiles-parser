@@ -30,6 +30,7 @@ use crate::{
 };
 
 mod from_str;
+mod implicit_hydrogens;
 
 /// Represents a parsed SMILES graph.
 #[derive(Debug, PartialEq)]
@@ -442,9 +443,6 @@ mod tests {
     fn hydrogen_with_explicit_hydrogen_invalid() {
         let invalid =
             "[HH]".parse::<Smiles>().expect_err("Hydrogens cannot have explicit hydrogens");
-        assert_eq!(
-            invalid.smiles_error(),
-            SmilesError::InvalidHydrogenWithExplicitHydrogensFound
-        );
+        assert_eq!(invalid.smiles_error(), SmilesError::InvalidHydrogenWithExplicitHydrogensFound);
     }
 }

@@ -9,7 +9,7 @@ description = "A SMILES parser in Rust"
 readme = "README.md"
 
 [dependencies]
-elements_rs = "0.1.1"
+elements_rs = "0.2.0"
 geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", branch = "main" }
 thiserror = "2.0.18"
 
@@ -44,8 +44,20 @@ clone_on_copy = "forbid"
 pedantic = { level = "deny", priority = -1 }
 
 
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[profile.bench]
+inherits = "release"
+
 [dev-dependencies]
+criterion = "0.8.2"
 csv = "1.4.0"
 flate2 = "1.1.9"
 indicatif = "0.18.4"
 serde = "1.0.228"
+
+[[bench]]
+name = "smiles_bench"
+harness = false

@@ -41,7 +41,8 @@ pub enum SmilesError {
     InvalidClass,
     /// Error indicating invalid Element name
     InvalidElementName(char),
-    /// A hydrogen has been specified as a bracketed atom and has explicit hydrogens listed
+    /// A hydrogen has been specified as a bracketed atom and has explicit
+    /// hydrogens listed
     InvalidHydrogenWithExplicitHydrogensFound,
     /// Invalid Isotope value passed
     InvalidIsotope,
@@ -101,13 +102,13 @@ impl fmt::Display for SmilesError {
             BondInBracket, ChargeOverflow, ChargeUnderflow, DuplicateEdge, DuplicateNodeId,
             ElementRequiresBrackets, ElementsRs, EmptyBranch, IncompleteBond, IntegerOverflow,
             InvalidAromaticElement, InvalidBond, InvalidBranch, InvalidChirality, InvalidClass,
-            InvalidElementName, InvalidIsotope, InvalidNonBondToken, InvalidNumber,
-            InvalidRingNumber, InvalidUnbracketedAtom, MissingBracketElement, MissingElement,
-            NodeIdInvalid, NonBondInBracket, RingNumberOverflow, SelfLoopEdge, UnclosedBracket,
-            UnclosedBranch, UnclosedRing, UnexpectedBracketedState, UnexpectedCharacter,
-            UnexpectedColon, UnexpectedDash, UnexpectedEndOfString, UnexpectedLeftBracket,
-            UnexpectedLeftParentheses, UnexpectedPercent, UnexpectedRightBracket,
-            UnexpectedRightParentheses, InvalidHydrogenWithExplicitHydrogensFound,
+            InvalidElementName, InvalidHydrogenWithExplicitHydrogensFound, InvalidIsotope,
+            InvalidNonBondToken, InvalidNumber, InvalidRingNumber, InvalidUnbracketedAtom,
+            MissingBracketElement, MissingElement, NodeIdInvalid, NonBondInBracket,
+            RingNumberOverflow, SelfLoopEdge, UnclosedBracket, UnclosedBranch, UnclosedRing,
+            UnexpectedBracketedState, UnexpectedCharacter, UnexpectedColon, UnexpectedDash,
+            UnexpectedEndOfString, UnexpectedLeftBracket, UnexpectedLeftParentheses,
+            UnexpectedPercent, UnexpectedRightBracket, UnexpectedRightParentheses,
         };
         match self {
             MissingElement => write!(f, "Missing element"),
@@ -154,7 +155,9 @@ impl fmt::Display for SmilesError {
             InvalidBond => write!(f, "A bond has been found in a non valid location"),
             EmptyBranch => write!(f, "A branch without any nodes has been found"),
             InvalidBranch => write!(f, "An invalid branch has been found"),
-            InvalidHydrogenWithExplicitHydrogensFound => write!(f, "Hydrogen found as bracketed atom with a listed explicit hydrogen count"),
+            InvalidHydrogenWithExplicitHydrogensFound => {
+                write!(f, "Hydrogen found as bracketed atom with a listed explicit hydrogen count")
+            }
         }
     }
 }

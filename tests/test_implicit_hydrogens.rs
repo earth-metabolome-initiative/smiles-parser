@@ -1,0 +1,84 @@
+//! Fixture-backed TDD scaffold for implicit hydrogen counting.
+//!
+//! The immediate target is the local SMILES rule set:
+//! - unbracketed organic-subset atoms
+//! - bracket atoms defaulting to zero implicit hydrogens
+//! - explicit bracket hydrogens never double-counted as implicit
+//!
+//! Aromatic cases are included separately because they need an aromatic policy
+//! layer in addition to the raw valence ranges from `elements-rs`.
+//!
+//! The fixtures are intentionally split into:
+//! - OpenSMILES / Daylight local-rule cases
+//! - raw-RDKit-compatibility cases for unsanitized SMILES input
+//! - aromatic token cases that are still local, but not purely periodic-table
+//!   lookups
+
+mod common;
+
+use std::str::FromStr;
+
+use common::implicit_hydrogen_cases::{
+    AROMATIC_CASES, ImplicitHydrogenCase, ORGANIC_SUBSET_CASES, RAW_RDKIT_COMPAT_CASES, all_cases,
+};
+use smiles_parser::smiles::Smiles;
+
+#[test]
+fn implicit_hydrogen_fixtures_match_current_parser_node_order() {
+    for case in all_cases() {
+        let smiles = Smiles::from_str(case.smiles).unwrap_or_else(|err| {
+            panic!("fixture {} failed to parse:\n{}", case.name, err.render(case.smiles))
+        });
+
+        let actual_labels =
+            smiles.nodes().iter().map(|node| node.atom().to_string()).collect::<Vec<_>>();
+        let expected_labels = case.atoms.iter().map(|atom| atom.atom).collect::<Vec<_>>();
+
+        assert_eq!(
+            actual_labels.len(),
+            case.atoms.len(),
+            "fixture {} has the wrong atom count for {}\nnote: {}",
+            case.name,
+            case.smiles,
+            case.note
+        );
+
+        assert_eq!(
+            actual_labels, expected_labels,
+            "fixture {} does not match the parser node order for {}\nnote: {}",
+            case.name, case.smiles, case.note
+        );
+    }
+}
+
+#[test]
+fn organic_subset_implicit_hydrogens_match_fixture() {
+    assert_cases_match_expected(ORGANIC_SUBSET_CASES);
+}
+
+#[test]
+fn raw_rdkit_compat_implicit_hydrogens_match_fixture() {
+    assert_cases_match_expected(RAW_RDKIT_COMPAT_CASES);
+}
+
+#[test]
+fn aromatic_implicit_hydrogens_match_fixture() {
+    assert_cases_match_expected(AROMATIC_CASES);
+}
+
+fn assert_cases_match_expected(cases: &[ImplicitHydrogenCase]) {
+    for case in cases {
+        let smiles = Smiles::from_str(case.smiles).unwrap_or_else(|err| {
+            panic!("fixture {} failed to parse:\n{}", case.name, err.render(case.smiles))
+        });
+
+        let actual = smiles.implicit_hydrogen_counts();
+        let expected = case.atoms.iter().map(|atom| atom.implicit_hydrogens).collect::<Vec<_>>();
+
+        assert_eq!(
+            actual, expected,
+            "implicit hydrogen mismatch for fixture {} ({})\nnote: {}",
+            case.name, case.smiles, case.note
+        );
+    }
+}
