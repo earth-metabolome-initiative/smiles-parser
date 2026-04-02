@@ -74,6 +74,14 @@ fn dfs<V: Visitor>(
         }
     }
 
+    // Prefer a leaf-like continuation edge when multiple choices exist. This
+    // keeps render output stable for graphs where one root-adjacent edge is
+    // also reachable through a later cycle closure.
+    unvisited_bonds.sort_by_key(|(_, _, other_id)| {
+        let degree = adjacency.get(other_id).map_or(0, Vec::len);
+        (degree == 1, *other_id)
+    });
+
     if let Some((main_edge_index, main_bond, main_other_id)) = unvisited_bonds.pop() {
         for (branch_edge_index, branch_bond, branch_other_id) in unvisited_bonds {
             if visited_nodes.contains(&branch_other_id) {
