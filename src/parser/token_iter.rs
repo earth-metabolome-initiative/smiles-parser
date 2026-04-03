@@ -374,7 +374,12 @@ fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
             match stream.peek_char() {
                 Some('-') => {
                     stream.chars.next();
-                    Charge::try_new(-2)
+                    let mut num = -2;
+                    while matches!(stream.peek_char(), Some('-')) {
+                        num -= 1;
+                        stream.chars.next();
+                    }
+                    Charge::try_new(num)
                 }
                 _ => {
                     if let Some(possible_num) = try_fold_number::<i8, 2>(stream) {
@@ -390,7 +395,12 @@ fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
             match stream.peek_char() {
                 Some('+') => {
                     stream.chars.next();
-                    Charge::try_new(2)
+                    let mut num = 2;
+                    while matches!(stream.peek_char(), Some('+')) {
+                        num += 1;
+                        stream.chars.next();
+                    }
+                    Charge::try_new(num)
                 }
                 _ => {
                     if let Some(possible_num) = try_fold_number::<i8, 2>(stream) {
@@ -400,7 +410,8 @@ fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
                     }
                 }
             }
-        }
+        },
+        todo!()
         _ => Ok(Charge::default()),
     }
 }
@@ -789,4 +800,33 @@ mod tests {
         let token = next_ok("[C@TH1]");
         assert!(matches!(token.token(), Token::BracketedAtom(_)));
     }
+    #[test]
+fn test_charge_parsing() {
+    // Define test cases with expected charge parsing behavior
+    let test_cases = vec![
+        ("[Fe+++]", 3),  // Fe with +3 charge
+        ("[Fe-1]", -1),  // Fe with -1 charge
+        ("[Fe+]", 1),    // Fe with +1 charge
+        ("[Fe2+]", 2),   // Fe with +2 charge
+        ("[Fe-2]", -2),  // Fe with -2 charge
+    ];
+
+    for (smiles, expected_charge) in test_cases {
+        let tokens: Vec<Result<TokenWithSpan, SmilesErrorWithSpan>> = TokenIter::from(smiles).collect();
+        for token in tokens {
+            match token {
+                Ok(token_with_span) => {
+                    let possible_atom = token_with_span.token();
+                    match possible_atom{
+                        Token::BracketedAtom(atom) => {
+                            assert_eq!(atom.charge_value(), expected_charge)
+                        },
+                        _ => panic!("Token: {:?} should be a bracketed atom!", possible_atom)
+                    }
+                },
+                Err(e) => panic!("{e} in {smiles}"),
+            }
+        }
+    }
+}
 }
