@@ -837,9 +837,9 @@ mod tests {
                         let possible_atom = token_with_span.token();
                         match possible_atom {
                             Token::BracketedAtom(atom) => {
-                                assert_eq!(atom.charge_value(), expected_charge)
+                                assert_eq!(atom.charge_value(), expected_charge);
                             }
-                            _ => panic!("Token: {:?} should be a bracketed atom!", possible_atom),
+                            _ => panic!("Token: {possible_atom:?} should be a bracketed atom!"),
                         }
                     }
                     Err(e) => panic!("{e} in {smiles}"),
@@ -872,9 +872,9 @@ mod tests {
                     Ok(token_with_span) => {
                         match token_with_span.token() {
                             Token::BracketedAtom(atom) => {
-                                assert_eq!(atom.charge_value(), expected_charge)
+                                assert_eq!(atom.charge_value(), expected_charge);
                             }
-                            other => panic!("Token {:?} should be a bracketed atom!", other),
+                            other => panic!("Token {other:?} should be a bracketed atom!"),
                         }
                     }
                     Err(e) => panic!("{e} in {smiles}"),
