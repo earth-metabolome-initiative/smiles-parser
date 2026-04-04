@@ -23,6 +23,8 @@
 //! (`MolFromSmiles(..., sanitize=False)` followed by `UpdatePropertyCache`
 //! with `strict=False`) for SMILES-as-written input.
 
+use alloc::vec::Vec;
+
 use elements_rs::{AllowedValences, ChargedValences, Element};
 
 use super::Smiles;

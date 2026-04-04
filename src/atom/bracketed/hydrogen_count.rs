@@ -1,7 +1,7 @@
 //! Module for specifying the total number of hydrogens a `SMILES` string
 //! specifies
 
-use std::fmt;
+use core::fmt;
 
 #[derive(Copy, Default, Debug, PartialEq, Clone, Eq, Hash)]
 /// Designates the hydrogen count (explicit only). Currently Hydrogen count has
@@ -44,6 +44,8 @@ impl fmt::Display for HydrogenCount {
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::{String, ToString};
+
     use crate::atom::bracketed::hydrogen_count::HydrogenCount;
 
     #[test]

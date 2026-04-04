@@ -40,6 +40,8 @@ impl fmt::Display for Bond {
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::ToString;
+
     use crate::bond::Bond;
 
     #[test]

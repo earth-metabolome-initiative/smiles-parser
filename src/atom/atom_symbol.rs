@@ -65,6 +65,8 @@ impl fmt::Display for AtomSymbol {
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::ToString;
+
     use elements_rs::Element;
 
     use crate::atom::atom_symbol::AtomSymbol;

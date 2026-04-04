@@ -4,7 +4,9 @@
 pub mod charge;
 pub mod chirality;
 pub mod hydrogen_count;
-use std::fmt;
+
+use alloc::string::ToString;
+use core::fmt;
 
 use elements_rs::{Element, Isotope};
 
@@ -223,6 +225,8 @@ impl fmt::Display for BracketAtom {
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::ToString;
+
     use elements_rs::Element;
 
     use super::BracketAtom;

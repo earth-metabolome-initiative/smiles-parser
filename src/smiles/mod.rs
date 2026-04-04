@@ -9,6 +9,8 @@
 //! into a SMILES string.
 //!
 //! ```rust
+//! use core::str::FromStr;
+//!
 //! use smiles_parser::prelude::Smiles;
 //!
 //! let source = "CC";
@@ -20,7 +22,8 @@
 //!
 //! # Ok::<(), smiles_parser::errors::SmilesErrorWithSpan>(())
 //! ```
-use std::fmt;
+use alloc::{string::String, vec::Vec};
+use core::fmt;
 
 use crate::{
     atom::atom_node::AtomNode,
@@ -174,6 +177,7 @@ impl fmt::Display for Smiles {
 
 #[cfg(test)]
 mod tests {
+    use alloc::{string::ToString, vec::Vec};
     use std::str::FromStr;
 
     use elements_rs::Element;

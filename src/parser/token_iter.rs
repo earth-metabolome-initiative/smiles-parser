@@ -1,7 +1,11 @@
 //! Submodule creating the `TokenIter` struct, which is an iterator over
 //! the `Token`s found in a provided string.
 
-use std::str::FromStr;
+use alloc::{format, string::ToString};
+use core::{
+    iter::Peekable,
+    str::{CharIndices, FromStr},
+};
 
 use elements_rs::Element;
 
@@ -21,7 +25,7 @@ use crate::{
 /// An iterator over the tokens found in a SMILES string.
 pub struct TokenIter<'a> {
     /// The peekable `Chars` with `Indices` iterator
-    chars: std::iter::Peekable<std::str::CharIndices<'a>>,
+    chars: Peekable<CharIndices<'a>>,
     /// Denotes whether currently inside brackets
     in_bracket: bool,
     /// The length of the input
@@ -498,6 +502,8 @@ fn try_bond(char: char, bracket: bool) -> Result<Token, SmilesError> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec::Vec;
+
     use elements_rs::Element;
 
     use super::*;

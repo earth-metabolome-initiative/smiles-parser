@@ -1,6 +1,6 @@
 //! Module for bonds as edges for a graph structure
 
-use std::fmt;
+use core::fmt;
 
 use crate::bond::{Bond, ring_num::RingNum};
 
@@ -87,6 +87,8 @@ impl fmt::Display for BondEdge {
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::ToString;
+
     use crate::bond::{Bond, bond_edge::BondEdge, ring_num::RingNum};
 
     #[test]

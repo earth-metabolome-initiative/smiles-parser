@@ -23,7 +23,7 @@ This parser was designed by following the [OpenSMILES specification](http://open
 ## Example Usage
 
 ```rust
-use std::str::FromStr;
+use core::str::FromStr;
 
 use smiles_parser::smiles::Smiles;
 

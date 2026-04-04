@@ -1,4 +1,5 @@
-use std::str::FromStr;
+use alloc::vec::Vec;
+use core::str::FromStr;
 
 use super::Smiles;
 use crate::{
@@ -17,6 +18,7 @@ impl FromStr for Smiles {
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::ToString;
     use std::str::FromStr;
 
     use elements_rs::Element;
