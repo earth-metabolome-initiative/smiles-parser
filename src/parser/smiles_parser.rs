@@ -1,6 +1,7 @@
 //! Second pass that parses the [`TokenWithSpan`]
 
-use std::{collections::HashMap, ops::Range};
+use alloc::{collections::BTreeMap, vec::Vec};
+use core::ops::Range;
 
 use elements_rs::Element;
 
@@ -26,7 +27,7 @@ pub struct ParserState {
     branch_stack: Vec<usize>,
     /// A hashmap with the RingNum as the key and a tuple of the atom id and the
     /// bond (if present)
-    ring_open: HashMap<RingNum, (usize, Option<Bond>)>,
+    ring_open: BTreeMap<RingNum, (usize, Option<Bond>)>,
     /// The last used span
     last_span: (usize, usize),
 }
@@ -40,7 +41,7 @@ impl ParserState {
             last_atom: None,
             pending_bond: None,
             branch_stack: Vec::new(),
-            ring_open: HashMap::new(),
+            ring_open: BTreeMap::new(),
             last_span: (0, 0),
         }
     }
@@ -516,6 +517,8 @@ fn default_bond(smiles: &Smiles, id_a: usize, id_b: usize) -> Bond {
 
 #[cfg(test)]
 mod tests {
+    use alloc::{string::ToString, vec::Vec};
+
     use elements_rs::Element;
 
     use crate::{

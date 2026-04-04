@@ -1,6 +1,12 @@
 //! Module rendering a SMILES string from the [`Smiles`] graph
 
-use std::collections::HashMap;
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::cmp::Ordering;
 
 use crate::{
     bond::{Bond, bond_edge::BondEdge, ring_num::RingNum},
@@ -16,10 +22,10 @@ pub struct RenderVisitor {
     /// is an optional node id for sections that are nodes.
     sections: Vec<(String, Option<usize>)>,
     /// Maps each node ID to its index in `sections`.
-    node_section_index: HashMap<usize, usize>,
+    node_section_index: BTreeMap<usize, usize>,
     /// Maps each ring label to the section index where its most recent
     /// ring-closure interval ended.
-    label_last_end: HashMap<u8, usize>,
+    label_last_end: BTreeMap<u8, usize>,
 }
 
 impl RenderVisitor {
@@ -28,8 +34,8 @@ impl RenderVisitor {
     pub fn new() -> Self {
         Self {
             sections: Vec::new(),
-            node_section_index: HashMap::new(),
-            label_last_end: HashMap::new(),
+            node_section_index: BTreeMap::new(),
+            label_last_end: BTreeMap::new(),
         }
     }
     /// Builds and returns the string from the section's `String` value
@@ -117,16 +123,16 @@ impl Visitor for RenderVisitor {
             Bond::Down => format!("\\{ring_text}"),
         };
         match start_index.cmp(&end_index) {
-            std::cmp::Ordering::Less => {
+            Ordering::Less => {
                 let (left, right) = self.sections.split_at_mut(end_index);
                 left[start_index].0.push_str(&ring_text);
                 right[0].0.push_str(&closure_text);
             }
-            std::cmp::Ordering::Equal => {
+            Ordering::Equal => {
                 self.sections[start_index].0.push_str(&ring_text);
                 self.sections[start_index].0.push_str(&closure_text);
             }
-            std::cmp::Ordering::Greater => {
+            Ordering::Greater => {
                 let (left, right) = self.sections.split_at_mut(start_index);
                 left[end_index].0.push_str(&closure_text);
                 right[0].0.push_str(&ring_text);
@@ -190,7 +196,8 @@ fn should_render_single(smiles: &Smiles, bond_edge: BondEdge) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, str::FromStr};
+    use alloc::string::ToString;
+    use std::{collections::BTreeMap, str::FromStr};
 
     use elements_rs::Element;
 
@@ -226,8 +233,8 @@ mod tests {
                 ("=".to_string(), None),
                 ("O".to_string(), Some(1)),
             ],
-            node_section_index: HashMap::new(),
-            label_last_end: HashMap::new(),
+            node_section_index: BTreeMap::new(),
+            label_last_end: BTreeMap::new(),
         };
 
         assert_eq!(visitor.into_string(), "C=O");

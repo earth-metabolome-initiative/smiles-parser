@@ -1,9 +1,9 @@
 //! Module for mapping and validating a ring marker
-use std::fmt;
+use core::fmt;
 
 use crate::errors::SmilesError;
 
-#[derive(Copy, Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Copy, Debug, PartialEq, PartialOrd, Clone, Eq, Ord, Hash)]
 /// Represents a ring marker and implements tighter bounds for the minimal and
 /// maximal value a ring marker can be
 pub struct RingNum(u8);
@@ -32,6 +32,8 @@ impl fmt::Display for RingNum {
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::ToString;
+
     use crate::{bond::ring_num::RingNum, errors::SmilesError};
     #[test]
     fn test_ring_num_try_new_bounds() -> Result<(), SmilesError> {
