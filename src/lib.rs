@@ -1,4 +1,12 @@
+#![no_std]
 #![doc = include_str!("../README.md")]
+
+#[allow(unused_imports)]
+#[macro_use]
+extern crate alloc;
+#[cfg(test)]
+#[macro_use]
+extern crate std;
 
 pub mod atom;
 pub mod bond;

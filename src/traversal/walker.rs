@@ -1,6 +1,9 @@
 //! Module for walking the [`Smiles`] graph and tracking progress
 
-use std::collections::{HashMap, HashSet};
+use alloc::{
+    collections::{BTreeMap, BTreeSet},
+    vec::Vec,
+};
 
 use crate::{
     bond::bond_edge::BondEdge, errors::SmilesError, smiles::Smiles,
@@ -13,10 +16,10 @@ use crate::{
 /// - Will return [`SmilesError::NodeIdInvalid`] if a node is unable to be found
 pub fn walk<V: Visitor>(smiles: &Smiles, visitor: &mut V) -> Result<(), SmilesError> {
     // Each key is a node ID and value is the list of incident edge indices.
-    let mut adjacency: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut adjacency: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
     build_adjacency(&mut adjacency, smiles.edges());
-    let mut visited_nodes: HashSet<usize> = HashSet::new();
-    let mut visited_edges: HashSet<usize> = HashSet::new();
+    let mut visited_nodes: BTreeSet<usize> = BTreeSet::new();
+    let mut visited_edges: BTreeSet<usize> = BTreeSet::new();
     let mut component_index = 0;
 
     for node in smiles.nodes() {
@@ -31,7 +34,7 @@ pub fn walk<V: Visitor>(smiles: &Smiles, visitor: &mut V) -> Result<(), SmilesEr
     Ok(())
 }
 
-fn build_adjacency(adjacency: &mut HashMap<usize, Vec<usize>>, edges: &[BondEdge]) {
+fn build_adjacency(adjacency: &mut BTreeMap<usize, Vec<usize>>, edges: &[BondEdge]) {
     for (index, edge) in edges.iter().enumerate() {
         let node_a = edge.node_a();
         let node_b = edge.node_b();
@@ -44,9 +47,9 @@ fn dfs<V: Visitor>(
     smiles: &Smiles,
     visitor: &mut V,
     current_id: usize,
-    visited_nodes: &mut HashSet<usize>,
-    visited_edges: &mut HashSet<usize>,
-    adjacency: &HashMap<usize, Vec<usize>>,
+    visited_nodes: &mut BTreeSet<usize>,
+    visited_edges: &mut BTreeSet<usize>,
+    adjacency: &BTreeMap<usize, Vec<usize>>,
 ) -> Result<(), SmilesError> {
     if !visited_nodes.insert(current_id) {
         return Ok(());
@@ -55,7 +58,7 @@ fn dfs<V: Visitor>(
     visitor.enter_node(smiles, current_id)?;
 
     let mut unvisited_bonds = Vec::new();
-    let mut queued_neighbors = HashSet::new();
+    let mut queued_neighbors = BTreeSet::new();
 
     if let Some(bond_indices) = adjacency.get(&current_id) {
         for bond_index in bond_indices {

@@ -258,12 +258,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34aa73646ffb006b8f5147f3dc182bd4bcb190227ce861fc4a4844bf8e3cb2c0"
 
 [[package]]
-name = "fallible-iterator"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2acce4a10f12dc2fb14a218589d4f1f62ef011b2d0cc4b3cb1bba8e94da14649"
-
-[[package]]
 name = "find-msvc-tools"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -277,17 +271,6 @@ checksum = "843fba2746e448b37e26a819579957415c8cef339bf08564fe8b7ddbd959573c"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
-]
-
-[[package]]
-name = "geometric-traits"
-version = "0.1.0"
-source = "git+https://github.com/earth-metabolome-initiative/geometric-traits?branch=main#b4b55cb80b20cedc1f977f7abe9f45b6852ee502"
-dependencies = [
- "lender",
- "multi_ranged",
- "num-traits",
- "thiserror",
 ]
 
 [[package]]
@@ -346,28 +329,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lender"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c150e24afda8f769930a339cb5ad6e182101fdf1165c30c157b33ce5050fd7ad"
-dependencies = [
- "fallible-iterator",
- "lender-derive",
- "stable_try_trait_v2",
-]
-
-[[package]]
-name = "lender-derive"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "556faf0c9adb22669a5f9f6b4ed804c8048d205dcd00fadd463affbb02931d26"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.182"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -387,17 +348,6 @@ checksum = "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316"
 dependencies = [
  "adler2",
  "simd-adler32",
-]
-
-[[package]]
-name = "multi_ranged"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9809fbd1a12e6b2303cedb9bff55196574b4d0c9b40209ba0d39aa1bb780cc69"
-dependencies = [
- "num-traits",
- "serde",
- "thiserror",
 ]
 
 [[package]]
@@ -616,17 +566,10 @@ dependencies = [
  "csv",
  "elements_rs",
  "flate2",
- "geometric-traits",
  "indicatif",
  "serde",
  "thiserror",
 ]
-
-[[package]]
-name = "stable_try_trait_v2"
-version = "1.75.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c4e48411f4db8ccca0470bfb67e3bb821af4227d455aa147917d8d109be0d13"
 
 [[package]]
 name = "strum"

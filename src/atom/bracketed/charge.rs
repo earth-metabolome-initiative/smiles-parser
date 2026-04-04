@@ -1,5 +1,5 @@
 //! Module for validating a charge on an atom
-use std::fmt;
+use core::fmt;
 
 use crate::errors::SmilesError;
 
@@ -44,6 +44,7 @@ impl fmt::Display for Charge {
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::{String, ToString};
     use std::panic::catch_unwind;
 
     use super::Charge;

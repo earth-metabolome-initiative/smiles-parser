@@ -4,7 +4,7 @@ pub mod atom_symbol;
 pub mod bracketed;
 pub mod unbracketed;
 
-use std::fmt;
+use core::fmt;
 
 use elements_rs::{Element, Isotope};
 
@@ -140,6 +140,8 @@ impl fmt::Display for Atom {
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::ToString;
+
     use elements_rs::Element;
 
     use super::*;

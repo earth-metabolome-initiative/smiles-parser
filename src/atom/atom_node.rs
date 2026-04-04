@@ -1,6 +1,6 @@
 //! Module for the structure of an atom as a node for use in a `Smiles` graph
 
-use std::{fmt, ops::Range};
+use core::{fmt, ops::Range};
 
 use crate::atom::Atom;
 /// Contains information about atom parsed from the SMILES string
@@ -45,7 +45,8 @@ impl fmt::Display for AtomNode {
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Range;
+    use alloc::string::ToString;
+    use core::ops::Range;
 
     use elements_rs::Element;
 

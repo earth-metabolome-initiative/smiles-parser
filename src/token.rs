@@ -1,6 +1,6 @@
 //! Represents tokens used in parsing SMILES strings.
 
-use std::ops::Range;
+use core::ops::Range;
 
 use crate::{
     atom::{bracketed::BracketAtom, unbracketed::UnbracketedAtom},

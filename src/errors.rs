@@ -1,171 +1,141 @@
 //! Defines errors used in the SMILES parser.
 
-use core::fmt;
-use std::{num::TryFromIntError, ops::Range};
+use alloc::{format, string::String};
+use core::{fmt, num::TryFromIntError, ops::Range};
 
 use elements_rs::Element;
+use thiserror::Error;
 
 use crate::{atom::atom_symbol::AtomSymbol, bond::Bond};
 
 /// The errors that could occur during SMILES parsing.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Error)]
 pub enum SmilesError {
     /// Bond Inside Bracket
+    #[error("Bond in bracket: {0}")]
     BondInBracket(Bond),
     /// A charge is over the allowed maximum (15)
+    #[error("Charge overflow: {0}")]
     ChargeOverflow(i8),
     /// A charge is below allowed minimum (-15)
+    #[error("Charge underflow: {0}")]
     ChargeUnderflow(i8),
     /// A Duplicate [`crate::atom::atom_node::AtomNode`] id was found
+    #[error("Node ID: {0} duplicated")]
     DuplicateNodeId(usize),
     /// A duplicate edge between two nodes has been found
+    #[error("Node A: {0} has multiple edges with Node B: {1}")]
     DuplicateEdge(usize, usize),
     /// A non bare element found outside of brackets
+    #[error("Element requires brackets")]
     ElementRequiresBrackets,
     /// Wrapper for `element_rs` errors
-    ElementsRs(elements_rs::errors::Error),
+    #[error("Error Parsing Element: {0}")]
+    ElementsRs(#[from] elements_rs::errors::Error),
     /// A branch without any nodes has been parsed
+    #[error("A branch without any nodes has been found")]
     EmptyBranch,
     /// A bond was not able to bind two atoms
+    #[error("Bond: {0} missing Atom Node(s)")]
     IncompleteBond(Bond),
     /// Element forbidden to be written as aromatic here
+    #[error("Invalid aromatic element: {0}")]
     InvalidAromaticElement(Element),
     /// A bond is not in a valid position, such as outside of a branch start or
     /// next to another bond
+    #[error("A bond has been found in a non valid location")]
     InvalidBond,
     /// A branch is invalid, missing an atom
+    #[error("An invalid branch has been found")]
     InvalidBranch,
     /// Specified Chirality is not a valid form
+    #[error("Invalid chirality")]
     InvalidChirality,
     /// The class is not valid
+    #[error("Invalid class")]
     InvalidClass,
     /// Error indicating invalid Element name
+    #[error("Invalid element name: {0}")]
     InvalidElementName(char),
     /// A hydrogen has been specified as a bracketed atom and has explicit
     /// hydrogens listed
+    #[error("Hydrogen found as bracketed atom with a listed explicit hydrogen count")]
     InvalidHydrogenWithExplicitHydrogensFound,
     /// Invalid Isotope value passed
+    #[error("Invalid isotope")]
     InvalidIsotope,
     /// Invalid `Token::NonBond`
+    #[error("Invalid Non-bond '.' found")]
     InvalidNonBondToken,
     /// Error indicating that an invalid number was encountered.
+    #[error("Invalid number")]
     InvalidNumber,
     /// Integer Overflow
+    #[error("Integer overflow")]
     IntegerOverflow,
     /// Non organic element found out of bracket
+    #[error("Invalid unbracketed atom: {0}")]
     InvalidUnbracketedAtom(AtomSymbol),
     /// An invalid ring number has been found
+    #[error("Invalid ring number")]
     InvalidRingNumber,
     /// found `[..]` that did not contain an element
+    #[error("Missing element inside brackets")]
     MissingBracketElement,
     /// Missing Element
+    #[error("Missing element")]
     MissingElement,
     /// Node id does not point to a valid `AtomNode`
+    #[error("Invalid Atom Node ID: {0}")]
     NodeIdInvalid(usize),
     /// Non Bond in Bracket
+    #[error("Non-bond '.' in bracket")]
     NonBondInBracket,
     /// Ring Number Overflow (greater than 99)
+    #[error("Ring number overflow: {0}")]
     RingNumberOverflow(u8),
     /// An edge connects a node to itself
+    #[error("Node: {0} has an edge that goes from itself and to itself")]
     SelfLoopEdge(usize),
     /// Unexpectedly inside of brackets
+    #[error("Unexpected bracketed state")]
     UnexpectedBracketedState,
     /// Unexpected end of string
+    #[error("Unexpected end of string")]
     UnexpectedEndOfString,
     /// Error indicating that an unexpected character was encountered.
+    #[error("Unexpected character: {0}")]
     UnexpectedCharacter(char),
     /// An unexpected `:` has been found
+    #[error("Unexpected ':'")]
     UnexpectedColon,
     /// An unexpected `-` has been found
+    #[error("Unexpected '-'")]
     UnexpectedDash,
     /// An unexpected `%` has been found
+    #[error("Unexpected '%'")]
     UnexpectedPercent,
     /// An unexpected left bracket `[` was found
+    #[error("Unexpected '['")]
     UnexpectedLeftBracket,
     /// A `(` that wasn't expected has been found
+    #[error("Unexpected '('")]
     UnexpectedLeftParentheses,
     /// An unexpected right bracket `]` was found
+    #[error("Unexpected ']'")]
     UnexpectedRightBracket,
     /// An unexpected right parentheses `)` was found
+    #[error("Unexpected `)`")]
     UnexpectedRightParentheses,
     /// A closing `]` bracket was not found
+    #[error("Unclosed '['")]
     UnclosedBracket,
     /// A branch has not been closed with a `)`
+    #[error("Branch not closed")]
     UnclosedBranch,
     /// A ring number has been found that was not completed
+    #[error("Ring not closed")]
     UnclosedRing,
-}
-
-impl fmt::Display for SmilesError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use SmilesError::{
-            BondInBracket, ChargeOverflow, ChargeUnderflow, DuplicateEdge, DuplicateNodeId,
-            ElementRequiresBrackets, ElementsRs, EmptyBranch, IncompleteBond, IntegerOverflow,
-            InvalidAromaticElement, InvalidBond, InvalidBranch, InvalidChirality, InvalidClass,
-            InvalidElementName, InvalidHydrogenWithExplicitHydrogensFound, InvalidIsotope,
-            InvalidNonBondToken, InvalidNumber, InvalidRingNumber, InvalidUnbracketedAtom,
-            MissingBracketElement, MissingElement, NodeIdInvalid, NonBondInBracket,
-            RingNumberOverflow, SelfLoopEdge, UnclosedBracket, UnclosedBranch, UnclosedRing,
-            UnexpectedBracketedState, UnexpectedCharacter, UnexpectedColon, UnexpectedDash,
-            UnexpectedEndOfString, UnexpectedLeftBracket, UnexpectedLeftParentheses,
-            UnexpectedPercent, UnexpectedRightBracket, UnexpectedRightParentheses,
-        };
-        match self {
-            MissingElement => write!(f, "Missing element"),
-            InvalidIsotope => write!(f, "Invalid isotope"),
-            InvalidElementName(c) => write!(f, "Invalid element name: {c}"),
-            InvalidNumber => write!(f, "Invalid number"),
-            UnexpectedCharacter(c) => write!(f, "Unexpected character: {c}"),
-            UnexpectedLeftBracket => write!(f, "Unexpected '['"),
-            UnexpectedRightBracket => write!(f, "Unexpected ']'"),
-            UnclosedBracket => write!(f, "Unclosed '['"),
-            ElementRequiresBrackets => write!(f, "Element requires brackets"),
-            MissingBracketElement => write!(f, "Missing element inside brackets"),
-            InvalidAromaticElement(e) => write!(f, "Invalid aromatic element: {e}"),
-            IntegerOverflow => write!(f, "Integer overflow"),
-            RingNumberOverflow(n) => write!(f, "Ring number overflow: {n}"),
-            ChargeUnderflow(c) => write!(f, "Charge underflow: {c}"),
-            ChargeOverflow(c) => write!(f, "Charge overflow: {c}"),
-            BondInBracket(b) => write!(f, "Bond in bracket: {b}"),
-            NonBondInBracket => write!(f, "Non-bond '.' in bracket"),
-            InvalidChirality => write!(f, "Invalid chirality"),
-            UnexpectedEndOfString => write!(f, "Unexpected end of string"),
-            InvalidClass => write!(f, "Invalid class"),
-            InvalidUnbracketedAtom(a) => write!(f, "Invalid unbracketed atom: {a}"),
-            UnexpectedBracketedState => write!(f, "Unexpected bracketed state"),
-            UnexpectedDash => write!(f, "Unexpected '-'"),
-            UnexpectedColon => write!(f, "Unexpected ':'"),
-            UnexpectedPercent => write!(f, "Unexpected '%'"),
-            InvalidRingNumber => write!(f, "Invalid ring number"),
-            ElementsRs(error) => write!(f, "Error Parsing Element: {error}"),
-            InvalidNonBondToken => write!(f, "Invalid Non-bond '.' found"),
-            NodeIdInvalid(n) => write!(f, "Invalid Atom Node ID: {n}"),
-            IncompleteBond(bond) => write!(f, "Bond: {bond} missing Atom Node(s)"),
-            UnexpectedLeftParentheses => write!(f, "Unexpected '('"),
-            UnclosedBranch => write!(f, "Branch not closed"),
-            UnclosedRing => write!(f, "Ring not closed"),
-            UnexpectedRightParentheses => write!(f, "Unexpected `)`"),
-            DuplicateNodeId(id) => write!(f, "Node ID: {id} duplicated"),
-            DuplicateEdge(id_a, id_b) => {
-                write!(f, "Node A: {id_a} has multiple edges with Node B: {id_b}")
-            }
-            SelfLoopEdge(id) => {
-                write!(f, "Node: {id} has an edge that goes from itself and to itself")
-            }
-            InvalidBond => write!(f, "A bond has been found in a non valid location"),
-            EmptyBranch => write!(f, "A branch without any nodes has been found"),
-            InvalidBranch => write!(f, "An invalid branch has been found"),
-            InvalidHydrogenWithExplicitHydrogensFound => {
-                write!(f, "Hydrogen found as bracketed atom with a listed explicit hydrogen count")
-            }
-        }
-    }
-}
-
-impl From<elements_rs::errors::Error> for SmilesError {
-    fn from(e: elements_rs::errors::Error) -> Self {
-        SmilesError::ElementsRs(e)
-    }
 }
 
 impl From<TryFromIntError> for SmilesError {
@@ -236,6 +206,7 @@ impl fmt::Display for SmilesErrorWithSpan {
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::ToString;
     use std::num::TryFromIntError;
 
     use elements_rs::Element;

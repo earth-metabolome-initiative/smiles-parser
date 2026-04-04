@@ -1,5 +1,6 @@
 //! Module for containing an organic element that occurs outside of brackets
 //! `[]`: `B, C, N, O, P, S, F, Cl, Br, I, *`.
+use alloc::string::ToString;
 use core::fmt;
 
 use elements_rs::Element;
@@ -56,6 +57,8 @@ impl fmt::Display for UnbracketedAtom {
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::ToString;
+
     use elements_rs::Element;
 
     use crate::atom::{atom_symbol::AtomSymbol, unbracketed::UnbracketedAtom};
