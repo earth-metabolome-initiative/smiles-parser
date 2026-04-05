@@ -1,4 +1,7 @@
 # SMILES-parser
+[![Rust CI](https://github.com/earth-metabolome-initiative/smiles-parser/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/earth-metabolome-initiative/smiles-parser/actions/workflows/rust.yml)
+[![codecov](https://codecov.io/gh/earth-metabolome-initiative/smiles-parser/graph/badge.svg)](https://codecov.io/gh/earth-metabolome-initiative/smiles-parser)
+
 A parser that checks the validity of SMILES strings and converts them into molecular graph representations.
 
 ## Parsing Specification
