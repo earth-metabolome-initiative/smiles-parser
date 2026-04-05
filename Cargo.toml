@@ -57,6 +57,8 @@ criterion = "0.8.2"
 csv = "1.4.0"
 flate2 = "1.1.9"
 indicatif = "0.18.4"
+rayon = "1.11.0"
+reqwest = { version = "0.12.24", default-features = false, features = ["blocking", "rustls-tls"] }
 serde = "1.0.228"
 
 [[bench]]
