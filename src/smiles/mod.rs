@@ -339,6 +339,16 @@ mod tests {
     }
 
     #[test]
+    fn hydrogen_with_single_explicit_hydrogen_is_accepted_for_compatibility() {
+        let smiles: Smiles = "[HH]".parse().expect("[HH] should be accepted for compatibility");
+        assert_eq!(smiles.nodes().len(), 1);
+        assert_eq!(smiles.number_of_bonds(), 0);
+        assert_eq!(smiles.nodes()[0].element(), Some(Element::H));
+        assert_eq!(smiles.nodes()[0].hydrogen_count(), 1);
+        assert_eq!(smiles.to_string(), "[HH]");
+    }
+
+    #[test]
     fn hydrogen_with_more_than_one_explicit_hydrogen_stays_invalid() {
         let invalid =
             "[HH2]".parse::<Smiles>().expect_err("Hydrogens cannot have explicit hydrogens > 1");

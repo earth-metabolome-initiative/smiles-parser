@@ -17,6 +17,9 @@ const SMILES_WITH_BRACKETS: &[&str] = &[
     "[14cH]1ccccc1",
     "[14c@H]1ccccc1",
     "[2H]C(Cl)(Cl)Cl",
+    "[HH]",
+    "[HH-]",
+    "[3HH]",
     "[C@@H](C)(N)C(=O)O",
     "C[C@H](N)C(=O)O",
     "OC(=O)[C@@H](N)C",
@@ -76,4 +79,21 @@ fn test_smiles_tokens_water() {
     assert_eq!(atom.class(), 0);
     assert_eq!(atom.chirality(), None);
     assert_eq!(atom.isotope_mass_number(), None);
+}
+
+#[test]
+fn test_hydrogen_hcount_compatibility_cases() {
+    for source in ["[HH]", "[HH1]", "[HH-]", "[3HH]"] {
+        let smiles =
+            Smiles::from_str(source).unwrap_or_else(|_| panic!("Failed to parse {source}"));
+        assert_eq!(smiles.nodes().len(), 1);
+        assert_eq!(smiles.nodes()[0].element(), Some(elements_rs::Element::H));
+        assert_eq!(smiles.nodes()[0].hydrogen_count(), 1);
+    }
+}
+
+#[test]
+fn test_hydrogen_hcount_gt_one_stays_invalid() {
+    let err = Smiles::from_str("[HH2]").unwrap_err();
+    assert_eq!(err.smiles_error(), SmilesError::InvalidHydrogenWithExplicitHydrogensFound);
 }

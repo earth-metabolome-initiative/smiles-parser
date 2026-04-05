@@ -54,9 +54,8 @@ pub enum SmilesError {
     /// Error indicating invalid Element name
     #[error("Invalid element name: {0}")]
     InvalidElementName(char),
-    /// A hydrogen has been specified as a bracketed atom and has explicit
-    /// hydrogens listed
-    #[error("Hydrogen found as bracketed atom with a listed explicit hydrogen count")]
+    /// A hydrogen bracket atom has an unsupported explicit hydrogen count
+    #[error("Hydrogen found as bracketed atom with an unsupported explicit hydrogen count")]
     InvalidHydrogenWithExplicitHydrogensFound,
     /// Invalid Isotope value passed
     #[error("Invalid isotope")]

@@ -189,7 +189,7 @@ impl ParserState {
         end: usize,
     ) -> Result<(), SmilesErrorWithSpan> {
         let id = self.atom_nodes.len();
-        if matches!(atom.element(), Some(Element::H)) && atom.hydrogen_count() > 0 {
+        if matches!(atom.element(), Some(Element::H)) && atom.hydrogen_count() > 1 {
             return Err(SmilesErrorWithSpan::new(
                 SmilesError::InvalidHydrogenWithExplicitHydrogensFound,
                 start,
