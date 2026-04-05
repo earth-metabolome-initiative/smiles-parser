@@ -20,9 +20,6 @@ pub enum SmilesError {
     /// A charge is below allowed minimum (-15)
     #[error("Charge underflow: {0}")]
     ChargeUnderflow(i8),
-    /// A Duplicate [`crate::atom::atom_node::AtomNode`] id was found
-    #[error("Node ID: {0} duplicated")]
-    DuplicateNodeId(usize),
     /// A duplicate edge between two nodes has been found
     #[error("Node A: {0} has multiple edges with Node B: {1}")]
     DuplicateEdge(usize, usize),
@@ -36,7 +33,7 @@ pub enum SmilesError {
     #[error("A branch without any nodes has been found")]
     EmptyBranch,
     /// A bond was not able to bind two atoms
-    #[error("Bond: {0} missing Atom Node(s)")]
+    #[error("Bond: {0} missing atom index(es)")]
     IncompleteBond(Bond),
     /// Element forbidden to be written as aromatic here
     #[error("Invalid aromatic element: {0}")]
@@ -57,9 +54,8 @@ pub enum SmilesError {
     /// Error indicating invalid Element name
     #[error("Invalid element name: {0}")]
     InvalidElementName(char),
-    /// A hydrogen has been specified as a bracketed atom and has explicit
-    /// hydrogens listed
-    #[error("Hydrogen found as bracketed atom with a listed explicit hydrogen count")]
+    /// A hydrogen bracket atom has an unsupported explicit hydrogen count
+    #[error("Hydrogen found as bracketed atom with an unsupported explicit hydrogen count")]
     InvalidHydrogenWithExplicitHydrogensFound,
     /// Invalid Isotope value passed
     #[error("Invalid isotope")]
@@ -85,8 +81,8 @@ pub enum SmilesError {
     /// Missing Element
     #[error("Missing element")]
     MissingElement,
-    /// Node id does not point to a valid `AtomNode`
-    #[error("Invalid Atom Node ID: {0}")]
+    /// Node id does not point to a valid atom in the graph
+    #[error("Invalid atom index: {0}")]
     NodeIdInvalid(usize),
     /// Non Bond in Bracket
     #[error("Non-bond '.' in bracket")]
@@ -106,6 +102,9 @@ pub enum SmilesError {
     /// Error indicating that an unexpected character was encountered.
     #[error("Unexpected character: {0}")]
     UnexpectedCharacter(char),
+    /// Error indicating that unexpected unicode input was encountered.
+    #[error("Unexpected unicode character")]
+    UnexpectedUnicodeCharacter,
     /// An unexpected `:` has been found
     #[error("Unexpected ':'")]
     UnexpectedColon,
@@ -228,7 +227,6 @@ mod tests {
             ),
             (SmilesError::ChargeOverflow(50), "Charge overflow: 50".to_string()),
             (SmilesError::ChargeUnderflow(-50), "Charge underflow: -50".to_string()),
-            (SmilesError::DuplicateNodeId(2), "Node ID: 2 duplicated".to_string()),
             (SmilesError::ElementRequiresBrackets, "Element requires brackets".to_string()),
             (
                 SmilesError::ElementsRs(elements_rs_error),
@@ -236,7 +234,7 @@ mod tests {
             ),
             (
                 SmilesError::IncompleteBond(Bond::Aromatic),
-                format!("Bond: {} missing Atom Node(s)", Bond::Aromatic),
+                format!("Bond: {} missing atom index(es)", Bond::Aromatic),
             ),
             (
                 SmilesError::InvalidAromaticElement(Element::Ac),
@@ -256,12 +254,13 @@ mod tests {
             (SmilesError::InvalidRingNumber, "Invalid ring number".to_string()),
             (SmilesError::MissingBracketElement, "Missing element inside brackets".to_string()),
             (SmilesError::MissingElement, "Missing element".to_string()),
-            (SmilesError::NodeIdInvalid(2), "Invalid Atom Node ID: 2".to_string()),
+            (SmilesError::NodeIdInvalid(2), "Invalid atom index: 2".to_string()),
             (SmilesError::NonBondInBracket, "Non-bond '.' in bracket".to_string()),
             (SmilesError::RingNumberOverflow(100), "Ring number overflow: 100".to_string()),
             (SmilesError::UnexpectedBracketedState, "Unexpected bracketed state".to_string()),
             (SmilesError::UnexpectedEndOfString, "Unexpected end of string".to_string()),
             (SmilesError::UnexpectedCharacter('$'), "Unexpected character: $".to_string()),
+            (SmilesError::UnexpectedUnicodeCharacter, "Unexpected unicode character".to_string()),
             (SmilesError::UnexpectedColon, "Unexpected ':'".to_string()),
             (SmilesError::UnexpectedDash, "Unexpected '-'".to_string()),
             (SmilesError::UnexpectedPercent, "Unexpected '%'".to_string()),
@@ -315,5 +314,17 @@ mod tests {
         assert_eq!(error.to_string(), "Unexpected character: $ at 2..3");
 
         assert_eq!(error.render("CC$O"), "CC$O\n  ^\nUnexpected character: $");
+    }
+
+    #[test]
+    fn test_smiles_error_with_unicode_span() {
+        let error = SmilesErrorWithSpan::new(SmilesError::UnexpectedUnicodeCharacter, 2, 4);
+
+        assert_eq!(error.smiles_error(), SmilesError::UnexpectedUnicodeCharacter);
+        assert_eq!(error.start(), 2);
+        assert_eq!(error.end(), 4);
+        assert_eq!(error.span(), (2..4));
+
+        assert_eq!(error.to_string(), "Unexpected unicode character at 2..4");
     }
 }

@@ -2,9 +2,7 @@
 
 use std::str::FromStr;
 
-use smiles_parser::{
-    bond::Bond, errors::SmilesErrorWithSpan, parser::token_iter::TokenIter, smiles::Smiles,
-};
+use smiles_parser::{bond::Bond, smiles::Smiles};
 const SMILES_STR: &[&str] = &[
     "C1=CC=CC=C1",
     "[OH2]",
@@ -43,20 +41,7 @@ const SMILES_STR: &[&str] = &[
 ];
 
 #[test]
-fn test_tokenizer() {
-    for &s in SMILES_STR {
-        let _tokens = TokenIter::from(s)
-            .collect::<Result<Vec<_>, SmilesErrorWithSpan>>()
-            .unwrap_or_else(|e| panic!("Failed to tokenize:\n{}", e.render(s)));
-    }
-}
-
-#[test]
 fn test_parser_all_inputs() {
-    use std::str::FromStr;
-
-    use smiles_parser::smiles::Smiles;
-
     for &s in SMILES_STR {
         Smiles::from_str(s).unwrap_or_else(|e| panic!("Failed to parse:\n{}", e.render(s)));
     }
@@ -64,33 +49,25 @@ fn test_parser_all_inputs() {
 
 #[test]
 fn test_parse_benzene_graph_shape() {
-    use std::str::FromStr;
-
-    use smiles_parser::smiles::Smiles;
-
     let line = SMILES_STR[0];
     let smiles =
         Smiles::from_str(line).unwrap_or_else(|e| panic!("Failed to parse:\n{}", e.render(line)));
 
     assert_eq!(smiles.nodes().len(), 6);
-    assert_eq!(smiles.edges().len(), 6);
-    assert!(smiles.nodes().iter().all(|n| !n.atom().aromatic()));
+    assert_eq!(smiles.number_of_bonds(), 6);
+    assert!(smiles.nodes().iter().all(|n| !n.aromatic()));
 }
 
 #[test]
 fn test_parse_benzene_with_wildcard_graph_shape() {
-    use std::str::FromStr;
-
-    use smiles_parser::smiles::Smiles;
-
     let line = SMILES_STR[31];
     let smiles =
         Smiles::from_str(line).unwrap_or_else(|e| panic!("Failed to parse:\n{}", e.render(line)));
 
     assert_eq!(smiles.nodes().len(), 7);
-    assert_eq!(smiles.edges().len(), 7);
+    assert_eq!(smiles.number_of_bonds(), 7);
 
-    let aromatic_count = smiles.nodes().iter().filter(|n| n.atom().aromatic()).count();
+    let aromatic_count = smiles.nodes().iter().filter(|n| n.aromatic()).count();
     assert_eq!(aromatic_count, 6);
 }
 
@@ -101,7 +78,7 @@ fn test_parse_tribenzo_annulene_variant() {
         .unwrap_or_else(|e| panic!("Failed to parse:\n{}", e.render(smiles_string)));
 
     assert_eq!(smiles.nodes().len(), 20);
-    assert_eq!(smiles.edges().len(), 23);
+    assert_eq!(smiles.number_of_bonds(), 23);
 
     assert!(has_edge(&smiles, 0, 1, Bond::Double));
     assert!(has_edge(&smiles, 1, 2, Bond::Down));
@@ -110,19 +87,13 @@ fn test_parse_tribenzo_annulene_variant() {
     assert!(has_edge(&smiles, 5, 8, Bond::Single));
     assert!(has_edge(&smiles, 13, 14, Bond::Single));
 
-    let degrees: Vec<usize> = smiles
-        .nodes()
-        .iter()
-        .map(|node| smiles.edges().iter().filter(|edge| edge.contains(node.id())).count())
-        .collect();
+    let degrees: Vec<usize> =
+        (0..smiles.nodes().len()).map(|node_id| smiles.edges_for_node(node_id).len()).collect();
 
     assert_eq!(degrees.iter().filter(|&&d| d == 3).count(), 6);
     assert_eq!(degrees.iter().filter(|&&d| d == 2).count(), 14);
 }
 
 fn has_edge(smiles: &Smiles, a: usize, b: usize, bond: Bond) -> bool {
-    smiles.edges().iter().any(|edge| {
-        ((edge.node_a() == a && edge.node_b() == b) || (edge.node_a() == b && edge.node_b() == a))
-            && edge.bond() == bond
-    })
+    smiles.edge_for_node_pair((a, b)).is_some_and(|edge| edge.bond() == bond)
 }

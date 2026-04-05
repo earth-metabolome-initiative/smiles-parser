@@ -4,8 +4,7 @@ use core::fmt;
 
 use crate::bond::{Bond, ring_num::RingNum};
 
-/// Contains the two ID's of the `AtomNode` that are connected via the
-/// [`Bond`]
+/// Contains the two atom indices connected via the [`Bond`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BondEdge {
     /// The first node
@@ -78,10 +77,7 @@ impl BondEdge {
 
 impl fmt::Display for BondEdge {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.bond {
-            Bond::Single => Ok(()),
-            _ => write!(f, "{}", self.bond),
-        }
+        f.write_str(self.bond.edge_symbol())
     }
 }
 

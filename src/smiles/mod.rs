@@ -1,7 +1,7 @@
 //! Represents a parsed SMILES graph.
 //!
-//! A [`Smiles`] value stores atoms as [`AtomNode`] values and bonds as
-//! [`BondEdge`] values.
+//! A [`Smiles`] value stores atoms as [`Atom`] values and bonds in a
+//! symmetric valued sparse matrix.
 //!
 //! # Examples
 //!
@@ -17,7 +17,7 @@
 //! let smiles: Smiles = source.parse()?;
 //!
 //! assert_eq!(smiles.nodes().len(), 2);
-//! assert_eq!(smiles.edges().len(), 1);
+//! assert_eq!(smiles.number_of_bonds(), 1);
 //! assert_eq!(smiles.to_string(), "CC");
 //!
 //! # Ok::<(), smiles_parser::errors::SmilesErrorWithSpan>(())
@@ -25,139 +25,97 @@
 use alloc::{string::String, vec::Vec};
 use core::fmt;
 
+use geometric_traits::traits::{
+    SizedSparseMatrix2D, SizedSparseValuedMatrixRef, SparseMatrix2D, SparseValuedMatrix2DRef,
+};
+
 use crate::{
-    atom::atom_node::AtomNode,
-    bond::{Bond, bond_edge::BondEdge, ring_num::RingNum},
+    atom::Atom,
+    bond::bond_edge::BondEdge,
     errors::SmilesError,
     traversal::{render_visitor::RenderVisitor, walker::walk},
 };
 
 mod from_str;
+mod geometric_traits_impl;
 mod implicit_hydrogens;
+
+pub(crate) use self::geometric_traits_impl::BondMatrixBuilder;
+pub use self::geometric_traits_impl::{BondEntry, BondMatrix};
 
 /// Represents a parsed SMILES graph.
 #[derive(Debug, PartialEq)]
 pub struct Smiles {
-    atom_nodes: Vec<AtomNode>,
-    bond_edges: Vec<BondEdge>,
+    atom_nodes: Vec<Atom>,
+    bond_matrix: BondMatrix,
 }
 
 impl Smiles {
-    /// creates a new instance of the `Smiles` struct.
+    /// Creates a new empty [`Smiles`] graph.
+    #[inline]
     #[must_use]
     pub fn new() -> Self {
-        Self { atom_nodes: Vec::new(), bond_edges: Vec::new() }
+        Self { atom_nodes: Vec::new(), bond_matrix: BondMatrix::default() }
     }
-    /// Pushes an [`AtomNode`] to the `Smiles` struct.
-    ///
-    /// # Errors
-    /// - Returns [`SmilesError::DuplicateNodeId`] if node id already exists
-    pub fn push_node(&mut self, node: AtomNode) -> Result<(), SmilesError> {
-        let id = node.id();
-        if self.atom_nodes.get(id).is_some() {
-            return Err(SmilesError::DuplicateNodeId(id));
-        }
-        self.atom_nodes.push(node);
-        Ok(())
-    }
-    /// Adds a [`BondEdge`] from two nodes, includes ring number information (if
-    /// present).
-    ///
-    /// # Errors
-    /// - Returns a [`SmilesError::NodeIdInvalid`] if a node cannot be found in
-    ///   the edge list
-    pub fn push_edge(
-        &mut self,
-        node_a: usize,
-        node_b: usize,
-        bond: Bond,
-        ring_num: Option<RingNum>,
-    ) -> Result<(), SmilesError> {
-        if !self.contains_node_id(node_a) {
-            return Err(SmilesError::NodeIdInvalid(node_a));
-        }
-        if !self.contains_node_id(node_b) {
-            return Err(SmilesError::NodeIdInvalid(node_b));
-        }
-        // reject self edges
-        if node_a == node_b {
-            return Err(SmilesError::SelfLoopEdge(node_a));
-        }
-        // reject duplicate edges
-        if self.edge_for_node_pair((node_a, node_b)).is_some() {
-            return Err(SmilesError::DuplicateEdge(node_a, node_b));
-        }
-        self.bond_edges.push(BondEdge::new(node_a, node_b, bond, ring_num));
-        Ok(())
-    }
-    /// Returns `bool` for if the [`AtomNode`] `id` exists in the set of nodes
-    /// parsed.
-    fn contains_node_id(&self, id: usize) -> bool {
-        self.atom_nodes.get(id).is_some()
-    }
-    /// Returns a slice of all [`AtomNode`] parsed in the graph.
+
+    /// Returns a slice of all parsed [`Atom`] values.
+    #[inline]
     #[must_use]
-    pub fn nodes(&self) -> &[AtomNode] {
+    pub fn nodes(&self) -> &[Atom] {
         &self.atom_nodes
     }
-    /// Returns mutable slice of [`AtomNode`] parsed in the graph.
+
+    /// Returns the atom with the given positional index, if present.
+    #[inline]
     #[must_use]
-    pub fn nodes_mut(&mut self) -> &mut [AtomNode] {
-        &mut self.atom_nodes
-    }
-    /// Returns the node with the given `id`, if present.
-    #[must_use]
-    pub fn node_by_id(&self, id: usize) -> Option<&AtomNode> {
+    pub fn node_by_id(&self, id: usize) -> Option<&Atom> {
         self.atom_nodes.get(id)
     }
-    /// Returns the slice of all [`BondEdge`] in the graph.
+
+    /// Returns a normalized edge key with node IDs in ascending order.
+    #[inline]
     #[must_use]
-    pub fn edges(&self) -> &[BondEdge] {
-        &self.bond_edges
+    pub fn edge_key(node_a: usize, node_b: usize) -> (usize, usize) {
+        if node_a < node_b { (node_a, node_b) } else { (node_b, node_a) }
     }
-    /// Returns a normalized edge key with node IDs in ascending order. Useful
-    /// for walking graph.
-    ///
-    /// # Parameters:
-    /// - a: the first node's `id`
-    /// - b: the second node's `id`
+
+    /// Returns the bond connecting the given pair of node ids, if present.
+    #[inline]
     #[must_use]
-    pub fn edge_key(a: usize, b: usize) -> (usize, usize) {
-        if a < b { (a, b) } else { (b, a) }
+    pub fn edge_for_node_pair(&self, nodes: (usize, usize)) -> Option<BondEdge> {
+        let (row, column) = Self::edge_key(nodes.0, nodes.1);
+        let rank = self.bond_matrix.try_rank(row, column)?;
+        let entry = *self.bond_matrix.select_value_ref(rank);
+        Some(entry.to_bond_edge(row, column))
     }
-    /// Returns the first [`BondEdge`] connecting the given pair of node IDs
-    /// passed as a tuple.
-    ///
-    /// # Parameters:
-    /// - nodes: A tuple of the two vertex id's.
+
+    /// Returns the bonds incident to the provided node id.
+    #[inline]
     #[must_use]
-    pub fn edge_for_node_pair(&self, nodes: (usize, usize)) -> Option<&BondEdge> {
-        let target = Self::edge_key(nodes.0, nodes.1);
-        self.bond_edges.iter().find(|b| {
-            let (a, c) = b.vertices();
-            Self::edge_key(a, c) == target
-        })
+    pub fn edges_for_node(&self, id: usize) -> Vec<BondEdge> {
+        if id >= self.atom_nodes.len() {
+            return Vec::new();
+        }
+
+        self.bond_matrix
+            .sparse_row(id)
+            .zip(self.bond_matrix.sparse_row_values_ref(id))
+            .map(|(other, entry)| entry.to_bond_edge(id, other))
+            .collect()
     }
-    /// Returns a vector of all (borrowed) [`BondEdge`] for a given [`AtomNode`]
-    /// `id`.
-    #[must_use]
-    pub fn edges_for_node(&self, id: usize) -> Vec<&BondEdge> {
-        self.bond_edges.iter().filter(|b| b.contains(id)).collect()
-    }
-    /// Returns mutable slice of [BondEdge].
-    pub fn edges_mut(&mut self) -> &mut [BondEdge] {
-        &mut self.bond_edges
-    }
-    /// Renders the `Smiles` graph into a valid SMILES String. Rendered `String`
-    /// may differ in order and notation from input `String` but still represent
-    /// the same structure.
+
+    /// Renders the graph back into a valid SMILES string.
     ///
     /// # Errors
-    /// - Returns a [`SmilesError`] if the graph fails to walk
+    /// - Returns a [`SmilesError`] if traversal fails.
     pub fn render(&self) -> Result<String, SmilesError> {
-        let mut render_visitor = RenderVisitor::new();
+        self.render_visitor().map(RenderVisitor::into_string)
+    }
+    fn render_visitor(&self) -> Result<RenderVisitor, SmilesError> {
+        let mut render_visitor =
+            RenderVisitor::with_capacity(self.nodes().len(), self.number_of_bonds());
         walk(self, &mut render_visitor)?;
-        Ok(render_visitor.into_string())
+        Ok(render_visitor)
     }
 }
 
@@ -169,9 +127,8 @@ impl Default for Smiles {
 
 impl fmt::Display for Smiles {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // need to map the smiles error to the `fmt::Error`
-        let rendered_smiles = self.render().map_err(|_| fmt::Error)?;
-        write!(f, "{rendered_smiles}")
+        let render_visitor = self.render_visitor().map_err(|_| fmt::Error)?;
+        render_visitor.write_into_formatter(f)
     }
 }
 
@@ -182,85 +139,42 @@ mod tests {
 
     use elements_rs::Element;
 
-    use super::Smiles;
+    use super::{BondMatrixBuilder, Smiles};
     use crate::{
-        atom::{atom_node::AtomNode, atom_symbol::AtomSymbol, unbracketed::UnbracketedAtom},
+        atom::{Atom, atom_symbol::AtomSymbol},
         bond::{Bond, bond_edge::BondEdge, ring_num::RingNum},
         errors::SmilesError,
     };
 
-    fn node(id: usize, element: Element, start: usize, end: usize) -> AtomNode {
-        AtomNode::new(
-            UnbracketedAtom::new(AtomSymbol::Element(element), false).into(),
-            id,
-            start..end,
-        )
+    fn atom(element: Element) -> Atom {
+        Atom::new_organic_subset(AtomSymbol::Element(element), false)
+    }
+
+    fn smiles_from_edges(atom_nodes: Vec<Atom>, bond_edges: &[BondEdge]) -> Smiles {
+        let mut builder = BondMatrixBuilder::with_capacity(bond_edges.len());
+        for edge in bond_edges {
+            builder.push_edge(edge.node_a(), edge.node_b(), edge.bond(), edge.ring_num()).unwrap();
+        }
+        let number_of_nodes = atom_nodes.len();
+        Smiles::from_bond_matrix_parts(atom_nodes, builder.finish(number_of_nodes))
     }
 
     #[test]
     fn smiles_new_and_default_create_empty_graph() {
         let smiles = Smiles::new();
         assert!(smiles.nodes().is_empty());
-        assert!(smiles.edges().is_empty());
+        assert_eq!(smiles.number_of_bonds(), 0);
 
         let default_smiles = Smiles::default();
         assert!(default_smiles.nodes().is_empty());
-        assert!(default_smiles.edges().is_empty());
+        assert_eq!(default_smiles.number_of_bonds(), 0);
     }
 
     #[test]
-    fn push_node_adds_node_and_duplicate_id_errors() {
-        let mut smiles = Smiles::new();
-
-        let n0 = node(0, Element::C, 0, 1);
-        let duplicate = node(0, Element::O, 1, 2);
-
-        smiles.push_node(n0).expect("first node should insert");
-        assert_eq!(smiles.nodes().len(), 1);
-        assert_eq!(smiles.node_by_id(0), Some(&node(0, Element::C, 0, 1)));
-
-        let err = smiles.push_node(duplicate).expect_err("duplicate id should fail");
-
-        assert_eq!(err, SmilesError::DuplicateNodeId(0));
-        assert_eq!(smiles.nodes().len(), 1);
-    }
-
-    #[test]
-    fn push_edge_adds_edge_and_validates_node_ids() {
-        let mut smiles = Smiles::new();
-        smiles.push_node(node(0, Element::C, 0, 1)).unwrap();
-        smiles.push_node(node(1, Element::O, 1, 2)).unwrap();
-
-        smiles.push_edge(0, 1, Bond::Double, None).unwrap();
-
-        assert_eq!(smiles.edges().len(), 1);
-        assert_eq!(smiles.edges()[0], BondEdge::new(0, 1, Bond::Double, None));
-
-        let err_a = smiles
-            .push_edge(9, 1, Bond::Single, None)
-            .expect_err("invalid first node id should fail");
-        assert_eq!(err_a, SmilesError::NodeIdInvalid(9));
-
-        let err_b = smiles
-            .push_edge(0, 8, Bond::Single, None)
-            .expect_err("invalid second node id should fail");
-        assert_eq!(err_b, SmilesError::NodeIdInvalid(8));
-    }
-
-    #[test]
-    fn nodes_mut_and_node_by_id_work() {
-        let mut smiles = Smiles::new();
-        smiles.push_node(node(0, Element::C, 0, 1)).unwrap();
-        smiles.push_node(node(1, Element::O, 1, 2)).unwrap();
-
-        assert_eq!(smiles.node_by_id(0), Some(&node(0, Element::C, 0, 1)));
-        assert_eq!(smiles.node_by_id(1), Some(&node(1, Element::O, 1, 2)));
-        assert_eq!(smiles.node_by_id(99), None);
-
-        smiles.nodes_mut()[1] = node(1, Element::N, 1, 2);
-
-        assert_eq!(smiles.node_by_id(1), Some(&node(1, Element::N, 1, 2)));
-        assert_eq!(smiles.nodes()[1], node(1, Element::N, 1, 2));
+    fn bond_matrix_builder_rejects_self_loops() {
+        let mut builder = BondMatrixBuilder::with_capacity(1);
+        let err = builder.push_edge(0, 0, Bond::Single, None).expect_err("self-loop should fail");
+        assert_eq!(err, SmilesError::SelfLoopEdge(0));
     }
 
     #[test]
@@ -271,61 +185,53 @@ mod tests {
     }
 
     #[test]
-    fn edge_lookup_helpers_and_edges_mut_work() {
-        let mut smiles = Smiles::new();
-        smiles.push_node(node(0, Element::C, 0, 1)).unwrap();
-        smiles.push_node(node(1, Element::O, 1, 2)).unwrap();
-        smiles.push_node(node(2, Element::N, 2, 3)).unwrap();
-
+    fn edge_lookup_helpers_work() {
         let ring = RingNum::try_new(1).unwrap();
+        let smiles = smiles_from_edges(
+            vec![atom(Element::C), atom(Element::O), atom(Element::N)],
+            &[
+                BondEdge::new(0, 1, Bond::Single, None),
+                BondEdge::new(1, 2, Bond::Double, Some(ring)),
+            ],
+        );
 
-        smiles.push_edge(0, 1, Bond::Single, None).unwrap();
-        smiles.push_edge(1, 2, Bond::Double, Some(ring)).unwrap();
-
-        assert_eq!(smiles.edges().len(), 2);
-
+        assert_eq!(smiles.number_of_bonds(), 2);
         assert_eq!(
             smiles.edge_for_node_pair((0, 1)),
-            Some(&BondEdge::new(0, 1, Bond::Single, None))
+            Some(BondEdge::new(0, 1, Bond::Single, None))
         );
         assert_eq!(
             smiles.edge_for_node_pair((1, 0)),
-            Some(&BondEdge::new(0, 1, Bond::Single, None))
+            Some(BondEdge::new(0, 1, Bond::Single, None))
         );
         assert_eq!(
             smiles.edge_for_node_pair((1, 2)),
-            Some(&BondEdge::new(1, 2, Bond::Double, Some(ring)))
+            Some(BondEdge::new(1, 2, Bond::Double, Some(ring)))
         );
         assert_eq!(smiles.edge_for_node_pair((0, 2)), None);
 
         let edges_for_1 = smiles.edges_for_node(1);
         assert_eq!(edges_for_1.len(), 2);
-        assert!(edges_for_1.contains(&&BondEdge::new(0, 1, Bond::Single, None)));
-        assert!(edges_for_1.contains(&&BondEdge::new(1, 2, Bond::Double, Some(ring))));
+        assert!(edges_for_1.contains(&BondEdge::new(1, 0, Bond::Single, None)));
+        assert!(edges_for_1.contains(&BondEdge::new(1, 2, Bond::Double, Some(ring))));
 
         let edges_for_0 = smiles.edges_for_node(0);
-        assert_eq!(edges_for_0.len(), 1);
-        assert_eq!(edges_for_0[0], &BondEdge::new(0, 1, Bond::Single, None));
+        assert_eq!(edges_for_0, vec![BondEdge::new(0, 1, Bond::Single, None)]);
 
         let edges_for_99 = smiles.edges_for_node(99);
         assert!(edges_for_99.is_empty());
-
-        smiles.edges_mut()[0] = BondEdge::new(0, 1, Bond::Triple, None);
-        assert_eq!(smiles.edges()[0], BondEdge::new(0, 1, Bond::Triple, None));
     }
 
     #[test]
     fn render_and_display_work_for_simple_valid_graph() {
-        let mut smiles = Smiles::new();
-        smiles.push_node(node(0, Element::C, 0, 1)).unwrap();
-        smiles.push_node(node(1, Element::O, 1, 2)).unwrap();
-        smiles.push_edge(0, 1, Bond::Double, None).unwrap();
+        let smiles = smiles_from_edges(
+            vec![atom(Element::C), atom(Element::O)],
+            &[BondEdge::new(0, 1, Bond::Double, None)],
+        );
 
         let rendered = smiles.render().expect("simple graph should render");
         assert_eq!(rendered, "C=O");
-
-        let displayed = format!("{smiles}");
-        assert_eq!(displayed, "C=O");
+        assert_eq!(format!("{smiles}"), "C=O");
     }
 
     #[test]
@@ -338,9 +244,7 @@ mod tests {
 
     #[test]
     fn invalid_bonds_rejected() {
-        let invalid_lead = "-N".parse::<Smiles>();
-        dbg!(&invalid_lead);
-        assert!(invalid_lead.is_err());
+        assert!("-N".parse::<Smiles>().is_err());
     }
 
     #[test]
@@ -354,6 +258,7 @@ mod tests {
             .unwrap_or_else(|_| panic!("Failed to reparse B(s)s"));
         assert_eq!(case_1_smiles_reparsed.to_string(), case_1_smiles_rerendered);
     }
+
     #[test]
     fn branch_render_regression_non_aromatic() {
         let smiles: Smiles = "C(O)N".parse().unwrap();
@@ -369,21 +274,10 @@ mod tests {
         let smiles: Smiles = "B(s)s".parse().unwrap();
 
         assert_eq!(smiles.nodes().len(), 3);
-        assert_eq!(smiles.edges().len(), 2);
-
-        let mut edges = smiles
-            .edges()
-            .iter()
-            .map(|edge| {
-                let (a, b) = edge.vertices();
-                let key = if a < b { (a, b) } else { (b, a) };
-                (key, edge.bond())
-            })
-            .collect::<Vec<_>>();
-
-        edges.sort_by_key(|((a, b), _)| (*a, *b));
-
-        assert_eq!(edges, vec![((0, 1), Bond::Single), ((0, 2), Bond::Single),]);
+        assert_eq!(smiles.number_of_bonds(), 2);
+        assert_eq!(smiles.edge_for_node_pair((0, 1)).unwrap().bond(), Bond::Single);
+        assert_eq!(smiles.edge_for_node_pair((0, 2)).unwrap().bond(), Bond::Single);
+        assert_eq!(smiles.edge_for_node_pair((1, 2)), None);
     }
 
     #[test]
@@ -443,10 +337,21 @@ mod tests {
         let err = "C12CCCCC12".parse::<Smiles>().expect_err("parallel edge should be invalid");
         assert_eq!(err.smiles_error(), SmilesError::InvalidRingNumber);
     }
+
     #[test]
-    fn hydrogen_with_explicit_hydrogen_invalid() {
+    fn hydrogen_with_single_explicit_hydrogen_is_accepted_for_compatibility() {
+        let smiles: Smiles = "[HH]".parse().expect("[HH] should be accepted for compatibility");
+        assert_eq!(smiles.nodes().len(), 1);
+        assert_eq!(smiles.number_of_bonds(), 0);
+        assert_eq!(smiles.nodes()[0].element(), Some(Element::H));
+        assert_eq!(smiles.nodes()[0].hydrogen_count(), 1);
+        assert_eq!(smiles.to_string(), "[HH]");
+    }
+
+    #[test]
+    fn hydrogen_with_more_than_one_explicit_hydrogen_stays_invalid() {
         let invalid =
-            "[HH]".parse::<Smiles>().expect_err("Hydrogens cannot have explicit hydrogens");
+            "[HH2]".parse::<Smiles>().expect_err("Hydrogens cannot have explicit hydrogens > 1");
         assert_eq!(invalid.smiles_error(), SmilesError::InvalidHydrogenWithExplicitHydrogensFound);
     }
 }

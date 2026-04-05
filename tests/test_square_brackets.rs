@@ -1,10 +1,8 @@
 //! Test for tokenizing square brackets
 
-use smiles_parser::{
-    errors::{SmilesError, SmilesErrorWithSpan},
-    parser::token_iter::TokenIter,
-    token::Token,
-};
+use std::str::FromStr;
+
+use smiles_parser::{errors::SmilesError, smiles::Smiles};
 
 /// const for testing square brackets
 const SMILES_WITH_BRACKETS: &[&str] = &[
@@ -19,6 +17,9 @@ const SMILES_WITH_BRACKETS: &[&str] = &[
     "[14cH]1ccccc1",
     "[14c@H]1ccccc1",
     "[2H]C(Cl)(Cl)Cl",
+    "[HH]",
+    "[HH-]",
+    "[3HH]",
     "[C@@H](C)(N)C(=O)O",
     "C[C@H](N)C(=O)O",
     "OC(=O)[C@@H](N)C",
@@ -30,17 +31,14 @@ const SMILES_WITH_BRACKETS: &[&str] = &[
 #[test]
 fn test_valid_square_brackets() {
     for &s in SMILES_WITH_BRACKETS {
-        let _tokens = TokenIter::from(s)
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap_or_else(|_| panic!("Failed to parse {s}"));
+        let _smiles = Smiles::from_str(s).unwrap_or_else(|_| panic!("Failed to parse {s}"));
     }
 }
 
 #[test]
 fn test_unexpected_right_brackets() {
     // stray ']' becomes UnexpectedCharacter(']') with a span
-    let err =
-        TokenIter::from("[Co+3]]").collect::<Result<Vec<_>, SmilesErrorWithSpan>>().unwrap_err();
+    let err = Smiles::from_str("[Co+3]]").unwrap_err();
 
     assert_eq!(err.smiles_error(), SmilesError::UnexpectedCharacter(']'));
     assert_eq!(err.start(), 6);
@@ -49,8 +47,7 @@ fn test_unexpected_right_brackets() {
 
 #[test]
 fn test_unexpected_left_brackets() {
-    let err =
-        TokenIter::from("[[Co+3]").collect::<Result<Vec<_>, SmilesErrorWithSpan>>().unwrap_err();
+    let err = Smiles::from_str("[[Co+3]").unwrap_err();
 
     assert_eq!(err.smiles_error(), SmilesError::MissingElement);
     assert_eq!(err.start(), 0);
@@ -59,8 +56,7 @@ fn test_unexpected_left_brackets() {
 
 #[test]
 fn test_unclosed_brackets() {
-    let err =
-        TokenIter::from("[Co+3").collect::<Result<Vec<_>, SmilesErrorWithSpan>>().unwrap_err();
+    let err = Smiles::from_str("[Co+3").unwrap_err();
 
     assert_eq!(err.smiles_error(), SmilesError::UnclosedBracket);
     assert_eq!(err.start(), 0);
@@ -70,25 +66,34 @@ fn test_unclosed_brackets() {
 #[test]
 fn test_smiles_tokens_water() {
     let water_line = SMILES_WITH_BRACKETS[0];
-    let tokens = TokenIter::from(water_line)
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap_or_else(|_| panic!("Failed to parse {water_line}"));
+    let smiles =
+        Smiles::from_str(water_line).unwrap_or_else(|_| panic!("Failed to parse {water_line}"));
 
-    assert_eq!(tokens.len(), 1);
+    assert_eq!(smiles.nodes().len(), 1);
 
-    match &tokens[0].token() {
-        Token::BracketedAtom(b) => {
-            assert_eq!(b.element(), Some(elements_rs::Element::O));
-            assert!(!b.aromatic());
-            assert_eq!(b.hydrogen_count(), Some(2));
-            assert_eq!(b.charge_value(), 0);
-            assert_eq!(b.class(), 0);
-            assert_eq!(b.chirality(), None);
-            assert_eq!(b.isotope_mass_number(), None);
-        }
-        other => panic!("Expected Token::BracketedAtom, got {other:?}"),
+    let atom = &smiles.nodes()[0];
+    assert_eq!(atom.element(), Some(elements_rs::Element::O));
+    assert!(!atom.aromatic());
+    assert_eq!(atom.hydrogen_count(), 2);
+    assert_eq!(atom.charge_value(), 0);
+    assert_eq!(atom.class(), 0);
+    assert_eq!(atom.chirality(), None);
+    assert_eq!(atom.isotope_mass_number(), None);
+}
+
+#[test]
+fn test_hydrogen_hcount_compatibility_cases() {
+    for source in ["[HH]", "[HH1]", "[HH-]", "[3HH]"] {
+        let smiles =
+            Smiles::from_str(source).unwrap_or_else(|_| panic!("Failed to parse {source}"));
+        assert_eq!(smiles.nodes().len(), 1);
+        assert_eq!(smiles.nodes()[0].element(), Some(elements_rs::Element::H));
+        assert_eq!(smiles.nodes()[0].hydrogen_count(), 1);
     }
+}
 
-    assert_eq!(tokens[0].start(), 0);
-    assert_eq!(tokens[0].end(), 5);
+#[test]
+fn test_hydrogen_hcount_gt_one_stays_invalid() {
+    let err = Smiles::from_str("[HH2]").unwrap_err();
+    assert_eq!(err.smiles_error(), SmilesError::InvalidHydrogenWithExplicitHydrogensFound);
 }

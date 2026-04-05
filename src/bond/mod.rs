@@ -26,7 +26,15 @@ pub enum Bond {
 
 impl fmt::Display for Bond {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
+        f.write_str(self.smiles_symbol())
+    }
+}
+
+impl Bond {
+    #[inline]
+    #[must_use]
+    pub(crate) const fn smiles_symbol(self) -> &'static str {
+        match self {
             Self::Single => "-",
             Self::Double => "=",
             Self::Triple => "#",
@@ -34,7 +42,25 @@ impl fmt::Display for Bond {
             Self::Aromatic => ":",
             Self::Up => "/",
             Self::Down => "\\",
-        })
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) const fn edge_symbol(self) -> &'static str {
+        match self {
+            Self::Single => "",
+            _ => self.smiles_symbol(),
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) const fn ring_closure_symbol(self) -> &'static str {
+        match self {
+            Self::Single | Self::Aromatic => "",
+            _ => self.smiles_symbol(),
+        }
     }
 }
 

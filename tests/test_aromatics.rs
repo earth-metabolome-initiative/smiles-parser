@@ -1,12 +1,12 @@
 //! Tests on Elements that should or should not be parsed as aromatic
 
+use std::str::FromStr;
+
 use elements_rs::Element;
 use smiles_parser::{
-    atom::{atom_symbol::AtomSymbol, unbracketed::UnbracketedAtom},
-    bond::ring_num::RingNum,
+    atom::{Atom, atom_symbol::AtomSymbol},
     errors::SmilesError,
-    parser::token_iter::TokenIter,
-    token::{Token, TokenWithSpan},
+    smiles::Smiles,
 };
 const SMILES_STR: &[&str] = &[
     "c1ccccc1",          // benzene
@@ -27,59 +27,29 @@ const SMILES_STR: &[&str] = &[
 
 #[test]
 fn test_aromatic_benzene_from_tokenization() -> Result<(), SmilesError> {
-    // c1ccccc1
-    let aromatic_c = UnbracketedAtom::new(AtomSymbol::Element(Element::C), true);
+    let smiles = Smiles::from_str(SMILES_STR[0]).map_err(|e| e.smiles_error())?;
 
-    let expected = vec![
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 0, 1),
-        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?), 1, 2),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 2, 3),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 3, 4),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 4, 5),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 5, 6),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 6, 7),
-        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?), 7, 8),
-    ];
-
-    let line = SMILES_STR[0];
-    let got = TokenIter::from(line).collect::<Result<Vec<_>, _>>().map_err(|e| e.smiles_error())?;
-
-    assert_eq!(expected, got);
+    assert_eq!(smiles.nodes().len(), 6);
+    assert_eq!(smiles.number_of_bonds(), 6);
+    assert!(smiles.nodes().iter().all(Atom::aromatic));
+    assert!(smiles.nodes().iter().all(|atom| atom.symbol() == AtomSymbol::Element(Element::C)));
 
     Ok(())
 }
 
 #[test]
 fn test_aromatic_imidazole_from_tokenization() -> Result<(), SmilesError> {
-    // n1cc[nH]c1
-    let aromatic_n = UnbracketedAtom::new(AtomSymbol::Element(Element::N), true);
-    let aromatic_c = UnbracketedAtom::new(AtomSymbol::Element(Element::C), true);
+    let smiles = Smiles::from_str(SMILES_STR[4]).map_err(|e| e.smiles_error())?;
+    let bracketed_n = Atom::builder()
+        .with_symbol(AtomSymbol::Element(Element::N))
+        .with_aromatic(true)
+        .with_hydrogens(1)
+        .build();
 
-    let expected = vec![
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_n), 0, 1),
-        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?), 1, 2),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 2, 3),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 3, 4),
-        TokenWithSpan::new(
-            Token::BracketedAtom(
-                smiles_parser::atom::bracketed::BracketAtom::builder()
-                    .with_symbol(AtomSymbol::Element(Element::N))
-                    .with_aromatic(true)
-                    .with_hydrogens(
-                        smiles_parser::atom::bracketed::hydrogen_count::HydrogenCount::new(Some(1)),
-                    )
-                    .build(),
-            ),
-            4,
-            8,
-        ),
-        TokenWithSpan::new(Token::UnbracketedAtom(aromatic_c), 8, 9),
-        TokenWithSpan::new(Token::RingClosure(RingNum::try_new(1)?), 9, 10),
-    ];
-
-    let line = SMILES_STR[4];
-    let got = TokenIter::from(line).collect::<Result<Vec<_>, _>>().map_err(|e| e.smiles_error())?;
-
-    assert_eq!(expected, got);
+    assert_eq!(smiles.nodes().len(), 5);
+    assert_eq!(smiles.number_of_bonds(), 5);
+    assert_eq!(smiles.nodes()[0], Atom::new_organic_subset(AtomSymbol::Element(Element::N), true));
+    assert_eq!(smiles.nodes()[3], bracketed_n);
+    assert!(smiles.nodes().iter().all(Atom::aromatic));
     Ok(())
 }

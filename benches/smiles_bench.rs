@@ -1,8 +1,10 @@
-//! Criterion benchmarks for SMILES parsing and implicit-hydrogen counting.
+//! Criterion benchmarks for SMILES parsing, rendering, and implicit-hydrogen
+//! counting.
 //!
 //! This bench uses the corpus in `tests/fixtures/benchmark_smiles_corpus.txt`.
-//! The two benchmarked operations are kept separate:
+//! The benchmarked operations are kept separate:
 //! - parse-only: `Smiles::from_str(...)`
+//! - display-only: `Smiles::to_string()` on already parsed molecules
 //! - implicit-only: `Smiles::implicit_hydrogen_counts()` on already parsed
 //!   molecules
 
@@ -61,5 +63,29 @@ fn bench_implicit_only(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(smiles_benches, bench_parse_only, bench_implicit_only);
+fn bench_display_only(c: &mut Criterion) {
+    let corpus = corpus_smiles();
+    let parsed = corpus
+        .iter()
+        .map(|smiles| Smiles::from_str(smiles).expect("fixture should parse"))
+        .collect::<Vec<_>>();
+
+    let mut group = c.benchmark_group("smiles_display");
+    group.throughput(Throughput::Elements(parsed.len() as u64));
+
+    group.bench_function("to_string", |b| {
+        b.iter(|| {
+            let mut rendered_total = 0usize;
+            for molecule in &parsed {
+                let rendered = black_box(molecule).to_string();
+                rendered_total += black_box(rendered.len());
+            }
+            black_box(rendered_total)
+        });
+    });
+
+    group.finish();
+}
+
+criterion_group!(smiles_benches, bench_parse_only, bench_display_only, bench_implicit_only);
 criterion_main!(smiles_benches);

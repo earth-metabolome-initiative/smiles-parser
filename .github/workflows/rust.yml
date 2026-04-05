@@ -11,7 +11,7 @@ env:
 
 jobs:
   test:
-    name: Build
+    name: Test
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -23,6 +23,30 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
+      - name: Run tests
+        run: cargo test
+
+  benches:
+    name: Bench Targets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Check benchmark targets compile
+        run: cargo test --benches --no-run
+
+  wasm:
+    name: wasm32-unknown-unknown
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Check no_std target build
+        run: cargo check --lib --target wasm32-unknown-unknown
 
   fmt:
     name: Rustfmt

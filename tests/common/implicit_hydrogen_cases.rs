@@ -125,7 +125,7 @@ pub const ORGANIC_SUBSET_CASES: &[ImplicitHydrogenCase] = &[
         name: "bracket-carbon-explicit-h-one",
         smiles: "[CH]",
         note: "`[CH]` is equivalent to `[CH1]`, so the bracket atom still gets zero implicit hydrogens.",
-        atoms: &[atom("[CH1]", 0)],
+        atoms: &[atom("[CH]", 0)],
     },
     ImplicitHydrogenCase {
         name: "molecular-hydrogen",
@@ -137,7 +137,7 @@ pub const ORGANIC_SUBSET_CASES: &[ImplicitHydrogenCase] = &[
         name: "hydroxide",
         smiles: "[OH-]",
         note: "Bracket hydrogen on hydroxide is explicit, not implicit.",
-        atoms: &[atom("[OH1-]", 0)],
+        atoms: &[atom("[OH-]", 0)],
     },
     ImplicitHydrogenCase {
         name: "ammonium",
@@ -256,7 +256,7 @@ pub const AROMATIC_CASES: &[ImplicitHydrogenCase] = &[
         name: "pyrrole",
         smiles: "[nH]1cccc1",
         note: "The aromatic nitrogen hydrogen is explicit in the bracket atom.",
-        atoms: &[atom("[nH1]", 0), atom("c", 1), atom("c", 1), atom("c", 1), atom("c", 1)],
+        atoms: &[atom("[nH]", 0), atom("c", 1), atom("c", 1), atom("c", 1), atom("c", 1)],
     },
     ImplicitHydrogenCase {
         name: "furan",

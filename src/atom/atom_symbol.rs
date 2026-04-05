@@ -55,9 +55,7 @@ impl AtomSymbol {
 impl fmt::Display for AtomSymbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Element(e) => {
-                write!(f, "{e}")
-            }
+            Self::Element(e) => f.write_str(e.symbol()),
             Self::WildCard => f.write_str("*"),
         }
     }

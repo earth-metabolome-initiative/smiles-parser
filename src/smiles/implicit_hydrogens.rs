@@ -26,10 +26,11 @@
 use alloc::vec::Vec;
 
 use elements_rs::{AllowedValences, ChargedValences, Element};
+use geometric_traits::traits::SparseValuedMatrix2DRef;
 
 use super::Smiles;
 use crate::{
-    atom::{Atom, atom_node::AtomNode, atom_symbol::AtomSymbol},
+    atom::{Atom, AtomSyntax, atom_symbol::AtomSymbol},
     bond::Bond,
 };
 
@@ -56,7 +57,11 @@ impl Smiles {
     #[inline]
     #[must_use]
     pub fn implicit_hydrogen_counts(&self) -> Vec<u8> {
-        self.nodes().iter().map(|node| implicit_hydrogens_for_node(self, node)).collect()
+        self.nodes()
+            .iter()
+            .enumerate()
+            .map(|(node_id, node)| implicit_hydrogens_for_node(self, node_id, node))
+            .collect()
     }
 
     /// Returns the implicit hydrogen count for a node id, if present.
@@ -66,7 +71,7 @@ impl Smiles {
     #[inline]
     #[must_use]
     pub fn implicit_hydrogen_count(&self, id: usize) -> Option<u8> {
-        self.node_by_id(id).map(|node| implicit_hydrogens_for_node(self, node))
+        self.node_by_id(id).map(|node| implicit_hydrogens_for_node(self, id, node))
     }
 }
 
@@ -76,15 +81,15 @@ impl Smiles {
 /// For bracket atoms, returning `0` is both the SMILES rule and the behavior
 /// observed from raw RDKit.
 #[inline]
-fn implicit_hydrogens_for_node(smiles: &Smiles, node: &AtomNode) -> u8 {
-    let explicit_valence = explicit_valence(smiles, node.id());
-    match node.atom() {
-        Atom::Bracketed(_) => 0,
-        Atom::Unbracketed(atom) => {
-            match atom.symbol() {
+fn implicit_hydrogens_for_node(smiles: &Smiles, node_id: usize, node: &Atom) -> u8 {
+    let explicit_valence = explicit_valence(smiles, node_id);
+    match node.syntax() {
+        AtomSyntax::Bracket => 0,
+        AtomSyntax::OrganicSubset => {
+            match node.symbol() {
                 AtomSymbol::WildCard => 0,
                 AtomSymbol::Element(element) => {
-                    if atom.aromatic() {
+                    if node.aromatic() {
                         aromatic_implicit_hydrogens(element, explicit_valence)
                     } else {
                         aliphatic_implicit_hydrogens(element, explicit_valence)
@@ -105,13 +110,7 @@ fn implicit_hydrogens_for_node(smiles: &Smiles, node: &AtomNode) -> u8 {
 /// of being folded back into a later implicit-hydrogen completion step.
 #[inline]
 fn explicit_valence(smiles: &Smiles, node_id: usize) -> u8 {
-    let mut total = 0;
-    for edge in smiles.edges() {
-        if edge.contains(node_id) {
-            total += bond_order(edge.bond());
-        }
-    }
-    total
+    smiles.bond_matrix().sparse_row_values_ref(node_id).map(|entry| bond_order(entry.bond())).sum()
 }
 
 /// Maps parsed bond syntax to the local bond-order contribution used for raw
@@ -249,7 +248,7 @@ mod tests {
 
     #[test]
     fn target_valence_falls_back_to_allowed_valences_when_neutral_table_is_empty() {
-        assert_eq!(Element::Xe.valences_at_charge(0), &[]);
+        assert_eq!(Element::Xe.valences_at_charge(0), &[] as &[u8]);
         assert_eq!(Element::Xe.allowed_valences(), &[0]);
         assert_eq!(target_valence(Element::Xe, 0), Some(0));
     }

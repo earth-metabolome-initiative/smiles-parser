@@ -1,21 +1,15 @@
 //! Submodule creating the `TokenIter` struct, which is an iterator over
 //! the `Token`s found in a provided string.
 
-use alloc::{format, string::ToString};
-use core::{
-    iter::Peekable,
-    str::{CharIndices, FromStr},
-};
+use core::str::{FromStr, from_utf8};
 
 use elements_rs::Element;
 
 use crate::{
     atom::{
+        Atom,
         atom_symbol::AtomSymbol,
-        bracketed::{
-            BracketAtom, charge::Charge, chirality::Chirality, hydrogen_count::HydrogenCount,
-        },
-        unbracketed::UnbracketedAtom,
+        bracketed::{charge::Charge, chirality::Chirality},
     },
     bond::{Bond, ring_num::RingNum},
     errors::{SmilesError, SmilesErrorWithSpan},
@@ -23,9 +17,11 @@ use crate::{
 };
 
 /// An iterator over the tokens found in a SMILES string.
-pub struct TokenIter<'a> {
-    /// The peekable `Chars` with `Indices` iterator
-    chars: Peekable<CharIndices<'a>>,
+pub(crate) struct TokenIter<'a> {
+    /// Raw input bytes for the ASCII-heavy parsing fast path.
+    bytes: &'a [u8],
+    /// Current byte offset in the input.
+    position: usize,
     /// Denotes whether currently inside brackets
     in_bracket: bool,
     /// The length of the input
@@ -33,61 +29,73 @@ pub struct TokenIter<'a> {
 }
 
 impl<'a> From<&'a str> for TokenIter<'a> {
+    #[inline]
     fn from(s: &'a str) -> Self {
-        TokenIter { chars: s.char_indices().peekable(), in_bracket: false, len: s.len() }
+        TokenIter { bytes: s.as_bytes(), position: 0, in_bracket: false, len: s.len() }
     }
 }
 
 impl TokenIter<'_> {
-    fn parse_token(&mut self, current_char: char) -> Result<Token, SmilesError> {
-        let token = match current_char {
-            '.' => {
+    #[inline]
+    fn parse_token(&mut self, current_byte: u8) -> Result<Token, SmilesError> {
+        let token = match current_byte {
+            b'.' => {
                 if self.in_bracket {
                     return Err(SmilesError::NonBondInBracket);
                 }
                 Token::NonBond
             }
-            '[' => {
+            b'[' => {
                 if self.in_bracket {
                     return Err(SmilesError::UnexpectedLeftBracket);
                 }
                 self.in_bracket = true;
-                let mut possible_bracket_atom = BracketAtom::builder();
-                if let Some(isotope) = try_fold_number::<u16, 3>(self) {
-                    possible_bracket_atom = possible_bracket_atom.with_isotope(isotope?);
-                }
-                let (atom, aromatic) = try_element(self)?;
-                possible_bracket_atom =
-                    possible_bracket_atom.with_symbol(atom).with_aromatic(aromatic);
-                if let Some(chiral) = try_chirality(self)? {
-                    possible_bracket_atom = possible_bracket_atom.with_chirality(chiral);
-                }
-
-                possible_bracket_atom = possible_bracket_atom.with_hydrogens(hydrogen_count(self)?);
-                possible_bracket_atom = possible_bracket_atom.with_charge(try_charge(self)?);
-                possible_bracket_atom = possible_bracket_atom.with_class(try_class(self)?);
-                let bracket_atom = possible_bracket_atom.build();
-                if matches!(self.peek_char(), Some(']')) {
+                let isotope_mass_number = if let Some(isotope) = try_fold_number::<u16, 3>(self) {
+                    Some(isotope?)
+                } else {
+                    None
+                };
+                let (symbol, aromatic) = try_element(self)?;
+                let chirality = try_chirality(self)?;
+                let hydrogens = hydrogen_count(self)?;
+                let charge = try_charge(self)?;
+                let class = try_class(self)?;
+                let atom = Atom::new_bracket(
+                    symbol,
+                    isotope_mass_number,
+                    aromatic,
+                    hydrogens,
+                    charge,
+                    class,
+                    chirality,
+                );
+                if self.peek_byte() == Some(b']') {
                     self.in_bracket = false;
-                    self.chars.next();
-                    Token::BracketedAtom(bracket_atom)
+                    let _ = self.next_byte();
+                    Token::Atom(atom)
                 } else {
                     return Err(SmilesError::UnclosedBracket);
                 }
             }
-            c if c.is_ascii_alphabetic() || c == '*' => {
-                let (symbol, aromatic) = try_element_from_first(self, c)?;
-                if !valid_unbracketed(symbol) {
-                    return Err(SmilesError::InvalidUnbracketedAtom(symbol));
-                }
+            c if c.is_ascii_alphabetic() || c == b'*' => {
                 if self.in_bracket {
                     return Err(SmilesError::UnexpectedBracketedState);
                 }
-                Token::UnbracketedAtom(UnbracketedAtom::new(symbol, aromatic))
+                let (symbol, aromatic) = if let Some(atom) = try_organic_subset_from_first(self, c)
+                {
+                    atom?
+                } else {
+                    let (symbol, aromatic) = try_element_from_first(self, c)?;
+                    if !valid_unbracketed(symbol) {
+                        return Err(SmilesError::InvalidUnbracketedAtom(symbol));
+                    }
+                    (symbol, aromatic)
+                };
+                Token::Atom(Atom::new_organic_subset(symbol, aromatic))
             }
 
-            n if n.is_ascii_digit() || n == '%' => {
-                if n == '%' {
+            n if n.is_ascii_digit() || n == b'%' => {
+                if n == b'%' {
                     if self.in_bracket {
                         return Err(SmilesError::UnexpectedPercent);
                     }
@@ -102,39 +110,44 @@ impl TokenIter<'_> {
                         return Err(SmilesError::InvalidRingNumber);
                     }
                 } else {
-                    let Some(first) = n.to_digit(10) else {
-                        return Err(SmilesError::InvalidClass);
-                    };
-
-                    Token::RingClosure(RingNum::try_new(u8::try_from(first)?)?)
+                    Token::RingClosure(RingNum::try_new(n - b'0')?)
                 }
             }
-            '-' | '=' | '#' | '$' | ':' | '/' | '\\' => try_bond(current_char, self.in_bracket)?,
-            '(' => {
+            b'-' | b'=' | b'#' | b'$' | b':' | b'/' | b'\\' => {
+                try_bond(current_byte, self.in_bracket)?
+            }
+            b'(' => {
                 if self.in_bracket {
                     return Err(SmilesError::UnexpectedBracketedState);
                 }
                 Token::LeftParentheses
             }
-            ')' => {
+            b')' => {
                 if self.in_bracket {
                     return Err(SmilesError::UnexpectedBracketedState);
                 }
                 Token::RightParentheses
             }
-            _ => return Err(SmilesError::UnexpectedCharacter(current_char)),
+            _ => return Err(SmilesError::UnexpectedCharacter(char::from(current_byte))),
         };
         Ok(token)
     }
 
-    fn current_end(&mut self) -> usize {
-        if let Some(&(next_id, _)) = self.chars.peek() { next_id } else { self.len }
+    #[inline]
+    fn current_end(&self) -> usize {
+        self.position
     }
-    fn peek_char(&mut self) -> Option<char> {
-        self.chars.peek().map(|(_, c)| *c)
+
+    #[inline]
+    fn peek_byte(&self) -> Option<u8> {
+        self.bytes.get(self.position).copied()
     }
-    fn next_char(&mut self) -> Option<char> {
-        self.chars.next().map(|(_, c)| c)
+
+    #[inline]
+    fn next_byte(&mut self) -> Option<u8> {
+        let byte = self.bytes.get(self.position).copied()?;
+        self.position += 1;
+        Some(byte)
     }
 }
 
@@ -142,8 +155,17 @@ impl Iterator for TokenIter<'_> {
     type Item = Result<TokenWithSpan, SmilesErrorWithSpan>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let (start, current_char) = self.chars.next()?;
-        match self.parse_token(current_char) {
+        let start = self.position;
+        let current_byte = self.next_byte()?;
+        if !current_byte.is_ascii() {
+            self.position = (start + utf8_char_width(current_byte)).min(self.len);
+            return Some(Err(SmilesErrorWithSpan::new(
+                SmilesError::UnexpectedUnicodeCharacter,
+                start,
+                self.position,
+            )));
+        }
+        match self.parse_token(current_byte) {
             Ok(token) => {
                 let end = self.current_end();
                 Some(Ok(TokenWithSpan::new(token, start, end)))
@@ -151,11 +173,21 @@ impl Iterator for TokenIter<'_> {
             Err(e) => {
                 let mut end = self.current_end();
                 if end <= start {
-                    end = (start + current_char.len_utf8()).min(self.len);
+                    end = (start + 1).min(self.len);
                 }
                 Some(Err(SmilesErrorWithSpan::new(e, start, end)))
             }
         }
+    }
+}
+
+#[inline]
+const fn utf8_char_width(first_byte: u8) -> usize {
+    match first_byte {
+        0xc0..=0xdf => 2,
+        0xe0..=0xef => 3,
+        0xf0..=0xf7 => 4,
+        _ => 1,
     }
 }
 
@@ -165,6 +197,7 @@ impl Iterator for TokenIter<'_> {
 /// # Parameters
 /// - `bool` for the status of `in_bracket`
 /// - the [`Element`] being passed
+#[inline]
 fn aromatic_from_element(in_bracket: bool, element: Element) -> Result<bool, SmilesError> {
     let allowed = if in_bracket {
         matches!(
@@ -187,52 +220,94 @@ fn aromatic_from_element(in_bracket: bool, element: Element) -> Result<bool, Smi
     if allowed { Ok(true) } else { Err(SmilesError::InvalidAromaticElement(element)) }
 }
 
+#[inline]
 fn try_element(stream: &mut TokenIter<'_>) -> Result<(AtomSymbol, bool), SmilesError> {
-    let first = stream.next_char().ok_or(SmilesError::MissingElement)?;
+    let first = stream.next_byte().ok_or(SmilesError::MissingElement)?;
     try_element_from_first(stream, first)
 }
 
+#[inline]
+fn try_organic_subset_from_first(
+    stream: &mut TokenIter<'_>,
+    byte_1: u8,
+) -> Option<Result<(AtomSymbol, bool), SmilesError>> {
+    let element = match byte_1 {
+        b'*' => return Some(Ok((AtomSymbol::WildCard, false))),
+        b'B' => {
+            if stream.peek_byte() == Some(b'r') {
+                let _ = stream.next_byte();
+                Element::Br
+            } else {
+                Element::B
+            }
+        }
+        b'C' => {
+            if stream.peek_byte() == Some(b'l') {
+                let _ = stream.next_byte();
+                Element::Cl
+            } else {
+                Element::C
+            }
+        }
+        b'N' => Element::N,
+        b'O' => Element::O,
+        b'P' => Element::P,
+        b'S' => Element::S,
+        b'F' => Element::F,
+        b'I' => Element::I,
+        b'b' => return Some(Ok((AtomSymbol::Element(Element::B), true))),
+        b'c' => return Some(Ok((AtomSymbol::Element(Element::C), true))),
+        b'n' => return Some(Ok((AtomSymbol::Element(Element::N), true))),
+        b'o' => return Some(Ok((AtomSymbol::Element(Element::O), true))),
+        b'p' => return Some(Ok((AtomSymbol::Element(Element::P), true))),
+        b's' => return Some(Ok((AtomSymbol::Element(Element::S), true))),
+        _ => return None,
+    };
+    Some(Ok((AtomSymbol::Element(element), false)))
+}
+
+#[inline]
+fn parse_ascii_element(bytes: &[u8]) -> Option<Element> {
+    let symbol = from_utf8(bytes).ok()?;
+    Element::from_str(symbol).ok()
+}
+
+#[inline]
 fn try_element_from_first(
     stream: &mut TokenIter<'_>,
-    char_1: char,
+    byte_1: u8,
 ) -> Result<(AtomSymbol, bool), SmilesError> {
-    if char_1 == '*' {
+    if byte_1 == b'*' {
         return Ok((AtomSymbol::WildCard, false));
     }
-    if !char_1.is_ascii_alphabetic() {
+    if !byte_1.is_ascii_alphabetic() {
         return Err(SmilesError::MissingElement);
     }
 
-    let is_aromatic_candidate = char_1.is_ascii_lowercase();
-    let try_candidate = |val: &str| -> Option<Element> { Element::from_str(val).ok() };
+    let is_aromatic_candidate = byte_1.is_ascii_lowercase();
 
-    if let Some(char_2) = stream.peek_char()
-        && char_2.is_ascii_alphabetic()
+    if let Some(byte_2) = stream.peek_byte()
+        && byte_2.is_ascii_alphabetic()
     {
-        if is_aromatic_candidate && char_2.is_ascii_lowercase() {
-            let candidate = format!("{}{}", char_1.to_ascii_uppercase(), char_2);
-            if let Some(element) = try_candidate(&candidate) {
-                stream.chars.next();
+        if is_aromatic_candidate && byte_2.is_ascii_lowercase() {
+            let candidate = [byte_1.to_ascii_uppercase(), byte_2];
+            if let Some(element) = parse_ascii_element(&candidate) {
+                let _ = stream.next_byte();
                 let aromatic = aromatic_from_element(stream.in_bracket, element)?;
                 return Ok((AtomSymbol::Element(element), aromatic));
             }
         }
-        if !is_aromatic_candidate && char_2.is_ascii_lowercase() {
-            let candidate = format!("{char_1}{char_2}");
-            if let Some(element) = try_candidate(&candidate) {
-                stream.chars.next();
+        if !is_aromatic_candidate && byte_2.is_ascii_lowercase() {
+            let candidate = [byte_1, byte_2];
+            if let Some(element) = parse_ascii_element(&candidate) {
+                let _ = stream.next_byte();
                 return Ok((AtomSymbol::Element(element), false));
             }
         }
     }
 
-    let one = if is_aromatic_candidate {
-        char_1.to_ascii_uppercase().to_string()
-    } else {
-        char_1.to_string()
-    };
-
-    if let Some(element) = try_candidate(&one) {
+    let one = [if is_aromatic_candidate { byte_1.to_ascii_uppercase() } else { byte_1 }];
+    if let Some(element) = parse_ascii_element(&one) {
         let aromatic = if is_aromatic_candidate {
             aromatic_from_element(stream.in_bracket, element)?
         } else {
@@ -241,10 +316,11 @@ fn try_element_from_first(
         return Ok((AtomSymbol::Element(element), aromatic));
     }
 
-    Err(SmilesError::InvalidElementName(char_1))
+    Err(SmilesError::InvalidElementName(char::from(byte_1)))
 }
 
 // B, C, N, O, P, S, F, Cl, Br, I,
+#[inline]
 fn valid_unbracketed(symbol: AtomSymbol) -> bool {
     match symbol {
         AtomSymbol::Element(element) => {
@@ -266,28 +342,29 @@ fn valid_unbracketed(symbol: AtomSymbol) -> bool {
     }
 }
 
+#[inline]
 fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, SmilesError> {
-    if stream.peek_char() != Some('@') {
+    if stream.peek_byte() != Some(b'@') {
         return Ok(None);
     }
-    stream.chars.next();
-    let char_2 = stream.peek_char().ok_or(SmilesError::UnexpectedEndOfString)?;
-    let chirality = match char_2 {
-        '@' => {
-            stream.chars.next();
+    let _ = stream.next_byte();
+    let byte_2 = stream.peek_byte().ok_or(SmilesError::UnexpectedEndOfString)?;
+    let chirality = match byte_2 {
+        b'@' => {
+            let _ = stream.next_byte();
             Chirality::AtAt
         }
-        'T' => {
-            stream.chars.next();
-            match stream.peek_char().ok_or(SmilesError::UnexpectedEndOfString)? {
-                'H' => {
-                    stream.chars.next();
+        b'T' => {
+            let _ = stream.next_byte();
+            match stream.peek_byte().ok_or(SmilesError::UnexpectedEndOfString)? {
+                b'H' => {
+                    let _ = stream.next_byte();
                     let num =
                         try_fold_number::<u8, 1>(stream).ok_or(SmilesError::InvalidChirality)??;
                     Chirality::try_th(num)?
                 }
-                'B' => {
-                    stream.chars.next();
+                b'B' => {
+                    let _ = stream.next_byte();
                     let num =
                         try_fold_number::<u8, 2>(stream).ok_or(SmilesError::InvalidChirality)??;
                     Chirality::try_tb(num)?
@@ -295,11 +372,11 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
                 _ => return Err(SmilesError::InvalidChirality),
             }
         }
-        'A' | 'S' => {
-            stream.chars.next();
-            match stream.peek_char().ok_or(SmilesError::UnexpectedEndOfString)? {
-                'P' => {
-                    stream.chars.next();
+        b'A' | b'S' => {
+            let _ = stream.next_byte();
+            match stream.peek_byte().ok_or(SmilesError::UnexpectedEndOfString)? {
+                b'P' => {
+                    let _ = stream.next_byte();
                     let num =
                         try_fold_number::<u8, 1>(stream).ok_or(SmilesError::InvalidChirality)??;
                     Chirality::try_sp(num)?
@@ -307,11 +384,11 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
                 _ => return Err(SmilesError::InvalidChirality),
             }
         }
-        'O' => {
-            stream.chars.next();
-            match stream.peek_char().ok_or(SmilesError::UnexpectedEndOfString)? {
-                'H' => {
-                    stream.chars.next();
+        b'O' => {
+            let _ = stream.next_byte();
+            match stream.peek_byte().ok_or(SmilesError::UnexpectedEndOfString)? {
+                b'H' => {
+                    let _ = stream.next_byte();
                     let num =
                         try_fold_number::<u8, 2>(stream).ok_or(SmilesError::InvalidChirality)??;
                     Chirality::try_oh(num)?
@@ -319,12 +396,13 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
                 _ => return Err(SmilesError::InvalidChirality),
             }
         }
-        'H' | '-' | '+' | ':' | ']' => Chirality::At,
+        b'H' | b'-' | b'+' | b':' | b']' => Chirality::At,
         _ => return Err(SmilesError::InvalidChirality),
     };
     Ok(Some(chirality))
 }
 
+#[inline]
 fn try_fold_number<B, const MAX_DIGITS: usize>(
     stream: &mut TokenIter<'_>,
 ) -> Option<Result<B, SmilesError>>
@@ -334,17 +412,18 @@ where
     let mut amount: u16 = 0;
     let mut digits_found = 0;
 
-    while let Some(char) = stream.peek_char() {
-        if digits_found == MAX_DIGITS {
+    let bytes = stream.bytes;
+    let len = stream.len;
+    let mut position = stream.position;
+
+    while position < len && digits_found < MAX_DIGITS {
+        let byte = bytes[position];
+        if !byte.is_ascii_digit() {
             break;
         }
-        let Some(digit) = char.to_digit(10) else {
-            break;
-        };
-        let digit = u16::try_from(digit)
-            .unwrap_or_else(|_| unreachable!("a character cannot be greater than u16"));
-        stream.chars.next();
         digits_found += 1;
+        position += 1;
+        let digit = u16::from(byte - b'0');
         match amount.checked_mul(10).and_then(|x| x.checked_add(digit)) {
             Some(val) => amount = val,
             None => return Some(Err(SmilesError::IntegerOverflow)),
@@ -355,33 +434,34 @@ where
         return None;
     }
 
+    stream.position = position;
     Some(B::try_from(amount).map_err(|_| SmilesError::IntegerOverflow))
 }
 
-fn hydrogen_count(stream: &mut TokenIter<'_>) -> Result<HydrogenCount, SmilesError> {
-    let possible_hydrogen = stream.peek_char();
-    if matches!(possible_hydrogen, Some('H')) {
-        stream.chars.next();
+#[inline]
+fn hydrogen_count(stream: &mut TokenIter<'_>) -> Result<u8, SmilesError> {
+    if stream.peek_byte() == Some(b'H') {
+        let _ = stream.next_byte();
         match try_fold_number::<u8, 3>(stream) {
-            Some(h) => Ok(HydrogenCount::new(Some(h?))),
-            None => Ok(HydrogenCount::new(Some(1))),
+            Some(h) => Ok(h?),
+            None => Ok(1),
         }
     } else {
-        Ok(HydrogenCount::Unspecified)
+        Ok(0)
     }
 }
 
+#[inline]
 fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
-    match stream.peek_char() {
-        Some('-') => {
-            stream.chars.next();
-            match stream.peek_char() {
-                Some('-') => {
-                    stream.chars.next();
-                    let mut num = -2;
-                    while matches!(stream.peek_char(), Some('-')) {
+    match stream.peek_byte() {
+        Some(b'-') => {
+            stream.position += 1;
+            match stream.peek_byte() {
+                Some(b'-') => {
+                    let mut num = -1;
+                    while stream.peek_byte() == Some(b'-') {
                         num -= 1;
-                        stream.chars.next();
+                        stream.position += 1;
                     }
                     Charge::try_new(num)
                 }
@@ -394,15 +474,14 @@ fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
                 }
             }
         }
-        Some('+') => {
-            stream.chars.next();
-            match stream.peek_char() {
-                Some('+') => {
-                    stream.chars.next();
-                    let mut num = 2;
-                    while matches!(stream.peek_char(), Some('+')) {
+        Some(b'+') => {
+            stream.position += 1;
+            match stream.peek_byte() {
+                Some(b'+') => {
+                    let mut num = 1;
+                    while stream.peek_byte() == Some(b'+') {
                         num += 1;
-                        stream.chars.next();
+                        stream.position += 1;
                     }
                     Charge::try_new(num)
                 }
@@ -415,32 +494,33 @@ fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
                 }
             }
         }
-        Some(c) if c.is_ascii_digit() => {
+        Some(byte) if byte.is_ascii_digit() => {
             if let Some(possible_num) = try_fold_number::<i8, 2>(stream) {
                 let magnitude = possible_num?;
-                match stream.peek_char() {
-                    Some('-') => {
-                        stream.chars.next();
+                match stream.peek_byte() {
+                    Some(b'-') => {
+                        stream.position += 1;
                         Charge::try_new(-magnitude)
                     }
-                    Some('+') => {
-                        stream.chars.next();
+                    Some(b'+') => {
+                        stream.position += 1;
                         Charge::try_new(magnitude)
                     }
-                    _ => Err(SmilesError::UnexpectedCharacter(c)),
+                    _ => Err(SmilesError::UnexpectedCharacter(char::from(byte))),
                 }
             } else {
-                Err(SmilesError::UnexpectedCharacter(c))
+                Err(SmilesError::UnexpectedCharacter(char::from(byte)))
             }
         }
         _ => Ok(Charge::default()),
     }
 }
 
+#[inline]
 fn try_class(stream: &mut TokenIter<'_>) -> Result<u16, SmilesError> {
-    match stream.peek_char() {
-        Some(':') => {
-            stream.chars.next();
+    match stream.peek_byte() {
+        Some(b':') => {
+            stream.position += 1;
             if let Some(possible_num) = try_fold_number::<u16, 3>(stream) {
                 possible_num
             } else {
@@ -451,51 +531,52 @@ fn try_class(stream: &mut TokenIter<'_>) -> Result<u16, SmilesError> {
     }
 }
 
-fn try_bond(char: char, bracket: bool) -> Result<Token, SmilesError> {
-    let bond = match char {
-        '-' => {
+#[inline]
+fn try_bond(byte: u8, bracket: bool) -> Result<Token, SmilesError> {
+    let bond = match byte {
+        b'-' => {
             if bracket {
                 return Err(SmilesError::UnexpectedDash);
             }
             Token::Bond(Bond::Single)
         }
-        '=' => {
+        b'=' => {
             if bracket {
                 return Err(SmilesError::BondInBracket(Bond::Double));
             }
             Token::Bond(Bond::Double)
         }
-        '#' => {
+        b'#' => {
             if bracket {
                 return Err(SmilesError::BondInBracket(Bond::Triple));
             }
             Token::Bond(Bond::Triple)
         }
-        '$' => {
+        b'$' => {
             if bracket {
                 return Err(SmilesError::BondInBracket(Bond::Quadruple));
             }
             Token::Bond(Bond::Quadruple)
         }
-        ':' => {
+        b':' => {
             if bracket {
                 return Err(SmilesError::UnexpectedColon);
             }
             Token::Bond(Bond::Aromatic)
         }
-        '/' => {
+        b'/' => {
             if bracket {
                 return Err(SmilesError::BondInBracket(Bond::Up));
             }
             Token::Bond(Bond::Up)
         }
-        '\\' => {
+        b'\\' => {
             if bracket {
                 return Err(SmilesError::BondInBracket(Bond::Down));
             }
             Token::Bond(Bond::Down)
         }
-        _ => return Err(SmilesError::UnexpectedCharacter(char)),
+        _ => return Err(SmilesError::UnexpectedCharacter(char::from(byte))),
     };
     Ok(bond)
 }
@@ -510,7 +591,7 @@ mod tests {
     use crate::{
         atom::{
             atom_symbol::AtomSymbol,
-            bracketed::{charge::Charge, chirality::Chirality, hydrogen_count::HydrogenCount},
+            bracketed::{charge::Charge, chirality::Chirality},
         },
         bond::{Bond, ring_num::RingNum},
         errors::SmilesError,
@@ -532,27 +613,27 @@ mod tests {
     fn parse_token_direct_bracket_state_errors() {
         let mut iter = TokenIter::from(".");
         iter.in_bracket = true;
-        assert_eq!(iter.parse_token('.'), Err(SmilesError::NonBondInBracket));
+        assert_eq!(iter.parse_token(b'.'), Err(SmilesError::NonBondInBracket));
 
         let mut iter = TokenIter::from("[");
         iter.in_bracket = true;
-        assert_eq!(iter.parse_token('['), Err(SmilesError::UnexpectedLeftBracket));
+        assert_eq!(iter.parse_token(b'['), Err(SmilesError::UnexpectedLeftBracket));
 
         let mut iter = TokenIter::from("C");
         iter.in_bracket = true;
-        assert_eq!(iter.parse_token('C'), Err(SmilesError::UnexpectedBracketedState));
+        assert_eq!(iter.parse_token(b'C'), Err(SmilesError::UnexpectedBracketedState));
 
         let mut iter = TokenIter::from("%");
         iter.in_bracket = true;
-        assert_eq!(iter.parse_token('%'), Err(SmilesError::UnexpectedPercent));
+        assert_eq!(iter.parse_token(b'%'), Err(SmilesError::UnexpectedPercent));
 
         let mut iter = TokenIter::from("(");
         iter.in_bracket = true;
-        assert_eq!(iter.parse_token('('), Err(SmilesError::UnexpectedBracketedState));
+        assert_eq!(iter.parse_token(b'('), Err(SmilesError::UnexpectedBracketedState));
 
         let mut iter = TokenIter::from(")");
         iter.in_bracket = true;
-        assert_eq!(iter.parse_token(')'), Err(SmilesError::UnexpectedBracketedState));
+        assert_eq!(iter.parse_token(b')'), Err(SmilesError::UnexpectedBracketedState));
     }
 
     #[test]
@@ -560,7 +641,7 @@ mod tests {
         let token = next_ok("[13C@H2+2:12]");
         assert_eq!(token.start(), 0);
         assert_eq!(token.end(), "[13C@H2+2:12]".len());
-        assert!(matches!(token.token(), Token::BracketedAtom(_)));
+        assert!(matches!(token.token(), Token::Atom(atom) if atom.is_bracket_atom()));
     }
 
     #[test]
@@ -626,33 +707,33 @@ mod tests {
     #[test]
     fn try_element_from_first_branches() {
         let mut stream = TokenIter::from("");
-        assert_eq!(try_element_from_first(&mut stream, '*'), Ok((AtomSymbol::WildCard, false)));
+        assert_eq!(try_element_from_first(&mut stream, b'*'), Ok((AtomSymbol::WildCard, false)));
 
         let mut stream = TokenIter::from("");
         assert_eq!(
-            try_element_from_first(&mut stream, 'c'),
+            try_element_from_first(&mut stream, b'c'),
             Ok((AtomSymbol::Element(Element::C), true))
         );
 
         let mut stream = TokenIter::from("l");
         assert_eq!(
-            try_element_from_first(&mut stream, 'C'),
+            try_element_from_first(&mut stream, b'C'),
             Ok((AtomSymbol::Element(Element::Cl), false))
         );
 
         let mut stream = TokenIter::from("e");
         stream.in_bracket = true;
         assert_eq!(
-            try_element_from_first(&mut stream, 's'),
+            try_element_from_first(&mut stream, b's'),
             Ok((AtomSymbol::Element(Element::Se), true))
         );
 
         let mut stream = TokenIter::from("");
-        assert_eq!(try_element_from_first(&mut stream, '1'), Err(SmilesError::MissingElement));
+        assert_eq!(try_element_from_first(&mut stream, b'1'), Err(SmilesError::MissingElement));
 
         let mut stream = TokenIter::from("");
         assert_eq!(
-            try_element_from_first(&mut stream, 'q'),
+            try_element_from_first(&mut stream, b'q'),
             Err(SmilesError::InvalidElementName('q'))
         );
     }
@@ -719,13 +800,13 @@ mod tests {
     #[test]
     fn hydrogen_count_branches() {
         let mut stream = TokenIter::from("H2");
-        assert_eq!(hydrogen_count(&mut stream), Ok(HydrogenCount::new(Some(2))));
+        assert_eq!(hydrogen_count(&mut stream), Ok(2));
 
         let mut stream = TokenIter::from("H");
-        assert_eq!(hydrogen_count(&mut stream), Ok(HydrogenCount::new(Some(1))));
+        assert_eq!(hydrogen_count(&mut stream), Ok(1));
 
         let mut stream = TokenIter::from("C");
-        assert_eq!(hydrogen_count(&mut stream), Ok(HydrogenCount::Unspecified));
+        assert_eq!(hydrogen_count(&mut stream), Ok(0));
     }
 
     #[test]
@@ -783,17 +864,17 @@ mod tests {
         ];
 
         for (ch, expected) in ok_cases {
-            assert_eq!(try_bond(ch, false), Ok(expected));
+            assert_eq!(try_bond(ch as u8, false), Ok(expected));
         }
 
-        assert_eq!(try_bond('-', true), Err(SmilesError::UnexpectedDash));
-        assert_eq!(try_bond(':', true), Err(SmilesError::UnexpectedColon));
-        assert_eq!(try_bond('=', true), Err(SmilesError::BondInBracket(Bond::Double)));
-        assert_eq!(try_bond('#', true), Err(SmilesError::BondInBracket(Bond::Triple)));
-        assert_eq!(try_bond('$', true), Err(SmilesError::BondInBracket(Bond::Quadruple)));
-        assert_eq!(try_bond('/', true), Err(SmilesError::BondInBracket(Bond::Up)));
-        assert_eq!(try_bond('\\', true), Err(SmilesError::BondInBracket(Bond::Down)));
-        assert_eq!(try_bond('x', false), Err(SmilesError::UnexpectedCharacter('x')));
+        assert_eq!(try_bond(b'-', true), Err(SmilesError::UnexpectedDash));
+        assert_eq!(try_bond(b':', true), Err(SmilesError::UnexpectedColon));
+        assert_eq!(try_bond(b'=', true), Err(SmilesError::BondInBracket(Bond::Double)));
+        assert_eq!(try_bond(b'#', true), Err(SmilesError::BondInBracket(Bond::Triple)));
+        assert_eq!(try_bond(b'$', true), Err(SmilesError::BondInBracket(Bond::Quadruple)));
+        assert_eq!(try_bond(b'/', true), Err(SmilesError::BondInBracket(Bond::Up)));
+        assert_eq!(try_bond(b'\\', true), Err(SmilesError::BondInBracket(Bond::Down)));
+        assert_eq!(try_bond(b'x', false), Err(SmilesError::UnexpectedCharacter('x')));
     }
 
     #[test]
@@ -821,7 +902,7 @@ mod tests {
     #[test]
     fn token_iter_parses_bracket_atom_with_th_chirality() {
         let token = next_ok("[C@TH1]");
-        assert!(matches!(token.token(), Token::BracketedAtom(_)));
+        assert!(matches!(token.token(), Token::Atom(atom) if atom.is_bracket_atom()));
     }
     #[test]
     fn test_charge_parsing() {
@@ -842,10 +923,10 @@ mod tests {
                     Ok(token_with_span) => {
                         let possible_atom = token_with_span.token();
                         match possible_atom {
-                            Token::BracketedAtom(atom) => {
+                            Token::Atom(atom) => {
                                 assert_eq!(atom.charge_value(), expected_charge);
                             }
-                            _ => panic!("Token: {possible_atom:?} should be a bracketed atom!"),
+                            _ => panic!("Token: {possible_atom:?} should be an atom token!"),
                         }
                     }
                     Err(e) => panic!("{e} in {smiles}"),
@@ -877,10 +958,10 @@ mod tests {
                 match token {
                     Ok(token_with_span) => {
                         match token_with_span.token() {
-                            Token::BracketedAtom(atom) => {
+                            Token::Atom(atom) => {
                                 assert_eq!(atom.charge_value(), expected_charge);
                             }
-                            other => panic!("Token {other:?} should be a bracketed atom!"),
+                            other => panic!("Token {other:?} should be an atom token!"),
                         }
                     }
                     Err(e) => panic!("{e} in {smiles}"),

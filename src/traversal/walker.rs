@@ -1,32 +1,27 @@
-//! Module for walking the [`Smiles`] graph and tracking progress
+//! Module for walking the [`Smiles`] graph and tracking progress.
 
-use alloc::{
-    collections::{BTreeMap, BTreeSet},
-    vec::Vec,
-};
+use alloc::vec::Vec;
 
-use crate::{
-    bond::bond_edge::BondEdge, errors::SmilesError, smiles::Smiles,
-    traversal::visitor_trait::Visitor,
-};
+use geometric_traits::traits::{SizedRowsSparseMatrix2D, SparseMatrix2D, SparseValuedMatrix2DRef};
 
-/// Traverses the [`Smiles`] graph via a depth first search
+use crate::{errors::SmilesError, smiles::Smiles, traversal::visitor_trait::Visitor};
+
+/// Traverses the [`Smiles`] graph via a depth first search.
 ///
 /// # Errors
-/// - Will return [`SmilesError::NodeIdInvalid`] if a node is unable to be found
-pub fn walk<V: Visitor>(smiles: &Smiles, visitor: &mut V) -> Result<(), SmilesError> {
-    // Each key is a node ID and value is the list of incident edge indices.
-    let mut adjacency: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
-    build_adjacency(&mut adjacency, smiles.edges());
-    let mut visited_nodes: BTreeSet<usize> = BTreeSet::new();
-    let mut visited_edges: BTreeSet<usize> = BTreeSet::new();
+/// - Will return [`SmilesError::NodeIdInvalid`] if a node is unable to be
+///   found.
+pub(crate) fn walk<V: Visitor>(smiles: &Smiles, visitor: &mut V) -> Result<(), SmilesError> {
+    let node_count = smiles.nodes().len();
+    let mut visited_nodes = vec![false; node_count];
+    let mut visited_edges = vec![false; smiles.number_of_bonds()];
     let mut component_index = 0;
 
-    for node in smiles.nodes() {
-        if !visited_nodes.contains(&node.id()) {
-            visitor.start_component(smiles, node.id(), component_index)?;
-            dfs(smiles, visitor, node.id(), &mut visited_nodes, &mut visited_edges, &adjacency)?;
-            visitor.finish_component(smiles, node.id(), component_index)?;
+    for node_id in 0..node_count {
+        if !visited_nodes[node_id] {
+            visitor.start_component(smiles, node_id, component_index)?;
+            dfs(smiles, visitor, node_id, &mut visited_nodes, &mut visited_edges)?;
+            visitor.finish_component(smiles, node_id, component_index)?;
             component_index += 1;
         }
     }
@@ -34,74 +29,64 @@ pub fn walk<V: Visitor>(smiles: &Smiles, visitor: &mut V) -> Result<(), SmilesEr
     Ok(())
 }
 
-fn build_adjacency(adjacency: &mut BTreeMap<usize, Vec<usize>>, edges: &[BondEdge]) {
-    for (index, edge) in edges.iter().enumerate() {
-        let node_a = edge.node_a();
-        let node_b = edge.node_b();
-        adjacency.entry(node_a).or_default().push(index);
-        adjacency.entry(node_b).or_default().push(index);
-    }
-}
-
 fn dfs<V: Visitor>(
     smiles: &Smiles,
     visitor: &mut V,
     current_id: usize,
-    visited_nodes: &mut BTreeSet<usize>,
-    visited_edges: &mut BTreeSet<usize>,
-    adjacency: &BTreeMap<usize, Vec<usize>>,
+    visited_nodes: &mut [bool],
+    visited_edges: &mut [bool],
 ) -> Result<(), SmilesError> {
-    if !visited_nodes.insert(current_id) {
+    if visited_nodes[current_id] {
         return Ok(());
     }
+    visited_nodes[current_id] = true;
 
     visitor.enter_node(smiles, current_id)?;
 
-    let mut unvisited_bonds = Vec::new();
-    let mut queued_neighbors = BTreeSet::new();
+    let bond_matrix = smiles.bond_matrix();
+    let mut unvisited_bonds =
+        Vec::with_capacity(bond_matrix.number_of_defined_values_in_row(current_id));
 
-    if let Some(bond_indices) = adjacency.get(&current_id) {
-        for bond_index in bond_indices {
-            if visited_edges.contains(bond_index) {
-                continue;
-            }
-            let bond = &smiles.edges()[*bond_index];
-            if let Some(other_id) = bond.other(current_id) {
-                if visited_nodes.contains(&other_id) {
-                    visited_edges.insert(*bond_index);
-                    visitor.cycle_edge(smiles, current_id, other_id, bond.bond())?;
-                } else if queued_neighbors.insert(other_id) {
-                    unvisited_bonds.push((*bond_index, bond, other_id));
-                }
-            }
+    for (other_id, entry) in
+        bond_matrix.sparse_row(current_id).zip(bond_matrix.sparse_row_values_ref(current_id))
+    {
+        let edge_order = entry.order();
+        if visited_edges[edge_order] {
+            continue;
+        }
+
+        if visited_nodes[other_id] {
+            visited_edges[edge_order] = true;
+            visitor.cycle_edge(smiles, current_id, other_id, entry.bond())?;
+        } else {
+            let is_leaf = bond_matrix.number_of_defined_values_in_row(other_id) == 1;
+            unvisited_bonds.push((other_id, is_leaf, *entry));
         }
     }
 
     // Prefer a leaf-like continuation edge when multiple choices exist. This
     // keeps render output stable for graphs where one root-adjacent edge is
     // also reachable through a later cycle closure.
-    unvisited_bonds.sort_by_key(|(_, _, other_id)| {
-        let degree = adjacency.get(other_id).map_or(0, Vec::len);
-        (degree == 1, *other_id)
-    });
+    unvisited_bonds.sort_by_key(|(other_id, is_leaf, entry)| (*is_leaf, entry.order(), *other_id));
 
-    if let Some((main_edge_index, main_bond, main_other_id)) = unvisited_bonds.pop() {
-        for (branch_edge_index, branch_bond, branch_other_id) in unvisited_bonds {
-            if visited_nodes.contains(&branch_other_id) {
+    if let Some((main_other_id, _, main_entry)) = unvisited_bonds.pop() {
+        for (branch_other_id, _, branch_entry) in unvisited_bonds {
+            if visited_nodes[branch_other_id] {
                 continue;
             }
-            visited_edges.insert(branch_edge_index);
+            visited_edges[branch_entry.order()] = true;
             visitor.open_branch(smiles, current_id, branch_other_id)?;
-            visitor.tree_edge(smiles, *branch_bond)?;
-            dfs(smiles, visitor, branch_other_id, visited_nodes, visited_edges, adjacency)?;
+            visitor.tree_edge(smiles, branch_entry.to_bond_edge(current_id, branch_other_id))?;
+            dfs(smiles, visitor, branch_other_id, visited_nodes, visited_edges)?;
             visitor.close_branch(smiles, current_id, branch_other_id)?;
         }
-        if !visited_nodes.contains(&main_other_id) {
-            visited_edges.insert(main_edge_index);
-            visitor.tree_edge(smiles, *main_bond)?;
-            dfs(smiles, visitor, main_other_id, visited_nodes, visited_edges, adjacency)?;
+        if !visited_nodes[main_other_id] {
+            visited_edges[main_entry.order()] = true;
+            visitor.tree_edge(smiles, main_entry.to_bond_edge(current_id, main_other_id))?;
+            dfs(smiles, visitor, main_other_id, visited_nodes, visited_edges)?;
         }
     }
+
     visitor.exit_node(smiles, current_id)?;
     Ok(())
 }

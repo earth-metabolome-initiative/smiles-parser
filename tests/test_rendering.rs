@@ -2,6 +2,7 @@
 
 use std::str::FromStr;
 
+use geometric_traits::traits::SparseValuedMatrixRef;
 use smiles_parser::{bond::Bond, smiles::Smiles};
 
 const SMILES_STR: &[&str] = &[
@@ -49,7 +50,11 @@ fn parse_or_panic(s: &str) -> Smiles {
 }
 
 fn bond_count(smiles: &Smiles, bond: Bond) -> usize {
-    smiles.edges().iter().filter(|e| e.bond() == bond).count()
+    smiles
+        .bond_matrix()
+        .sparse_entries()
+        .filter(|((row, column), entry)| row < column && entry.bond() == bond)
+        .count()
 }
 
 #[test]
@@ -72,13 +77,13 @@ fn test_render_round_trip_all_inputs() {
         );
 
         assert_eq!(
-            parsed.edges().len(),
-            reparsed.edges().len(),
+            parsed.number_of_bonds(),
+            reparsed.number_of_bonds(),
             "Edge count changed after render round trip.\nOriginal:\n{original}\nRendered:\n{rendered}"
         );
 
-        let parsed_aromatic = parsed.nodes().iter().filter(|n| n.atom().aromatic()).count();
-        let reparsed_aromatic = reparsed.nodes().iter().filter(|n| n.atom().aromatic()).count();
+        let parsed_aromatic = parsed.nodes().iter().filter(|n| n.aromatic()).count();
+        let reparsed_aromatic = reparsed.nodes().iter().filter(|n| n.aromatic()).count();
 
         assert_eq!(
             parsed_aromatic, reparsed_aromatic,
