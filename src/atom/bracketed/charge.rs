@@ -27,6 +27,19 @@ impl Charge {
     pub fn get(&self) -> i8 {
         self.0
     }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn display_len(self) -> usize {
+        match self.0 {
+            0 => 0,
+            1 | -1 => 1,
+            2..=9 | -9..=-2 => 2,
+            10..=15 => 3,
+            -15..=-10 => 4,
+            _ => unreachable!("state not reachable, charges can only be between -15 & 15"),
+        }
+    }
 }
 
 impl fmt::Display for Charge {

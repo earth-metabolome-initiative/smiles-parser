@@ -9,7 +9,9 @@ description = "A SMILES parser in Rust"
 readme = "README.md"
 
 [dependencies]
-elements_rs = "0.2.0"
+elements_rs = "0.2.1"
+geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", rev = "b509d25854aac0ecf368a2e8f97d2530e970a106", default-features = false, features = ["alloc"] }
+hashbrown = { version = "0.16.1", default-features = false, features = ["alloc", "default-hasher", "inline-more"] }
 thiserror = { version = "2.0.18", default-features = false }
 
 

@@ -63,6 +63,18 @@ impl Chirality {
     pub fn try_oh(num: u8) -> Result<Self, SmilesError> {
         (1..=30).contains(&num).then_some(Self::OH(num)).ok_or(SmilesError::InvalidChirality)
     }
+
+    #[inline]
+    #[must_use]
+    pub(crate) const fn display_len(self) -> usize {
+        match self {
+            Self::At => 1,
+            Self::AtAt => 2,
+            Self::TH(n) | Self::AL(n) | Self::SP(n) | Self::TB(n) | Self::OH(n) => {
+                3 + decimal_len_u8(n)
+            }
+        }
+    }
 }
 
 impl fmt::Display for Chirality {
@@ -76,6 +88,16 @@ impl fmt::Display for Chirality {
             Self::TB(n) => write!(f, "@TB{n}"),
             Self::OH(n) => write!(f, "@OH{n}"),
         }
+    }
+}
+
+const fn decimal_len_u8(value: u8) -> usize {
+    if value >= 100 {
+        3
+    } else if value >= 10 {
+        2
+    } else {
+        1
     }
 }
 

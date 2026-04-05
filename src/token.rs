@@ -3,19 +3,35 @@
 use core::ops::Range;
 
 use crate::{
-    atom::{bracketed::BracketAtom, unbracketed::UnbracketedAtom},
+    atom::Atom,
     bond::{Bond, ring_num::RingNum},
 };
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+/// Lightweight token category used when only syntax class matters.
+pub enum TokenKind {
+    /// `.` separator
+    NonBond,
+    /// Atom token
+    Atom,
+    /// Explicit bond token
+    Bond,
+    /// `(`
+    LeftParentheses,
+    /// `)`
+    RightParentheses,
+    /// Ring closure token
+    RingClosure,
+}
 
 #[derive(Copy, Debug, PartialEq, Clone, Eq, Hash)]
 /// Represents a token in a molecular formula.
 pub enum Token {
     /// Represented with a `.`
     NonBond,
-    /// Elements that occur inside of `[]`, structured as [`BracketAtom`]
-    BracketedAtom(BracketAtom),
-    /// Aliphatic organic elements only as [`UnbracketedAtom`]
-    UnbracketedAtom(UnbracketedAtom),
+    /// Parsed atom token, preserving whether it came from bracket or
+    /// organic-subset syntax inside the stored [`Atom`] value.
+    Atom(Atom),
     /// The parsed bond. Single bonds are implicit between atoms if not
     /// explicated as a bond, e.g. `CC` would be `C-C`.
     Bond(Bond),
@@ -48,6 +64,11 @@ impl TokenWithSpan {
     pub fn token(&self) -> Token {
         self.token
     }
+    /// Returns the token kind without the payload.
+    #[must_use]
+    pub fn token_kind(&self) -> TokenKind {
+        self.token.kind()
+    }
     /// Returns the span as [`Range`]
     #[must_use]
     pub fn span(&self) -> Range<usize> {
@@ -66,7 +87,23 @@ impl TokenWithSpan {
     /// Returns whether the token is a bond
     #[must_use]
     pub fn is_bond(&self) -> bool {
-        matches!(self.token, Token::Bond(_))
+        self.token_kind() == TokenKind::Bond
+    }
+}
+
+impl Token {
+    /// Returns the payload-free category of the token.
+    #[inline]
+    #[must_use]
+    pub fn kind(self) -> TokenKind {
+        match self {
+            Self::NonBond => TokenKind::NonBond,
+            Self::Atom(_) => TokenKind::Atom,
+            Self::Bond(_) => TokenKind::Bond,
+            Self::LeftParentheses => TokenKind::LeftParentheses,
+            Self::RightParentheses => TokenKind::RightParentheses,
+            Self::RingClosure(_) => TokenKind::RingClosure,
+        }
     }
 }
 
@@ -76,21 +113,20 @@ mod tests {
 
     use super::{Token, TokenWithSpan};
     use crate::{
-        atom::{atom_symbol::AtomSymbol, bracketed::BracketAtom, unbracketed::UnbracketedAtom},
+        atom::{Atom, atom_symbol::AtomSymbol},
         bond::{Bond, ring_num::RingNum},
     };
 
     #[test]
     fn token_variants_can_be_constructed_and_compared() {
-        let bracket_atom =
-            BracketAtom::builder().with_symbol(AtomSymbol::Element(Element::C)).build();
-        let unbracketed_atom = UnbracketedAtom::new(AtomSymbol::Element(Element::O), false);
+        let bracket_atom = Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).build();
+        let organic_atom = Atom::new_organic_subset(AtomSymbol::Element(Element::O), false);
         let ring_num = RingNum::try_new(12).unwrap();
 
         let cases = [
             Token::NonBond,
-            Token::BracketedAtom(bracket_atom),
-            Token::UnbracketedAtom(unbracketed_atom),
+            Token::Atom(bracket_atom),
+            Token::Atom(organic_atom),
             Token::Bond(Bond::Double),
             Token::LeftParentheses,
             Token::RightParentheses,
@@ -98,8 +134,8 @@ mod tests {
         ];
 
         assert_eq!(cases[0], Token::NonBond);
-        assert_eq!(cases[1], Token::BracketedAtom(bracket_atom));
-        assert_eq!(cases[2], Token::UnbracketedAtom(unbracketed_atom));
+        assert_eq!(cases[1], Token::Atom(bracket_atom));
+        assert_eq!(cases[2], Token::Atom(organic_atom));
         assert_eq!(cases[3], Token::Bond(Bond::Double));
         assert_eq!(cases[4], Token::LeftParentheses);
         assert_eq!(cases[5], Token::RightParentheses);
@@ -119,15 +155,14 @@ mod tests {
 
     #[test]
     fn token_with_span_preserves_complex_token_variants() {
-        let bracket_atom =
-            BracketAtom::builder().with_symbol(AtomSymbol::Element(Element::N)).build();
+        let bracket_atom = Atom::builder().with_symbol(AtomSymbol::Element(Element::N)).build();
         let ring_num = RingNum::try_new(9).unwrap();
 
-        let bracketed = TokenWithSpan::new(Token::BracketedAtom(bracket_atom), 0, 3);
+        let bracketed = TokenWithSpan::new(Token::Atom(bracket_atom), 0, 3);
         let ring = TokenWithSpan::new(Token::RingClosure(ring_num), 5, 6);
         let non_bond = TokenWithSpan::new(Token::NonBond, 10, 11);
 
-        assert_eq!(bracketed.token(), Token::BracketedAtom(bracket_atom));
+        assert_eq!(bracketed.token(), Token::Atom(bracket_atom));
         assert_eq!(bracketed.span(), 0..3);
 
         assert_eq!(ring.token(), Token::RingClosure(ring_num));

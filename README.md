@@ -31,13 +31,14 @@ let smiles = Smiles::from_str("CCO").expect("valid SMILES should parse");
 
 // The molecular graph contains 3 atoms and 2 bonds for ethanol.
 assert_eq!(smiles.nodes().len(), 3);
-assert_eq!(smiles.edges().len(), 2);
+assert_eq!(smiles.number_of_bonds(), 2);
 
 // You can inspect each node in the graph.
 let node_summaries: Vec<(usize, String)> = smiles
     .nodes()
     .iter()
-    .map(|node| (node.id(), node.atom().to_string()))
+    .enumerate()
+    .map(|(index, atom)| (index, atom.to_string()))
     .collect();
 
 assert_eq!(

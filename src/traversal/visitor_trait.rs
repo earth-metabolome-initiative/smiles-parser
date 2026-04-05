@@ -7,7 +7,7 @@ use crate::{
 };
 
 /// Trait that defines visitors to [`Smiles`] nodes
-pub trait Visitor {
+pub(crate) trait Visitor {
     /// Called when traversal first enters a node
     ///
     /// # Errors

@@ -1,18 +1,13 @@
-use alloc::vec::Vec;
 use core::str::FromStr;
 
 use super::Smiles;
-use crate::{
-    errors::SmilesErrorWithSpan,
-    parser::{smiles_parser::SmilesParser, token_iter::TokenIter},
-};
+use crate::{errors::SmilesErrorWithSpan, parser::smiles_parser::parse_smiles};
 
 impl FromStr for Smiles {
     type Err = SmilesErrorWithSpan;
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let token_iter = TokenIter::from(s);
-        let tokens = token_iter.collect::<Result<Vec<_>, _>>()?;
-        SmilesParser::new(&tokens).parse()
+        parse_smiles(s)
     }
 }
 
@@ -24,7 +19,7 @@ mod tests {
     use elements_rs::Element;
 
     use crate::{
-        atom::{atom_node::AtomNode, atom_symbol::AtomSymbol, unbracketed::UnbracketedAtom},
+        atom::{Atom, atom_symbol::AtomSymbol},
         bond::{Bond, bond_edge::BondEdge, ring_num::RingNum},
         smiles::Smiles,
     };
@@ -34,56 +29,24 @@ mod tests {
         let smiles = Smiles::from_str("C1=CC=CC=C1")
             .unwrap_or_else(|e| panic!("Failed to tokenize:\n{}", e.render("C1=CC=CC=C1")));
 
-        let expected = Smiles {
-            atom_nodes: vec![
-                AtomNode::new(
-                    UnbracketedAtom::new(AtomSymbol::Element(Element::C), false).into(),
-                    0,
-                    0..1,
-                ),
-                AtomNode::new(
-                    UnbracketedAtom::new(AtomSymbol::Element(Element::C), false).into(),
-                    1,
-                    3..4,
-                ),
-                AtomNode::new(
-                    UnbracketedAtom::new(AtomSymbol::Element(Element::C), false).into(),
-                    2,
-                    4..5,
-                ),
-                AtomNode::new(
-                    UnbracketedAtom::new(AtomSymbol::Element(Element::C), false).into(),
-                    3,
-                    6..7,
-                ),
-                AtomNode::new(
-                    UnbracketedAtom::new(AtomSymbol::Element(Element::C), false).into(),
-                    4,
-                    7..8,
-                ),
-                AtomNode::new(
-                    UnbracketedAtom::new(AtomSymbol::Element(Element::C), false).into(),
-                    5,
-                    9..10,
-                ),
-            ],
-            bond_edges: vec![
-                BondEdge::new(0, 1, Bond::Double, None),
-                BondEdge::new(1, 2, Bond::Single, None),
-                BondEdge::new(2, 3, Bond::Double, None),
-                BondEdge::new(3, 4, Bond::Single, None),
-                BondEdge::new(4, 5, Bond::Double, None),
-                BondEdge::new(5, 0, Bond::Single, Some(RingNum::try_new(1).unwrap())),
-            ],
-        };
+        let expected_nodes = [
+            Atom::new_organic_subset(AtomSymbol::Element(Element::C), false),
+            Atom::new_organic_subset(AtomSymbol::Element(Element::C), false),
+            Atom::new_organic_subset(AtomSymbol::Element(Element::C), false),
+            Atom::new_organic_subset(AtomSymbol::Element(Element::C), false),
+            Atom::new_organic_subset(AtomSymbol::Element(Element::C), false),
+            Atom::new_organic_subset(AtomSymbol::Element(Element::C), false),
+        ];
+        let expected_ring_edge =
+            BondEdge::new(0, 5, Bond::Single, Some(RingNum::try_new(1).unwrap()));
 
-        assert_eq!(smiles.nodes()[0], expected.atom_nodes[0]);
-        assert_eq!(smiles.nodes()[5], expected.atom_nodes[5]);
+        assert_eq!(smiles.nodes()[0], expected_nodes[0]);
+        assert_eq!(smiles.nodes()[5], expected_nodes[5]);
 
-        assert_eq!(smiles.edges()[5], expected.bond_edges[5]);
-        assert_eq!(smiles.edges()[5].ring_num_val(), Some(1));
-        assert_eq!(smiles.node_by_id(0), expected.node_by_id(0));
-        assert_eq!(smiles.node_by_id(5), expected.node_by_id(5));
+        assert_eq!(smiles.edge_for_node_pair((0, 5)), Some(expected_ring_edge));
+        assert_eq!(smiles.edge_for_node_pair((0, 5)).and_then(|edge| edge.ring_num_val()), Some(1));
+        assert_eq!(smiles.node_by_id(0), Some(&expected_nodes[0]));
+        assert_eq!(smiles.node_by_id(5), Some(&expected_nodes[5]));
     }
 
     #[test]

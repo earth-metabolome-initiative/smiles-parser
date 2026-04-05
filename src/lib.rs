@@ -11,10 +11,10 @@ extern crate std;
 pub mod atom;
 pub mod bond;
 pub mod errors;
-pub mod parser;
+pub(crate) mod parser;
 pub mod smiles;
 pub mod token;
-pub mod traversal;
+pub(crate) mod traversal;
 
 pub use crate::{
     errors::{SmilesError, SmilesErrorWithSpan},

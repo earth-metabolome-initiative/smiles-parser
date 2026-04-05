@@ -76,7 +76,7 @@ fn validate_pubchem_smiles() -> Result<(), Box<dyn std::error::Error>> {
                     )
                 });
                 assert_eq!(smiles.nodes().len(), reparsed.nodes().len());
-                assert_eq!(smiles.edges().len(), reparsed.edges().len());
+                assert_eq!(smiles.number_of_bonds(), reparsed.number_of_bonds());
             }
             Err(err) => {
                 panic!("id: {}\n SMILES:\n{}", result.id, err.render(smiles_str));

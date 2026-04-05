@@ -1,15 +1,10 @@
 //! Module rendering a SMILES string from the [`Smiles`] graph
 
-use alloc::{
-    collections::BTreeMap,
-    format,
-    string::{String, ToString},
-    vec::Vec,
-};
-use core::cmp::Ordering;
+use alloc::{borrow::Cow, string::String, vec, vec::Vec};
+use core::{cmp::Ordering, fmt};
 
 use crate::{
-    bond::{Bond, bond_edge::BondEdge, ring_num::RingNum},
+    bond::{Bond, bond_edge::BondEdge},
     errors::SmilesError,
     smiles::Smiles,
     traversal::visitor_trait::Visitor,
@@ -17,35 +12,44 @@ use crate::{
 
 /// Structure used for implementing node visits and building output SMILES
 /// `String`
-pub struct RenderVisitor {
-    /// Vector of the outputs generated from the [`Smiles`] graph. Second value
-    /// is an optional node id for sections that are nodes.
-    sections: Vec<(String, Option<usize>)>,
+pub(crate) struct RenderVisitor {
+    /// Vector of output sections generated from the [`Smiles`] graph.
+    sections: Vec<Cow<'static, str>>,
     /// Maps each node ID to its index in `sections`.
-    node_section_index: BTreeMap<usize, usize>,
-    /// Maps each ring label to the section index where its most recent
-    /// ring-closure interval ended.
-    label_last_end: BTreeMap<u8, usize>,
+    node_section_index: Vec<usize>,
+    /// Records where each ring label most recently ended.
+    label_last_end: [usize; 100],
 }
 
+const MISSING_SECTION_INDEX: usize = usize::MAX;
+const UNUSED_RING_LABEL: usize = usize::MAX;
+
 impl RenderVisitor {
-    /// Generates a new `RenderVisitor`
     #[must_use]
-    pub fn new() -> Self {
+    pub(crate) fn with_capacity(number_of_nodes: usize, number_of_bonds: usize) -> Self {
+        let section_capacity = number_of_nodes.saturating_mul(2).saturating_add(number_of_bonds);
         Self {
-            sections: Vec::new(),
-            node_section_index: BTreeMap::new(),
-            label_last_end: BTreeMap::new(),
+            sections: Vec::with_capacity(section_capacity),
+            node_section_index: vec![MISSING_SECTION_INDEX; number_of_nodes],
+            label_last_end: [UNUSED_RING_LABEL; 100],
         }
     }
     /// Builds and returns the string from the section's `String` value
     #[must_use]
-    pub fn into_string(self) -> String {
-        let mut output = String::new();
-        for (section, _) in self.sections {
+    pub(crate) fn into_string(self) -> String {
+        let mut output =
+            String::with_capacity(self.sections.iter().map(|section| section.len()).sum());
+        for section in self.sections {
             output.push_str(&section);
         }
         output
+    }
+
+    pub(crate) fn write_into_formatter(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for section in &self.sections {
+            f.write_str(section.as_ref())?;
+        }
+        Ok(())
     }
     /// Returns the next available ring number
     ///
@@ -53,31 +57,34 @@ impl RenderVisitor {
     /// - Returns [`SmilesError::RingNumberOverflow`] if ring number is over 99
     fn take_ring_num(&mut self, start_index: usize) -> Result<u8, SmilesError> {
         for label in 1..=99 {
-            match self.label_last_end.get(&label) {
-                Some(&last_end) if last_end >= start_index => {}
-                _ => return Ok(label),
+            let last_end = self.label_last_end[label as usize];
+            if last_end == UNUSED_RING_LABEL || last_end < start_index {
+                return Ok(label);
             }
         }
         Err(SmilesError::RingNumberOverflow(100))
     }
-}
 
-impl Default for RenderVisitor {
-    fn default() -> Self {
-        Self::new()
+    fn section_index_for_node(&self, node_id: usize) -> Option<usize> {
+        let section_index = *self.node_section_index.get(node_id)?;
+        (section_index != MISSING_SECTION_INDEX).then_some(section_index)
+    }
+
+    fn record_node_section(&mut self, node_id: usize, section_index: usize) {
+        if self.node_section_index.len() <= node_id {
+            self.node_section_index.resize(node_id + 1, MISSING_SECTION_INDEX);
+        }
+        self.node_section_index[node_id] = section_index;
     }
 }
 
 impl Visitor for RenderVisitor {
     fn enter_node(&mut self, smiles: &Smiles, node_id: usize) -> Result<(), SmilesError> {
-        if let Some(node) = smiles.node_by_id(node_id) {
-            let index = self.sections.len();
-            self.sections.push((node.to_string(), Some(node_id)));
-            self.node_section_index.insert(node_id, index);
-            Ok(())
-        } else {
-            Err(SmilesError::NodeIdInvalid(node_id))
-        }
+        let node = smiles.nodes().get(node_id).ok_or(SmilesError::NodeIdInvalid(node_id))?;
+        let index = self.sections.len();
+        self.sections.push(node.rendered_cow());
+        self.record_node_section(node_id, index);
+        Ok(())
     }
 
     fn exit_node(&mut self, _smiles: &Smiles, _node_id: usize) -> Result<(), SmilesError> {
@@ -85,18 +92,14 @@ impl Visitor for RenderVisitor {
     }
 
     fn tree_edge(&mut self, smiles: &Smiles, bond_edge: BondEdge) -> Result<(), SmilesError> {
-        match bond_edge.bond() {
-            Bond::Single => {
-                if should_render_single(smiles, bond_edge) {
-                    self.sections.push(('-'.to_string(), None));
-                }
-            }
-            Bond::Double => self.sections.push(('='.to_string(), None)),
-            Bond::Triple => self.sections.push(('#'.to_string(), None)),
-            Bond::Quadruple => self.sections.push(('$'.to_string(), None)),
-            Bond::Aromatic => self.sections.push((':'.to_string(), None)),
-            Bond::Up => self.sections.push(('/'.to_string(), None)),
-            Bond::Down => self.sections.push(('\\'.to_string(), None)),
+        let symbol = if bond_edge.bond() == Bond::Single && should_render_single(smiles, bond_edge)
+        {
+            Bond::Single.smiles_symbol()
+        } else {
+            bond_edge.bond().edge_symbol()
+        };
+        if !symbol.is_empty() {
+            self.sections.push(Cow::Borrowed(symbol));
         }
         Ok(())
     }
@@ -108,37 +111,28 @@ impl Visitor for RenderVisitor {
         to: usize,
         bond: Bond,
     ) -> Result<(), SmilesError> {
-        let start_index =
-            *self.node_section_index.get(&to).ok_or(SmilesError::NodeIdInvalid(to))?;
+        let start_index = self.section_index_for_node(to).ok_or(SmilesError::NodeIdInvalid(to))?;
         let end_index =
-            *self.node_section_index.get(&from).ok_or(SmilesError::NodeIdInvalid(from))?;
+            self.section_index_for_node(from).ok_or(SmilesError::NodeIdInvalid(from))?;
         let label = self.take_ring_num(start_index)?;
-        let ring_text = RingNum::try_new(label)?.to_string();
-        let closure_text = match bond {
-            Bond::Double => format!("={ring_text}"),
-            Bond::Triple => format!("#{ring_text}"),
-            Bond::Quadruple => format!("${ring_text}"),
-            Bond::Single | Bond::Aromatic => ring_text.clone(),
-            Bond::Up => format!("/{ring_text}"),
-            Bond::Down => format!("\\{ring_text}"),
-        };
         match start_index.cmp(&end_index) {
             Ordering::Less => {
                 let (left, right) = self.sections.split_at_mut(end_index);
-                left[start_index].0.push_str(&ring_text);
-                right[0].0.push_str(&closure_text);
+                append_ring_label(left[start_index].to_mut(), label);
+                append_closure_label(right[0].to_mut(), bond, label);
             }
             Ordering::Equal => {
-                self.sections[start_index].0.push_str(&ring_text);
-                self.sections[start_index].0.push_str(&closure_text);
+                let section = self.sections[start_index].to_mut();
+                append_ring_label(section, label);
+                append_closure_label(section, bond, label);
             }
             Ordering::Greater => {
                 let (left, right) = self.sections.split_at_mut(start_index);
-                left[end_index].0.push_str(&closure_text);
-                right[0].0.push_str(&ring_text);
+                append_closure_label(left[end_index].to_mut(), bond, label);
+                append_ring_label(right[0].to_mut(), label);
             }
         }
-        self.label_last_end.insert(label, end_index);
+        self.label_last_end[label as usize] = end_index;
         Ok(())
     }
     fn open_branch(
@@ -147,7 +141,7 @@ impl Visitor for RenderVisitor {
         _from: usize,
         _to: usize,
     ) -> Result<(), SmilesError> {
-        self.sections.push(('('.to_string(), None));
+        self.sections.push(Cow::Borrowed("("));
         Ok(())
     }
 
@@ -157,7 +151,7 @@ impl Visitor for RenderVisitor {
         _from: usize,
         _to: usize,
     ) -> Result<(), SmilesError> {
-        self.sections.push((')'.to_string(), None));
+        self.sections.push(Cow::Borrowed(")"));
         Ok(())
     }
 
@@ -168,7 +162,7 @@ impl Visitor for RenderVisitor {
         component_index: usize,
     ) -> Result<(), SmilesError> {
         if component_index > 0 {
-            self.sections.push(('.'.to_string(), None));
+            self.sections.push(Cow::Borrowed("."));
         }
         Ok(())
     }
@@ -185,56 +179,54 @@ impl Visitor for RenderVisitor {
 
 fn should_render_single(smiles: &Smiles, bond_edge: BondEdge) -> bool {
     let (a, b) = bond_edge.vertices();
-    let Some(node_a) = smiles.node_by_id(a) else {
-        return false;
-    };
-    let Some(node_b) = smiles.node_by_id(b) else {
-        return false;
-    };
-    node_a.atom().aromatic() && node_b.atom().aromatic()
+    let nodes = smiles.nodes();
+    debug_assert!(a < nodes.len());
+    debug_assert!(b < nodes.len());
+    nodes[a].aromatic() && nodes[b].aromatic()
+}
+
+fn append_ring_label(target: &mut String, label: u8) {
+    if label >= 10 {
+        target.push('%');
+        target.push(char::from(b'0' + (label / 10)));
+        target.push(char::from(b'0' + (label % 10)));
+    } else {
+        target.push(char::from(b'0' + label));
+    }
+}
+
+fn append_closure_label(target: &mut String, bond: Bond, label: u8) {
+    target.push_str(bond.ring_closure_symbol());
+    append_ring_label(target, label);
 }
 
 #[cfg(test)]
 mod tests {
-    use alloc::string::ToString;
-    use std::{collections::BTreeMap, str::FromStr};
+    use alloc::{borrow::Cow, string::ToString, vec::Vec};
+    use std::str::FromStr;
 
-    use elements_rs::Element;
-
-    use super::RenderVisitor;
+    use super::{RenderVisitor, UNUSED_RING_LABEL};
     use crate::{
-        atom::{atom_node::AtomNode, atom_symbol::AtomSymbol, unbracketed::UnbracketedAtom},
         bond::{Bond, bond_edge::BondEdge},
         errors::SmilesError,
         smiles::Smiles,
         traversal::visitor_trait::Visitor,
     };
 
-    fn node(id: usize, element: Element, start: usize, end: usize) -> AtomNode {
-        AtomNode::new(
-            UnbracketedAtom::new(AtomSymbol::Element(element), false).into(),
-            id,
-            start..end,
-        )
+    fn two_node_smiles() -> Smiles {
+        "CO".parse().unwrap()
     }
 
-    fn two_node_smiles() -> Smiles {
-        let mut smiles = Smiles::new();
-        smiles.push_node(node(0, Element::C, 0, 1)).unwrap();
-        smiles.push_node(node(1, Element::O, 1, 2)).unwrap();
-        smiles
+    fn empty_visitor() -> RenderVisitor {
+        RenderVisitor::with_capacity(0, 0)
     }
 
     #[test]
     fn into_string_concatenates_sections_in_order() {
         let visitor = RenderVisitor {
-            sections: vec![
-                ("C".to_string(), Some(0)),
-                ("=".to_string(), None),
-                ("O".to_string(), Some(1)),
-            ],
-            node_section_index: BTreeMap::new(),
-            label_last_end: BTreeMap::new(),
+            sections: vec![Cow::Borrowed("C"), Cow::Borrowed("="), Cow::Borrowed("O")],
+            node_section_index: Vec::new(),
+            label_last_end: [UNUSED_RING_LABEL; 100],
         };
 
         assert_eq!(visitor.into_string(), "C=O");
@@ -243,20 +235,20 @@ mod tests {
     #[test]
     fn enter_node_pushes_node_string_and_id() {
         let smiles = two_node_smiles();
-        let mut visitor = RenderVisitor::new();
+        let mut visitor = empty_visitor();
 
         visitor.enter_node(&smiles, 0).unwrap();
         visitor.enter_node(&smiles, 1).unwrap();
 
         assert_eq!(visitor.sections.len(), 2);
-        assert_eq!(visitor.sections[0], ("C".to_string(), Some(0)));
-        assert_eq!(visitor.sections[1], ("O".to_string(), Some(1)));
+        assert_eq!(visitor.sections[0], Cow::Borrowed("C"));
+        assert_eq!(visitor.sections[1], Cow::Borrowed("O"));
     }
 
     #[test]
     fn enter_node_errors_for_invalid_node_id() {
         let smiles = two_node_smiles();
-        let mut visitor = RenderVisitor::new();
+        let mut visitor = empty_visitor();
 
         let err = visitor.enter_node(&smiles, 99).expect_err("expected invalid node id");
         assert_eq!(err, SmilesError::NodeIdInvalid(99));
@@ -265,7 +257,7 @@ mod tests {
     #[test]
     fn exit_node_is_ok_and_does_not_modify_sections() {
         let smiles = two_node_smiles();
-        let mut visitor = RenderVisitor::new();
+        let mut visitor = empty_visitor();
         visitor.enter_node(&smiles, 0).unwrap();
 
         let before = visitor.sections.clone();
@@ -289,14 +281,14 @@ mod tests {
         ];
 
         for (bond, expected_symbol) in cases {
-            let mut visitor = RenderVisitor::new();
+            let mut visitor = empty_visitor();
             visitor.tree_edge(&smiles, BondEdge::new(0, 1, bond, None)).unwrap();
 
             match expected_symbol {
                 None => assert!(visitor.sections.is_empty(), "single bond should add nothing"),
                 Some(symbol) => {
                     assert_eq!(visitor.sections.len(), 1);
-                    assert_eq!(visitor.sections[0], (symbol.to_string(), None));
+                    assert_eq!(visitor.sections[0], Cow::Borrowed(symbol));
                 }
             }
         }
@@ -305,73 +297,73 @@ mod tests {
     #[test]
     fn cycle_edge_writes_ring_labels_for_single_and_tracks_label_usage() {
         let smiles = two_node_smiles();
-        let mut visitor = RenderVisitor::new();
+        let mut visitor = empty_visitor();
 
         visitor.enter_node(&smiles, 0).unwrap();
         visitor.enter_node(&smiles, 1).unwrap();
 
         visitor.cycle_edge(&smiles, 0, 1, Bond::Single).unwrap_or_else(|e| panic!("{}", e));
 
-        assert_eq!(visitor.sections[0], ("C1".to_string(), Some(0)));
-        assert_eq!(visitor.sections[1], ("O1".to_string(), Some(1)));
+        assert_eq!(visitor.sections[0], Cow::Borrowed("C1"));
+        assert_eq!(visitor.sections[1], Cow::Borrowed("O1"));
 
-        assert_eq!(visitor.node_section_index.get(&0), Some(&0));
-        assert_eq!(visitor.node_section_index.get(&1), Some(&1));
-        assert!(visitor.label_last_end.contains_key(&1));
+        assert_eq!(visitor.section_index_for_node(0), Some(0));
+        assert_eq!(visitor.section_index_for_node(1), Some(1));
+        assert_eq!(visitor.label_last_end[1], 0);
     }
 
     #[test]
     fn cycle_edge_writes_ring_labels_for_all_bond_variants() {
         let smiles = two_node_smiles();
-        let mut visitor = RenderVisitor::new();
+        let mut visitor = empty_visitor();
 
         visitor.enter_node(&smiles, 0).unwrap();
         visitor.enter_node(&smiles, 1).unwrap();
         visitor.cycle_edge(&smiles, 0, 1, Bond::Single).unwrap();
 
-        assert_eq!(visitor.sections[0], ("C1".to_string(), Some(0)));
-        assert_eq!(visitor.sections[1], ("O1".to_string(), Some(1)));
+        assert_eq!(visitor.sections[0], Cow::Borrowed("C1"));
+        assert_eq!(visitor.sections[1], Cow::Borrowed("O1"));
 
-        assert_eq!(visitor.node_section_index.get(&1), Some(&1));
-        assert_eq!(visitor.node_section_index.get(&1), Some(&1));
-        assert_eq!(visitor.label_last_end.get(&1), Some(&0));
+        assert_eq!(visitor.section_index_for_node(1), Some(1));
+        assert_eq!(visitor.section_index_for_node(1), Some(1));
+        assert_eq!(visitor.label_last_end[1], 0);
     }
 
     #[test]
     fn open_and_close_branch_push_parentheses_sections() {
         let smiles = two_node_smiles();
-        let mut visitor = RenderVisitor::new();
+        let mut visitor = empty_visitor();
 
         visitor.open_branch(&smiles, 0, 1).unwrap();
         visitor.close_branch(&smiles, 0, 1).unwrap();
 
         assert_eq!(visitor.sections.len(), 2);
-        assert_eq!(visitor.sections[0], ("(".to_string(), None));
-        assert_eq!(visitor.sections[1], (")".to_string(), None));
+        assert_eq!(visitor.sections[0], Cow::Borrowed("("));
+        assert_eq!(visitor.sections[1], Cow::Borrowed(")"));
     }
 
     #[test]
     fn start_component_only_adds_dot_after_first_component() {
         let smiles = two_node_smiles();
-        let mut visitor = RenderVisitor::new();
+        let mut visitor = empty_visitor();
 
         visitor.start_component(&smiles, 0, 0).unwrap();
         assert!(visitor.sections.is_empty());
 
         visitor.start_component(&smiles, 1, 1).unwrap();
         assert_eq!(visitor.sections.len(), 1);
-        assert_eq!(visitor.sections[0], (".".to_string(), None));
+        assert_eq!(visitor.sections[0], Cow::Borrowed("."));
 
         visitor.start_component(&smiles, 2, 2).unwrap();
         assert_eq!(visitor.sections.len(), 2);
-        assert_eq!(visitor.sections[1], (".".to_string(), None));
+        assert_eq!(visitor.sections[1], Cow::Borrowed("."));
     }
 
     #[test]
     fn finish_component_is_ok_and_does_not_modify_sections() {
         let smiles = two_node_smiles();
-        let mut visitor = RenderVisitor::new();
-        visitor.sections.push(("C".to_string(), Some(0)));
+        let mut visitor = empty_visitor();
+        visitor.sections.push(Cow::Borrowed("C"));
 
         let before = visitor.sections.clone();
         visitor.finish_component(&smiles, 0, 0).unwrap();

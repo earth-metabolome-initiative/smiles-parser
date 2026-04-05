@@ -30,8 +30,7 @@ fn implicit_hydrogen_fixtures_match_current_parser_node_order() {
             panic!("fixture {} failed to parse:\n{}", case.name, err.render(case.smiles))
         });
 
-        let actual_labels =
-            smiles.nodes().iter().map(|node| node.atom().to_string()).collect::<Vec<_>>();
+        let actual_labels = smiles.nodes().iter().map(ToString::to_string).collect::<Vec<_>>();
         let expected_labels = case.atoms.iter().map(|atom| atom.atom).collect::<Vec<_>>();
 
         assert_eq!(
