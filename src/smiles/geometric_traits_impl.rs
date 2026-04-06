@@ -17,23 +17,11 @@ use crate::{
 /// The symmetric valued sparse matrix storing SMILES bonds.
 pub type BondMatrix = SymmetricCSR2D<ValuedCSR2D<usize, usize, usize, BondEntry>>;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-/// MCES-facing bond label derived from a stored [`BondEntry`].
-///
-/// Literal SMILES ring digits are parser notation, not chemistry. The default
-/// labeled-MCES bridge therefore uses bond kind plus computed ring membership
-/// instead of the raw `ring_num`.
-struct McesBondLabel {
-    bond: Bond,
-    in_ring: bool,
-}
-
 #[derive(Clone, Copy, Debug)]
 /// Value stored for each bond in the symmetric adjacency matrix.
 pub struct BondEntry {
     bond: Bond,
     ring_num: Option<RingNum>,
-    in_ring: bool,
     order: usize,
 }
 
@@ -42,7 +30,7 @@ impl BondEntry {
     #[inline]
     #[must_use]
     pub const fn new(bond: Bond, ring_num: Option<RingNum>, order: usize) -> Self {
-        Self { bond, ring_num, in_ring: false, order }
+        Self { bond, ring_num, order }
     }
 
     /// Returns the bond type stored for this adjacency entry.
@@ -59,13 +47,6 @@ impl BondEntry {
         self.ring_num
     }
 
-    /// Returns whether this bond lies on a cycle in the parsed graph.
-    #[inline]
-    #[must_use]
-    pub const fn in_ring(self) -> bool {
-        self.in_ring
-    }
-
     #[inline]
     #[must_use]
     pub(crate) const fn order(self) -> usize {
@@ -77,25 +58,12 @@ impl BondEntry {
     pub(crate) fn to_bond_edge(self, node_a: usize, node_b: usize) -> BondEdge {
         BondEdge::new(node_a, node_b, self.bond, self.ring_num)
     }
-
-    #[inline]
-    #[must_use]
-    const fn with_in_ring(mut self, in_ring: bool) -> Self {
-        self.in_ring = in_ring;
-        self
-    }
-
-    #[inline]
-    #[must_use]
-    const fn mces_label(self) -> McesBondLabel {
-        McesBondLabel { bond: self.bond, in_ring: self.in_ring }
-    }
 }
 
 impl PartialEq for BondEntry {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.mces_label() == other.mces_label()
+        self.bond == other.bond
     }
 }
 
@@ -104,7 +72,7 @@ impl Eq for BondEntry {}
 impl Hash for BondEntry {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.mces_label().hash(state);
+        self.bond.hash(state);
     }
 }
 
@@ -189,7 +157,6 @@ impl PendingBond {
 #[inline]
 #[must_use]
 fn build_bond_matrix(number_of_nodes: usize, mut entries: Vec<PendingBond>) -> BondMatrix {
-    annotate_ring_membership(number_of_nodes, &mut entries);
     if !is_row_major_sorted(&entries) {
         entries.sort_unstable_by_key(|bond| bond.row_major_key());
     }
@@ -205,79 +172,6 @@ fn build_bond_matrix(number_of_nodes: usize, mut entries: Vec<PendingBond>) -> B
 #[inline]
 fn is_row_major_sorted(entries: &[PendingBond]) -> bool {
     entries.windows(2).all(|window| window[0].row_major_key() <= window[1].row_major_key())
-}
-
-fn annotate_ring_membership(number_of_nodes: usize, entries: &mut [PendingBond]) {
-    let in_ring_by_order = ring_membership_by_order(number_of_nodes, entries);
-    for bond in entries {
-        bond.entry = bond.entry.with_in_ring(in_ring_by_order[bond.entry.order()]);
-    }
-}
-
-fn ring_membership_by_order(number_of_nodes: usize, entries: &[PendingBond]) -> Vec<bool> {
-    let number_of_edges = entries.len();
-    let mut adjacency: Vec<Vec<(usize, usize)>> = vec![Vec::new(); number_of_nodes];
-    for bond in entries {
-        let edge_index = bond.entry.order();
-        adjacency[bond.row].push((bond.column, edge_index));
-        adjacency[bond.column].push((bond.row, edge_index));
-    }
-
-    let mut visited = vec![false; number_of_nodes];
-    let mut discovery = vec![0usize; number_of_nodes];
-    let mut low = vec![0usize; number_of_nodes];
-    let mut time = 0usize;
-    let mut is_bridge = vec![false; number_of_edges];
-
-    for node in 0..number_of_nodes {
-        if !visited[node] {
-            mark_bridges(
-                node,
-                None,
-                &adjacency,
-                &mut visited,
-                &mut discovery,
-                &mut low,
-                &mut time,
-                &mut is_bridge,
-            );
-        }
-    }
-
-    is_bridge.into_iter().map(|bridge| !bridge).collect()
-}
-
-#[allow(clippy::too_many_arguments)]
-fn mark_bridges(
-    node: usize,
-    parent_edge: Option<usize>,
-    adjacency: &[Vec<(usize, usize)>],
-    visited: &mut [bool],
-    discovery: &mut [usize],
-    low: &mut [usize],
-    time: &mut usize,
-    is_bridge: &mut [bool],
-) {
-    visited[node] = true;
-    discovery[node] = *time;
-    low[node] = *time;
-    *time += 1;
-
-    for &(other, edge_index) in &adjacency[node] {
-        if Some(edge_index) == parent_edge {
-            continue;
-        }
-        if visited[other] {
-            low[node] = low[node].min(discovery[other]);
-            continue;
-        }
-
-        mark_bridges(other, Some(edge_index), adjacency, visited, discovery, low, time, is_bridge);
-        low[node] = low[node].min(low[other]);
-        if low[other] > discovery[node] {
-            is_bridge[edge_index] = true;
-        }
-    }
 }
 
 impl Smiles {
@@ -355,17 +249,14 @@ mod tests {
     }
 
     #[test]
-    fn bond_entry_equality_ignores_ring_digits_but_keeps_ring_membership() {
-        let first =
-            BondEntry::new(Bond::Double, Some(RingNum::try_new(1).unwrap()), 0).with_in_ring(true);
-        let second =
-            BondEntry::new(Bond::Double, Some(RingNum::try_new(9).unwrap()), 17).with_in_ring(true);
-        let third = BondEntry::new(Bond::Double, None, 99).with_in_ring(false);
-        let fourth =
-            BondEntry::new(Bond::Single, Some(RingNum::try_new(1).unwrap()), 0).with_in_ring(true);
+    fn bond_entry_equality_ignores_ring_digits_and_uses_bond_kind() {
+        let first = BondEntry::new(Bond::Double, Some(RingNum::try_new(1).unwrap()), 0);
+        let second = BondEntry::new(Bond::Double, Some(RingNum::try_new(9).unwrap()), 17);
+        let third = BondEntry::new(Bond::Double, None, 99);
+        let fourth = BondEntry::new(Bond::Single, Some(RingNum::try_new(1).unwrap()), 0);
 
         assert_eq!(first, second);
-        assert_ne!(first, third);
+        assert_eq!(first, third);
         assert_ne!(first, fourth);
     }
 
@@ -415,16 +306,5 @@ mod tests {
 
         assert_eq!(result.matched_edges().len(), 6);
         assert_similarity_close(result.johnson_similarity(), 1.0);
-    }
-
-    #[test]
-    fn labeled_mces_distinguishes_ring_bonds_from_chain_bonds() {
-        let ring = Smiles::from_str("C1CCCCC1").unwrap();
-        let chain = Smiles::from_str("CCCCCC").unwrap();
-
-        let result = McesBuilder::new(&ring, &chain).compute_labeled();
-
-        assert_eq!(result.matched_edges().len(), 0);
-        assert_similarity_close(result.johnson_similarity(), 0.0);
     }
 }

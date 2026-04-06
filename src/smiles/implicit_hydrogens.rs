@@ -19,9 +19,9 @@
 //!   property-cache behavior before aromaticity perception or Kekule
 //!   normalization.
 //!
-//! The current behavior is designed to match raw `RDKit` property-cache semantics
-//! (`MolFromSmiles(..., sanitize=False)` followed by `UpdatePropertyCache`
-//! with `strict=False`) for SMILES-as-written input.
+//! The current behavior is designed to match raw `RDKit` property-cache
+//! semantics (`MolFromSmiles(..., sanitize=False)` followed by
+//! `UpdatePropertyCache` with `strict=False`) for SMILES-as-written input.
 
 use alloc::vec::Vec;
 
@@ -53,7 +53,8 @@ impl Smiles {
     ///
     /// Wherever this crate had to choose among multiple plausible local
     /// behaviors, the current implementation prefers the behavior observed from
-    /// raw `RDKit` (`sanitize=False`, then `UpdatePropertyCache(strict=False)`).
+    /// raw `RDKit` (`sanitize=False`, then
+    /// `UpdatePropertyCache(strict=False)`).
     #[inline]
     #[must_use]
     pub fn implicit_hydrogen_counts(&self) -> Vec<u8> {
@@ -172,9 +173,9 @@ fn target_valence(element: Element, explicit_valence: u8) -> Option<u8> {
 /// It only answers the local implicit-hydrogen question for atoms that were
 /// already parsed as aromatic.
 ///
-/// The table is also chosen to agree with raw `RDKit` for aromatic tokens such as
-/// `c`, `n`, `o`, `s`, `b`, `p`, and bracketed aromatic atoms that default to
-/// `H0` unless an explicit hydrogen count is written.
+/// The table is also chosen to agree with raw `RDKit` for aromatic tokens such
+/// as `c`, `n`, `o`, `s`, `b`, `p`, and bracketed aromatic atoms that default
+/// to `H0` unless an explicit hydrogen count is written.
 #[inline]
 fn aromatic_implicit_hydrogens(element: Element, explicit_valence: u8) -> u8 {
     if element == Element::C { 3_u8.saturating_sub(explicit_valence) } else { 0 }
