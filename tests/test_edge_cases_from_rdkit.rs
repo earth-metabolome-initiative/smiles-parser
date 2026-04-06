@@ -1,6 +1,6 @@
-//! RDKit parser-reject regression cases.
+//! `RDKit` parser-reject regression cases.
 //!
-//! These SMILES strings are currently accepted by this crate, but RDKit
+//! These SMILES strings are currently accepted by this crate, but `RDKit`
 //! `2024.09.6` rejects them during parsing with `Chem.MolFromSmiles(...)`.
 //!
 //! Expected work:

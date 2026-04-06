@@ -9,7 +9,7 @@
 //! layer in addition to the raw valence ranges from `elements-rs`.
 //!
 //! The fixtures are intentionally split into:
-//! - OpenSMILES / Daylight local-rule cases
+//! - `OpenSMILES` / Daylight local-rule cases
 //! - raw-RDKit-compatibility cases for unsanitized SMILES input
 //! - aromatic token cases that are still local, but not purely periodic-table
 //!   lookups

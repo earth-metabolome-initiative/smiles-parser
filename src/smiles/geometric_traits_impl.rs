@@ -344,6 +344,16 @@ mod tests {
     use super::*;
     use crate::bond::ring_num::RingNum;
 
+    fn assert_similarity_close(actual: impl Into<f64>, expected: f64) {
+        let actual = actual.into();
+        let difference = (actual - expected).abs();
+
+        assert!(
+            difference < 1.0e-12,
+            "expected Johnson similarity {expected}, got {actual} (diff {difference})"
+        );
+    }
+
     #[test]
     fn bond_entry_equality_ignores_ring_digits_but_keeps_ring_membership() {
         let first =
@@ -382,7 +392,7 @@ mod tests {
         let result = McesBuilder::new(&implicit, &explicit).compute_labeled();
 
         assert_eq!(result.matched_edges().len(), 1);
-        assert_eq!(result.johnson_similarity(), 1.0);
+        assert_similarity_close(result.johnson_similarity(), 1.0);
     }
 
     #[test]
@@ -404,7 +414,7 @@ mod tests {
         let result = McesBuilder::new(&ring_one, &ring_two).compute_labeled();
 
         assert_eq!(result.matched_edges().len(), 6);
-        assert_eq!(result.johnson_similarity(), 1.0);
+        assert_similarity_close(result.johnson_similarity(), 1.0);
     }
 
     #[test]
@@ -415,6 +425,6 @@ mod tests {
         let result = McesBuilder::new(&ring, &chain).compute_labeled();
 
         assert_eq!(result.matched_edges().len(), 0);
-        assert_eq!(result.johnson_similarity(), 0.0);
+        assert_similarity_close(result.johnson_similarity(), 0.0);
     }
 }

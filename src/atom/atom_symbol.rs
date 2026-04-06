@@ -9,7 +9,7 @@ use elements_rs::Element;
 pub enum AtomSymbol {
     /// The explicitly named [`Element`]
     Element(Element),
-    /// WildCard variant, described [here](http://opensmiles.org/opensmiles.html#inatoms)
+    /// `WildCard` variant, described [here](http://opensmiles.org/opensmiles.html#inatoms)
     #[default]
     WildCard,
 }

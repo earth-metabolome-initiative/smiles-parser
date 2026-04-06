@@ -1,8 +1,8 @@
-//! Test suite for validating SMILES parsing against PubChem Data.
+//! Test suite for validating SMILES parsing against `PubChem` Data.
 //!
 //! # Running Tests
 //!
-//! To run this test (validates SMILES in the PubChem dataset), ensure that:
+//! To run this test (validates SMILES in the `PubChem` dataset), ensure that:
 //!
 //! ```
 //! cargo test --release --test validate_pubchem_smiles
@@ -31,7 +31,7 @@ const PUBCHEM_CID_SMILES_URL: &str =
 const PUBCHEM_RECORD_COUNT: u64 = 123_458_626;
 const PUBCHEM_BATCH_SIZE: usize = 16_384;
 
-/// Structure representing a PubChem compound as a SMILES string
+/// Structure representing a `PubChem` compound as a SMILES string
 #[derive(Debug, Deserialize)]
 struct SmilesPubChemCompound {
     /// The id for the SMILES

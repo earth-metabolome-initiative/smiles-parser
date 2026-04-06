@@ -19,7 +19,7 @@ const fn atom(atom: &'static str, implicit_hydrogens: u8) -> ExpectedImplicitHyd
 /// Cases that should be solvable from local bond-order sums plus SMILES
 /// bracket defaults.
 ///
-/// These are directly motivated by the OpenSMILES and Daylight rules for:
+/// These are directly motivated by the `OpenSMILES` and Daylight rules for:
 /// - unbracketed organic-subset atoms
 /// - bracket atoms defaulting to zero implicit hydrogens
 /// - wildcard atoms outside brackets carrying zero implicit hydrogens
@@ -147,12 +147,12 @@ pub const ORGANIC_SUBSET_CASES: &[ImplicitHydrogenCase] = &[
     },
 ];
 
-/// Edge cases that are intentionally aligned to RDKit's raw property-cache
+/// Edge cases that are intentionally aligned to `RDKit`'s raw property-cache
 /// behavior on SMILES-as-written input.
 ///
-/// These are still local rules, but they go beyond the minimal OpenSMILES
+/// These are still local rules, but they go beyond the minimal `OpenSMILES`
 /// organic-subset defaults. The iodine and sulfur cases are included because
-/// they showed up in the PubChem reference sweep and are easy to regress.
+/// they showed up in the `PubChem` reference sweep and are easy to regress.
 pub const RAW_RDKIT_COMPAT_CASES: &[ImplicitHydrogenCase] = &[
     ImplicitHydrogenCase {
         name: "difluorochlorane-like",
