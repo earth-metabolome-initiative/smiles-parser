@@ -63,7 +63,7 @@ impl BondEntry {
 impl PartialEq for BondEntry {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.bond == other.bond
+        self.bond == other.bond && self.ring_num == other.ring_num
     }
 }
 
@@ -73,6 +73,7 @@ impl Hash for BondEntry {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.bond.hash(state);
+        self.ring_num.hash(state);
     }
 }
 
@@ -239,13 +240,15 @@ mod tests {
     use crate::bond::ring_num::RingNum;
 
     #[test]
-    fn bond_entry_equality_ignores_ring_numbers_and_insertion_order() {
+    fn bond_entry_equality_keeps_ring_numbers_but_ignores_insertion_order() {
         let first = BondEntry::new(Bond::Double, Some(RingNum::try_new(1).unwrap()), 0);
         let second = BondEntry::new(Bond::Double, Some(RingNum::try_new(9).unwrap()), 17);
-        let third = BondEntry::new(Bond::Single, Some(RingNum::try_new(1).unwrap()), 0);
+        let third = BondEntry::new(Bond::Double, Some(RingNum::try_new(1).unwrap()), 99);
+        let fourth = BondEntry::new(Bond::Single, Some(RingNum::try_new(1).unwrap()), 0);
 
-        assert_eq!(first, second);
-        assert_ne!(first, third);
+        assert_ne!(first, second);
+        assert_eq!(first, third);
+        assert_ne!(first, fourth);
     }
 
     #[test]
@@ -271,6 +274,17 @@ mod tests {
         let result = McesBuilder::new(&benzene, &pyridine).compute_labeled();
 
         assert_eq!(result.matched_edges().len(), 4);
+        assert!(result.johnson_similarity() < 1.0);
+    }
+
+    #[test]
+    fn labeled_mces_distinguishes_ring_numbers_in_bond_labels() {
+        let ring_one = Smiles::from_str("C1CCCCC1").unwrap();
+        let ring_two = Smiles::from_str("C2CCCCC2").unwrap();
+
+        let result = McesBuilder::new(&ring_one, &ring_two).compute_labeled();
+
+        assert!(result.matched_edges().len() < 6);
         assert!(result.johnson_similarity() < 1.0);
     }
 }
