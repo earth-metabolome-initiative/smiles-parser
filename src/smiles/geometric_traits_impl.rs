@@ -267,6 +267,17 @@ mod tests {
     }
 
     #[test]
+    fn labeled_mces_ignores_bracket_and_explicit_hydrogen_spelling() {
+        let implicit = Smiles::from_str("CC").unwrap();
+        let explicit = Smiles::from_str("[CH3][CH3]").unwrap();
+
+        let result = McesBuilder::new(&implicit, &explicit).compute_labeled();
+
+        assert_eq!(result.matched_edges().len(), 1);
+        assert_eq!(result.johnson_similarity(), 1.0);
+    }
+
+    #[test]
     fn labeled_mces_rejects_topology_only_ring_false_positive() {
         let benzene = Smiles::from_str("c1ccccc1").unwrap();
         let pyridine = Smiles::from_str("c1ccncc1").unwrap();
