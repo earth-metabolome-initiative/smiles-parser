@@ -6,6 +6,7 @@ use alloc::{borrow::Cow, string::String};
 use core::fmt;
 
 use elements_rs::{Element, Isotope};
+use geometric_traits::traits::TypedNode;
 
 use crate::{
     atom::{
@@ -15,7 +16,7 @@ use crate::{
     errors::SmilesError,
 };
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 /// Distinguishes between the two SMILES atom syntaxes this crate stores.
 pub enum AtomSyntax {
     /// Organic-subset atom written without brackets, such as `C` or `c`.
@@ -24,7 +25,7 @@ pub enum AtomSyntax {
     Bracket,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 /// A parsed atom together with the syntax form it originated from.
 pub struct Atom {
     symbol: AtomSymbol,
@@ -372,6 +373,15 @@ impl fmt::Display for Atom {
     }
 }
 
+impl TypedNode for Atom {
+    type NodeType = Atom;
+
+    #[inline]
+    fn node_type(&self) -> Self::NodeType {
+        *self
+    }
+}
+
 #[inline]
 fn write_symbol<W: fmt::Write>(target: &mut W, symbol: AtomSymbol, aromatic: bool) -> fmt::Result {
     match rendered_symbol_static(symbol, aromatic) {
@@ -431,6 +441,7 @@ mod tests {
     use alloc::string::ToString;
 
     use elements_rs::Element;
+    use geometric_traits::traits::TypedNode;
 
     use super::*;
 
@@ -527,6 +538,18 @@ mod tests {
     fn isotope_errors_when_symbol_has_no_element() {
         let atom = Atom::builder().with_symbol(AtomSymbol::WildCard).build();
         assert_eq!(atom.isotope().unwrap_err(), SmilesError::InvalidIsotope);
+    }
+
+    #[test]
+    fn typed_node_returns_atom_itself() {
+        let atom = Atom::builder()
+            .with_symbol(AtomSymbol::Element(Element::N))
+            .with_charge(Charge::try_new(1).unwrap())
+            .with_isotope(15)
+            .with_hydrogens(1)
+            .build();
+
+        assert_eq!(atom.node_type(), atom);
     }
 
     #[test]

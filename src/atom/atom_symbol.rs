@@ -1,5 +1,5 @@
 //! Module for the symbols representing an element in a `SMILES` string
-use core::fmt;
+use core::{cmp::Ordering, fmt};
 
 use elements_rs::Element;
 
@@ -61,6 +61,25 @@ impl fmt::Display for AtomSymbol {
     }
 }
 
+impl PartialOrd for AtomSymbol {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for AtomSymbol {
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Self::WildCard, Self::WildCard) => Ordering::Equal,
+            (Self::WildCard, Self::Element(_)) => Ordering::Less,
+            (Self::Element(_), Self::WildCard) => Ordering::Greater,
+            (Self::Element(left), Self::Element(right)) => left.symbol().cmp(right.symbol()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::string::ToString;
@@ -96,5 +115,11 @@ mod tests {
         for (symbol, expected) in cases {
             assert_eq!(expected, symbol.to_string());
         }
+    }
+
+    #[test]
+    fn atom_symbols_have_a_stable_total_order() {
+        assert!(AtomSymbol::WildCard < AtomSymbol::Element(Element::C));
+        assert!(AtomSymbol::Element(Element::C) < AtomSymbol::Element(Element::O));
     }
 }

@@ -3,7 +3,7 @@ use core::fmt;
 
 use crate::errors::SmilesError;
 
-#[derive(Copy, Default, Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Copy, Default, Debug, PartialEq, Clone, Eq, Hash, PartialOrd, Ord)]
 /// Wrapper struct for possible charge to limit upper and lower bounds
 pub struct Charge(i8);
 

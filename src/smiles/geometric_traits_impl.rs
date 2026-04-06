@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::hash::{Hash, Hasher};
 
 use geometric_traits::{
     impls::{SymmetricCSR2D, ValuedCSR2D},
@@ -16,7 +17,7 @@ use crate::{
 /// The symmetric valued sparse matrix storing SMILES bonds.
 pub type BondMatrix = SymmetricCSR2D<ValuedCSR2D<usize, usize, usize, BondEntry>>;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug)]
 /// Value stored for each bond in the symmetric adjacency matrix.
 pub struct BondEntry {
     bond: Bond,
@@ -56,6 +57,22 @@ impl BondEntry {
     #[must_use]
     pub(crate) fn to_bond_edge(self, node_a: usize, node_b: usize) -> BondEdge {
         BondEdge::new(node_a, node_b, self.bond, self.ring_num)
+    }
+}
+
+impl PartialEq for BondEntry {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.bond == other.bond
+    }
+}
+
+impl Eq for BondEntry {}
+
+impl Hash for BondEntry {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.bond.hash(state);
     }
 }
 
@@ -209,5 +226,51 @@ impl MonopartiteGraph for Smiles {
     #[inline]
     fn nodes_vocabulary(&self) -> &Self::Nodes {
         &self.atom_nodes
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use core::str::FromStr;
+
+    use geometric_traits::traits::{GraphSimilarities, McesBuilder};
+
+    use super::*;
+    use crate::bond::ring_num::RingNum;
+
+    #[test]
+    fn bond_entry_equality_ignores_ring_numbers_and_insertion_order() {
+        let first = BondEntry::new(Bond::Double, Some(RingNum::try_new(1).unwrap()), 0);
+        let second = BondEntry::new(Bond::Double, Some(RingNum::try_new(9).unwrap()), 17);
+        let third = BondEntry::new(Bond::Single, Some(RingNum::try_new(1).unwrap()), 0);
+
+        assert_eq!(first, second);
+        assert_ne!(first, third);
+    }
+
+    #[test]
+    fn labeled_mces_distinguishes_atom_identity() {
+        let ethanol = Smiles::from_str("CCO").unwrap();
+        let ethylamine = Smiles::from_str("CCN").unwrap();
+        let dimethyl_ether = Smiles::from_str("COC").unwrap();
+
+        let result_one = McesBuilder::new(&ethanol, &ethylamine).compute_labeled();
+        let result_two = McesBuilder::new(&ethanol, &dimethyl_ether).compute_labeled();
+
+        assert_eq!(result_one.matched_edges().len(), 1);
+        assert_eq!(result_two.matched_edges().len(), 1);
+        assert!(result_one.johnson_similarity() < 1.0);
+        assert!(result_two.johnson_similarity() < 1.0);
+    }
+
+    #[test]
+    fn labeled_mces_rejects_topology_only_ring_false_positive() {
+        let benzene = Smiles::from_str("c1ccccc1").unwrap();
+        let pyridine = Smiles::from_str("c1ccncc1").unwrap();
+
+        let result = McesBuilder::new(&benzene, &pyridine).compute_labeled();
+
+        assert_eq!(result.matched_edges().len(), 4);
+        assert!(result.johnson_similarity() < 1.0);
     }
 }

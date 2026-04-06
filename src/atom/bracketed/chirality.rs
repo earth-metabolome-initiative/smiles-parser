@@ -3,7 +3,7 @@ use core::fmt;
 
 use crate::errors::SmilesError;
 
-#[derive(Copy, Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Copy, Debug, PartialEq, Clone, Eq, Hash, PartialOrd, Ord)]
 /// Specifies the chirality if present
 pub enum Chirality {
     /// `@`
