@@ -16,7 +16,7 @@ use crate::{
     errors::SmilesError,
 };
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 /// Distinguishes between the two SMILES atom syntaxes this crate stores.
 pub enum AtomSyntax {
     /// Organic-subset atom written without brackets, such as `C` or `c`.
@@ -25,7 +25,7 @@ pub enum AtomSyntax {
     Bracket,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 /// A parsed atom together with the syntax form it originated from.
 pub struct Atom {
     symbol: AtomSymbol,
@@ -40,6 +40,49 @@ pub struct Atom {
     class: u16,
     chirality: Option<Chirality>,
     syntax: AtomSyntax,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+/// MCES-facing atom label derived from a parsed [`Atom`].
+///
+/// This intentionally captures chemistry-facing identity for the default
+/// labeled-MCES bridge while excluding parser spelling details such as bracket
+/// syntax, explicit hydrogen notation, atom class, and chirality tokens.
+pub struct McesAtomType {
+    symbol: AtomSymbol,
+    aromatic: bool,
+    isotope_mass_number: Option<u16>,
+    formal_charge: i8,
+}
+
+impl McesAtomType {
+    /// Returns the atom symbol used by the MCES label.
+    #[inline]
+    #[must_use]
+    pub fn symbol(self) -> AtomSymbol {
+        self.symbol
+    }
+
+    /// Returns whether the MCES label treats the atom as aromatic.
+    #[inline]
+    #[must_use]
+    pub fn aromatic(self) -> bool {
+        self.aromatic
+    }
+
+    /// Returns the isotope mass number, if one is part of the MCES label.
+    #[inline]
+    #[must_use]
+    pub fn isotope_mass_number(self) -> Option<u16> {
+        self.isotope_mass_number
+    }
+
+    /// Returns the formal charge used by the MCES label.
+    #[inline]
+    #[must_use]
+    pub fn formal_charge(self) -> i8 {
+        self.formal_charge
+    }
 }
 
 impl Atom {
@@ -374,11 +417,16 @@ impl fmt::Display for Atom {
 }
 
 impl TypedNode for Atom {
-    type NodeType = Atom;
+    type NodeType = McesAtomType;
 
     #[inline]
     fn node_type(&self) -> Self::NodeType {
-        *self
+        McesAtomType {
+            symbol: self.symbol(),
+            aromatic: self.aromatic(),
+            isotope_mass_number: self.isotope_mass_number(),
+            formal_charge: self.charge_value(),
+        }
     }
 }
 
@@ -541,15 +589,33 @@ mod tests {
     }
 
     #[test]
-    fn typed_node_returns_atom_itself() {
-        let atom = Atom::builder()
-            .with_symbol(AtomSymbol::Element(Element::N))
-            .with_charge(Charge::try_new(1).unwrap())
-            .with_isotope(15)
-            .with_hydrogens(1)
+    fn typed_node_ignores_parser_spelling_fields() {
+        let organic = Atom::new_organic_subset(AtomSymbol::Element(Element::C), false);
+        let bracket = Atom::builder()
+            .with_symbol(AtomSymbol::Element(Element::C))
+            .with_hydrogens(3)
+            .with_class(7)
+            .with_chirality(Chirality::At)
             .build();
 
-        assert_eq!(atom.node_type(), atom);
+        assert_eq!(organic.node_type(), bracket.node_type());
+    }
+
+    #[test]
+    fn typed_node_keeps_charge_isotope_and_aromaticity() {
+        let neutral = Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).build();
+        let charged = Atom::builder()
+            .with_symbol(AtomSymbol::Element(Element::C))
+            .with_charge(Charge::try_new(1).unwrap())
+            .build();
+        let isotopic =
+            Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).with_isotope(13).build();
+        let aromatic = Atom::new_organic_subset(AtomSymbol::Element(Element::C), true);
+        let aliphatic = Atom::new_organic_subset(AtomSymbol::Element(Element::C), false);
+
+        assert_ne!(neutral.node_type(), charged.node_type());
+        assert_ne!(neutral.node_type(), isotopic.node_type());
+        assert_ne!(aromatic.node_type(), aliphatic.node_type());
     }
 
     #[test]
