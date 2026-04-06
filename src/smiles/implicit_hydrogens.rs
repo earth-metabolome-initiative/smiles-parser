@@ -8,18 +8,18 @@
 //! In practice that means:
 //! - bracket atoms always contribute zero implicit hydrogens unless a future
 //!   API explicitly chooses to model bracket defaults differently. This matches
-//!   OpenSMILES bracket-`H0` semantics and raw RDKit behavior.
+//!   `OpenSMILES` bracket-`H0` semantics and raw `RDKit` behavior.
 //! - unbracketed organic-subset atoms use normal-valence completion. This also
-//!   matches raw RDKit for unsanitized SMILES input.
+//!   matches raw `RDKit` for unsanitized SMILES input.
 //! - lowercase aromatic atoms use a small SMILES-specific policy table. The
-//!   current table is chosen to match raw RDKit for atoms that were already
+//!   current table is chosen to match raw `RDKit` for atoms that were already
 //!   parsed as aromatic tokens.
 //! - aromatic bonds are counted as bond order 1 because this is a raw parsed
-//!   graph, not a normalized Lewis structure. This also matches raw RDKit's
+//!   graph, not a normalized Lewis structure. This also matches raw `RDKit`'s
 //!   property-cache behavior before aromaticity perception or Kekule
 //!   normalization.
 //!
-//! The current behavior is designed to match raw RDKit property-cache semantics
+//! The current behavior is designed to match raw `RDKit` property-cache semantics
 //! (`MolFromSmiles(..., sanitize=False)` followed by `UpdatePropertyCache`
 //! with `strict=False`) for SMILES-as-written input.
 
@@ -53,7 +53,7 @@ impl Smiles {
     ///
     /// Wherever this crate had to choose among multiple plausible local
     /// behaviors, the current implementation prefers the behavior observed from
-    /// raw RDKit (`sanitize=False`, then `UpdatePropertyCache(strict=False)`).
+    /// raw `RDKit` (`sanitize=False`, then `UpdatePropertyCache(strict=False)`).
     #[inline]
     #[must_use]
     pub fn implicit_hydrogen_counts(&self) -> Vec<u8> {
@@ -79,7 +79,7 @@ impl Smiles {
 /// graph information.
 ///
 /// For bracket atoms, returning `0` is both the SMILES rule and the behavior
-/// observed from raw RDKit.
+/// observed from raw `RDKit`.
 #[inline]
 fn implicit_hydrogens_for_node(smiles: &Smiles, node_id: usize, node: &Atom) -> u8 {
     let explicit_valence = explicit_valence(smiles, node_id);
@@ -106,7 +106,7 @@ fn implicit_hydrogens_for_node(smiles: &Smiles, node_id: usize, node: &Atom) -> 
 /// because this helper is only used for unbracketed atoms; bracket atoms return
 /// zero implicit hydrogens before valence completion is considered.
 ///
-/// This split also mirrors raw RDKit: bracket hydrogens stay explicit instead
+/// This split also mirrors raw `RDKit`: bracket hydrogens stay explicit instead
 /// of being folded back into a later implicit-hydrogen completion step.
 #[inline]
 fn explicit_valence(smiles: &Smiles, node_id: usize) -> u8 {
@@ -118,7 +118,7 @@ fn explicit_valence(smiles: &Smiles, node_id: usize) -> u8 {
 ///
 /// Aromatic bonds contribute `1` here because this module works on the parsed
 /// aromatic graph directly instead of first assigning a Kekule form.
-/// That choice matches raw RDKit on unsanitized molecules before any aromatic
+/// That choice matches raw `RDKit` on unsanitized molecules before any aromatic
 /// normalization pass is applied.
 #[inline]
 fn bond_order(bond: Bond) -> u8 {
@@ -140,14 +140,14 @@ fn aliphatic_implicit_hydrogens(element: Element, explicit_valence: u8) -> u8 {
 /// Selects the first compatible target valence for an unbracketed atom.
 ///
 /// Most elements delegate to `elements-rs`, but a few halogens are handled
-/// explicitly in order to stay aligned with raw RDKit behavior on unsanitized
+/// explicitly in order to stay aligned with raw `RDKit` behavior on unsanitized
 /// SMILES input:
 /// - `F`, `Cl`, and `Br` cap at valence 1 for implicit-hydrogen purposes
 /// - neutral `I` advances through the sequence 1, 3, 5
 ///
 /// These overrides are intentionally documented here because they are not just
 /// periodic-table defaults; they are compatibility choices made to match raw
-/// RDKit.
+/// `RDKit`.
 #[inline]
 fn target_valence(element: Element, explicit_valence: u8) -> Option<u8> {
     if matches!(element, Element::F | Element::Cl | Element::Br) {
@@ -172,7 +172,7 @@ fn target_valence(element: Element, explicit_valence: u8) -> Option<u8> {
 /// It only answers the local implicit-hydrogen question for atoms that were
 /// already parsed as aromatic.
 ///
-/// The table is also chosen to agree with raw RDKit for aromatic tokens such as
+/// The table is also chosen to agree with raw `RDKit` for aromatic tokens such as
 /// `c`, `n`, `o`, `s`, `b`, `p`, and bracketed aromatic atoms that default to
 /// `H0` unless an explicit hydrogen count is written.
 #[inline]
