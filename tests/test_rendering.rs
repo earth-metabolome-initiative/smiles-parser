@@ -43,10 +43,23 @@ const SMILES_STR: &[&str] = &[
     "C1CC2CC3C4C5C6C7C8C9C%10C%11C%12C%13C%14C%15C%16CC%17C%16%16C%15%15C%14%14C%13%13C%12%12C%11%11C%10%10C99C88C77C66C55C44C33C2C2C33C44C55C66C77C88C99C%10%10C%11%11C%12%12C%13%13C%14%14C%15%15C%16%16C%17C%17C%16%16C%15%15C%14%14C%13%13C%12%12C%11%11C%10%10C99C88C77C66C55C44C33C2C2C33C44C55C66C77C88C99C%10%10C%11%11C%12%12C%13%13C%14%14C%15%15C%16%16C%17C%17C%16%16C%15%15C%14%14C%13%13C%12%12C%11%11C%10%10C99C88C77C66C55C44C33C2C2C33C44C55C66C77C88C99C%10%10C%11%11C%12%12C%13%13C%14%14C%15%15C%16%16C%17C%17C%16%16C%15%15C%14%14C%13%13C%12%12C%11%11C%10%10C99C88C77C66C55C44C33C2C(C1)C3C4C5C6C7C8C9C%10C%11C%12C%13C%14C%15C%16C%17",
     "C1[C@H]([C@H]([C@@H](C(O1)(CO)O)O)O)O",
     "C(C(F)(F)I)(CC1=CC=CC=C1N=C=NC2=CC=CC=OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOF)(F)FOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOC2C",
+    "CC(=O)OC(CC(=O)[O-])C",
+    "CC(=O)OC(CC(=O)[O-])C",
 ];
 
 fn parse_or_panic(s: &str) -> Smiles {
     Smiles::from_str(s).unwrap_or_else(|e| panic!("Failed to parse:\n{}", e.render(s)))
+}
+
+#[test]
+fn test_parsed_graphs_equivalent_with_rerender() {
+    for &s in SMILES_STR {
+        let smiles: Smiles = s.parse::<Smiles>().unwrap_or_else(|e| panic!("Failed to parse: \n{}", e.render(s)));
+        let rerendered_s = smiles.to_string();
+        let reparsed: Smiles = rerendered_s.parse::<Smiles>().unwrap_or_else(|e| panic!("Failed to reparse: \n{}", e.render(&rerendered_s)));
+        assert_eq!(smiles, reparsed, "Smiles graphs are not equivalent!\nleft:{smiles}\nright:{reparsed}, from source:{s}");
+        //assert_eq!(s, rerendered_s, "Smiles rendering differs from original input:\nleft: {s}\nright:{rerendered_s}");
+    }
 }
 
 fn bond_count(smiles: &Smiles, bond: Bond) -> usize {
