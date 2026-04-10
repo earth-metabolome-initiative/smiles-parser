@@ -48,7 +48,7 @@ pub use self::{
     aromaticity::{
         AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
         AromaticityModel, AromaticityPerception, AromaticityPolicy, AromaticityRingFamilyKind,
-        AromaticityStatus, RdkitDefaultAromaticity, RdkitMdlAromaticity,
+        AromaticityStatus, RdkitDefaultAromaticity, RdkitMdlAromaticity, RdkitSimpleAromaticity,
     },
     geometric_traits_impl::{BondEntry, BondMatrix},
 };
@@ -366,7 +366,7 @@ mod tests {
     use super::{
         AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
         AromaticityModel, AromaticityPolicy, AromaticityStatus, BondMatrixBuilder,
-        RdkitMdlAromaticity, RingMembership, Smiles,
+        RdkitMdlAromaticity, RdkitSimpleAromaticity, RingMembership, Smiles,
     };
     use crate::{
         atom::{Atom, atom_symbol::AtomSymbol},
@@ -638,6 +638,24 @@ mod tests {
     }
 
     #[test]
+    fn aromaticity_policy_helpers_match_simple_model() {
+        let smiles: Smiles = "C1=CC=CC=C1".parse().unwrap();
+
+        assert_eq!(
+            smiles.aromaticity_assignment_for(AromaticityPolicy::RdkitSimple),
+            smiles.aromaticity_assignment_with(&RdkitSimpleAromaticity)
+        );
+
+        let perception = smiles.perceive_aromaticity_for(AromaticityPolicy::RdkitSimple).unwrap();
+        assert_eq!(perception.status(), AromaticityStatus::Complete);
+        assert_eq!(
+            perception.assignment(),
+            &smiles.aromaticity_assignment_for(AromaticityPolicy::RdkitSimple)
+        );
+        assert!(perception.aromaticized().nodes().iter().all(Atom::aromatic));
+    }
+
+    #[test]
     fn mdl_aromaticity_keeps_kekule_benzene_aromatic() {
         let smiles: Smiles = "C1=CC=CC=C1".parse().unwrap();
         let assignment = smiles.aromaticity_assignment_for(AromaticityPolicy::RdkitMdl);
@@ -720,6 +738,81 @@ mod tests {
                 [16, 17],
             ]
         );
+    }
+
+    #[test]
+    fn simple_aromaticity_keeps_kekule_benzene_aromatic() {
+        let smiles: Smiles = "C1=CC=CC=C1".parse().unwrap();
+        let assignment = smiles.aromaticity_assignment_for(AromaticityPolicy::RdkitSimple);
+
+        assert_eq!(assignment.status(), AromaticityStatus::Complete);
+        assert_eq!(assignment.atom_ids(), &[0, 1, 2, 3, 4, 5]);
+        assert_eq!(assignment.bond_edges(), &[[0, 1], [0, 5], [1, 2], [2, 3], [3, 4], [4, 5]]);
+    }
+
+    #[test]
+    fn simple_aromaticity_keeps_standalone_imidazole_aromatic() {
+        let smiles: Smiles = "C1=CN=CN1".parse().unwrap();
+        let assignment = smiles.aromaticity_assignment_for(AromaticityPolicy::RdkitSimple);
+
+        assert_eq!(assignment.status(), AromaticityStatus::Complete);
+        assert_eq!(assignment.atom_ids(), &[0, 1, 2, 3, 4]);
+        assert_eq!(assignment.bond_edges(), &[[0, 1], [0, 4], [1, 2], [2, 3], [3, 4]]);
+    }
+
+    #[test]
+    fn simple_aromaticity_keeps_naphthalene_aromatic() {
+        let smiles: Smiles = "C1=CC2=CC=CC=C2C=C1".parse().unwrap();
+        let assignment = smiles.aromaticity_assignment_for(AromaticityPolicy::RdkitSimple);
+
+        assert_eq!(assignment.status(), AromaticityStatus::Complete);
+        assert_eq!(assignment.atom_ids(), &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        assert_eq!(
+            assignment.bond_edges(),
+            &[
+                [0, 1],
+                [0, 9],
+                [1, 2],
+                [2, 3],
+                [2, 7],
+                [3, 4],
+                [4, 5],
+                [5, 6],
+                [6, 7],
+                [7, 8],
+                [8, 9]
+            ]
+        );
+    }
+
+    #[test]
+    fn simple_aromaticity_rejects_tropylium() {
+        let smiles: Smiles = "[CH+]1C=CC=CC=C1".parse().unwrap();
+        let assignment = smiles.aromaticity_assignment_for(AromaticityPolicy::RdkitSimple);
+
+        assert_eq!(assignment.status(), AromaticityStatus::Complete);
+        assert!(assignment.atom_ids().is_empty(), "{assignment:?}");
+        assert!(assignment.bond_edges().is_empty(), "{assignment:?}");
+    }
+
+    #[test]
+    fn simple_aromaticity_rejects_azulene() {
+        let smiles: Smiles = "C1=CC=C2C=CC=C2C=C1".parse().unwrap();
+        let assignment = smiles.aromaticity_assignment_for(AromaticityPolicy::RdkitSimple);
+
+        assert_eq!(assignment.status(), AromaticityStatus::Complete);
+        assert!(assignment.atom_ids().is_empty(), "{assignment:?}");
+        assert!(assignment.bond_edges().is_empty(), "{assignment:?}");
+    }
+
+    #[test]
+    fn simple_aromaticity_rejects_large_annulene() {
+        let smiles: Smiles = "C1=CC=CC=CC=CC=CC=CC=CC=CC=C1".parse().unwrap();
+        let assignment = smiles.aromaticity_assignment_for(AromaticityPolicy::RdkitSimple);
+
+        assert_eq!(assignment.status(), AromaticityStatus::Complete);
+        assert!(assignment.atom_ids().is_empty(), "{assignment:?}");
+        assert!(assignment.bond_edges().is_empty(), "{assignment:?}");
     }
 
     #[test]

@@ -25,6 +25,8 @@ pub trait AromaticityModel {
 pub enum AromaticityPolicy {
     /// The current `RDKit` default aromaticity model target.
     RdkitDefault,
+    /// The `RDKit` simple aromaticity model target.
+    RdkitSimple,
     /// The `RDKit` MDL aromaticity model target.
     RdkitMdl,
 }
@@ -33,6 +35,7 @@ impl AromaticityModel for AromaticityPolicy {
     fn assignment(&self, smiles: &Smiles) -> AromaticityAssignment {
         match self {
             Self::RdkitDefault => RdkitDefaultAromaticity.assignment(smiles),
+            Self::RdkitSimple => RdkitSimpleAromaticity.assignment(smiles),
             Self::RdkitMdl => RdkitMdlAromaticity.assignment(smiles),
         }
     }
@@ -41,6 +44,10 @@ impl AromaticityModel for AromaticityPolicy {
 /// The `RDKit` default aromaticity-model implementation.
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash)]
 pub struct RdkitDefaultAromaticity;
+
+/// The `RDKit` simple aromaticity-model implementation.
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash)]
+pub struct RdkitSimpleAromaticity;
 
 /// The `RDKit` MDL aromaticity-model implementation.
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash)]

@@ -18,10 +18,13 @@ const DEFAULT_CORPUS_PATH: &str =
     "target/pubchem_aromaticity/default/pubchem_non_aromaticity_default.jsonl.gz";
 const DEFAULT_MANIFEST_PATH: &str =
     "target/pubchem_aromaticity/default/pubchem_non_aromaticity_default.manifest.json";
-const MDL_CORPUS_PATH: &str =
-    "target/pubchem_aromaticity/mdl/pubchem_non_aromaticity_mdl.jsonl.gz";
+const MDL_CORPUS_PATH: &str = "target/pubchem_aromaticity/mdl/pubchem_non_aromaticity_mdl.jsonl.gz";
 const MDL_MANIFEST_PATH: &str =
     "target/pubchem_aromaticity/mdl/pubchem_non_aromaticity_mdl.manifest.json";
+const SIMPLE_CORPUS_PATH: &str =
+    "target/pubchem_aromaticity/simple/pubchem_non_aromaticity_simple.jsonl.gz";
+const SIMPLE_MANIFEST_PATH: &str =
+    "target/pubchem_aromaticity/simple/pubchem_non_aromaticity_simple.manifest.json";
 const DEFAULT_VALIDATION_BATCH_SIZE: usize = 4_096;
 const DEFAULT_PROGRESS_EVERY: usize = 100_000;
 
@@ -56,13 +59,24 @@ fn validate_rdkit_default_pubchem_non_aromaticity_corpus() -> Result<(), Box<dyn
 
 #[test]
 #[ignore = "This test streams a whole-PubChem non-aromatic corpus and checks that aromatic assignments stay empty for RDKit MDL."]
-fn validate_rdkit_mdl_pubchem_non_aromaticity_corpus() -> Result<(), Box<dyn std::error::Error>>
-{
+fn validate_rdkit_mdl_pubchem_non_aromaticity_corpus() -> Result<(), Box<dyn std::error::Error>> {
     validate_pubchem_non_aromaticity_corpus(
         AromaticityPolicy::RdkitMdl,
         "PUBCHEM_MDL_NON_AROMATICITY",
         MDL_CORPUS_PATH,
         MDL_MANIFEST_PATH,
+    )
+}
+
+#[test]
+#[ignore = "This test streams a whole-PubChem non-aromatic corpus and checks that aromatic assignments stay empty for RDKit Simple."]
+fn validate_rdkit_simple_pubchem_non_aromaticity_corpus() -> Result<(), Box<dyn std::error::Error>>
+{
+    validate_pubchem_non_aromaticity_corpus(
+        AromaticityPolicy::RdkitSimple,
+        "PUBCHEM_SIMPLE_NON_AROMATICITY",
+        SIMPLE_CORPUS_PATH,
+        SIMPLE_MANIFEST_PATH,
     )
 }
 
@@ -382,4 +396,18 @@ fn exact_pubchem_mdl_non_aromatic_record_validation_accepts_imidazole() {
     let line = r#"{"cid":795,"smiles":"c1ncc[nH]1","atoms":5,"bonds":5,"aromatic_atom_ids":[],"aromatic_bond_edges":[],"aromatic_atom_count":0,"aromatic_bond_count":0}"#;
     validate_record_line_with_policy(line, AromaticityPolicy::RdkitMdl)
         .expect("imidazole should validate as non-aromatic under MDL");
+}
+
+#[test]
+fn exact_pubchem_simple_non_aromatic_record_validation_accepts_tropylium() {
+    let line = r#"{"cid":7066,"smiles":"[CH+]1C=CC=CC=C1","atoms":7,"bonds":7,"aromatic_atom_ids":[],"aromatic_bond_edges":[],"aromatic_atom_count":0,"aromatic_bond_count":0}"#;
+    validate_record_line_with_policy(line, AromaticityPolicy::RdkitSimple)
+        .expect("tropylium should validate as non-aromatic under Simple");
+}
+
+#[test]
+fn exact_pubchem_simple_non_aromatic_record_validation_accepts_cid_672() {
+    let line = r#"{"cid":672,"smiles":"CC1=C(N(C2=NC(=O)NC(=O)C2=N1)CC(C(C(CO)O)O)O)C","atoms":23,"bonds":24,"aromatic_atom_ids":[],"aromatic_bond_edges":[],"aromatic_atom_count":0,"aromatic_bond_count":0}"#;
+    validate_record_line_with_policy(line, AromaticityPolicy::RdkitSimple)
+        .expect("CID 672 should validate as non-aromatic under Simple");
 }

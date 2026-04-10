@@ -21,6 +21,10 @@ const DEFAULT_MANIFEST_PATH: &str =
 const MDL_CORPUS_PATH: &str = "target/pubchem_aromaticity/mdl/pubchem_aromaticity_mdl.jsonl.gz";
 const MDL_MANIFEST_PATH: &str =
     "target/pubchem_aromaticity/mdl/pubchem_aromaticity_mdl.manifest.json";
+const SIMPLE_CORPUS_PATH: &str =
+    "target/pubchem_aromaticity/simple/pubchem_aromaticity_simple.jsonl.gz";
+const SIMPLE_MANIFEST_PATH: &str =
+    "target/pubchem_aromaticity/simple/pubchem_aromaticity_simple.manifest.json";
 const DEFAULT_VALIDATION_BATCH_SIZE: usize = 4_096;
 const DEFAULT_PROGRESS_EVERY: usize = 100_000;
 
@@ -60,6 +64,17 @@ fn validate_rdkit_mdl_pubchem_aromaticity_corpus() -> Result<(), Box<dyn std::er
         "PUBCHEM_MDL_AROMATICITY",
         MDL_CORPUS_PATH,
         MDL_MANIFEST_PATH,
+    )
+}
+
+#[test]
+#[ignore = "This test streams a whole-PubChem aromatic corpus and checks exact aromatic atom and bond identity for RDKit Simple."]
+fn validate_rdkit_simple_pubchem_aromaticity_corpus() -> Result<(), Box<dyn std::error::Error>> {
+    validate_pubchem_aromaticity_corpus(
+        AromaticityPolicy::RdkitSimple,
+        "PUBCHEM_SIMPLE_AROMATICITY",
+        SIMPLE_CORPUS_PATH,
+        SIMPLE_MANIFEST_PATH,
     )
 }
 
@@ -410,4 +425,26 @@ fn exact_pubchem_mdl_record_validation_rejects_default_only_assignment() {
     let error = validate_record_line_with_policy(line, AromaticityPolicy::RdkitMdl)
         .expect_err("imidazole should not validate as aromatic under MDL");
     assert!(error.contains("aromatic atom-id mismatch"), "{error}");
+}
+
+#[test]
+fn exact_pubchem_simple_record_validation_accepts_matching_assignment() {
+    let line = r#"{"cid":241,"smiles":"c1ccccc1","atoms":6,"bonds":6,"aromatic_atom_ids":[0,1,2,3,4,5],"aromatic_bond_edges":[[0,1],[0,5],[1,2],[2,3],[3,4],[4,5]],"aromatic_atom_count":6,"aromatic_bond_count":6}"#;
+    validate_record_line_with_policy(line, AromaticityPolicy::RdkitSimple)
+        .expect("matching exact Simple aromatic assignment should validate");
+}
+
+#[test]
+fn exact_pubchem_simple_record_validation_rejects_default_only_assignment() {
+    let line = r#"{"cid":7066,"smiles":"[CH+]1C=CC=CC=C1","atoms":7,"bonds":7,"aromatic_atom_ids":[0,1,2,3,4,5,6],"aromatic_bond_edges":[[0,1],[0,6],[1,2],[2,3],[3,4],[4,5],[5,6]],"aromatic_atom_count":7,"aromatic_bond_count":7}"#;
+    let error = validate_record_line_with_policy(line, AromaticityPolicy::RdkitSimple)
+        .expect_err("tropylium should not validate as aromatic under Simple");
+    assert!(error.contains("aromatic atom-id mismatch"), "{error}");
+}
+
+#[test]
+fn exact_pubchem_simple_record_validation_matches_cid_8936_rdkit_oracle() {
+    let line = r#"{"cid":8936,"smiles":"CC[C@@]1(CC2C[C@@](C3=C(CCN(C2)C1)C4=CC=CC=C4N3)(C5=C(C=C6C(=C5)[C@]78CCN9[C@H]7[C@@](C=CC9)([C@H]([C@@]([C@@H]8N6C)(C(=O)OC)O)C(=O)OC)CC)OC)C(=O)OC)O","atoms":59,"bonds":67,"aromatic_atom_ids":[7,8,14,15,16,17,18,19,20,21,22,23,24,25,26],"aromatic_bond_edges":[[7,8],[7,20],[8,14],[14,15],[14,19],[15,16],[16,17],[17,18],[18,19],[19,20],[21,22],[21,26],[22,23],[23,24],[24,25],[25,26]],"aromatic_atom_count":15,"aromatic_bond_count":16}"#;
+    validate_record_line_with_policy(line, AromaticityPolicy::RdkitSimple)
+        .expect("CID 8936 should match the frozen RDKit Simple oracle");
 }
