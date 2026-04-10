@@ -10,7 +10,7 @@ readme = "README.md"
 
 [dependencies]
 elements_rs = "0.2.1"
-geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", rev = "b509d25854aac0ecf368a2e8f97d2530e970a106", default-features = false, features = ["alloc"] }
+geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", rev = "fc79f945805bae4f3f6cba49dfb3ce191c0355ec", default-features = false, features = ["alloc"] }
 hashbrown = { version = "0.16.1", default-features = false, features = ["alloc", "default-hasher", "inline-more"] }
 thiserror = { version = "2.0.18", default-features = false }
 
@@ -59,7 +59,8 @@ flate2 = "1.1.9"
 indicatif = "0.18.4"
 rayon = "1.11.0"
 reqwest = { version = "0.12.24", default-features = false, features = ["blocking", "rustls-tls"] }
-serde = "1.0.228"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
 
 [[bench]]
 name = "smiles_bench"

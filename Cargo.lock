@@ -417,7 +417,7 @@ dependencies = [
 [[package]]
 name = "geometric-traits"
 version = "0.1.0"
-source = "git+https://github.com/earth-metabolome-initiative/geometric-traits?rev=b509d25854aac0ecf368a2e8f97d2530e970a106#b509d25854aac0ecf368a2e8f97d2530e970a106"
+source = "git+https://github.com/earth-metabolome-initiative/geometric-traits?rev=fc79f945805bae4f3f6cba49dfb3ce191c0355ec#fc79f945805bae4f3f6cba49dfb3ce191c0355ec"
 dependencies = [
  "bitvec",
  "hashbrown",
@@ -1300,6 +1300,7 @@ dependencies = [
  "rayon",
  "reqwest",
  "serde",
+ "serde_json",
  "thiserror",
 ]
 

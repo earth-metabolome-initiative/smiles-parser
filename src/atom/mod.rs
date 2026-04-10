@@ -210,6 +210,22 @@ impl Atom {
         self.aromatic
     }
 
+    #[inline]
+    #[must_use]
+    pub(crate) const fn with_aromatic(mut self, aromatic: bool) -> Self {
+        self.aromatic = aromatic;
+        self
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn with_charge_value(mut self, charge: i8) -> Self {
+        self.charge = Charge::try_new(charge).unwrap_or_else(|_| {
+            unreachable!("internal aromaticity cleanup only uses valid charges")
+        });
+        self
+    }
+
     /// Returns the explicit hydrogen count written on the atom.
     #[inline]
     #[must_use]
@@ -616,6 +632,108 @@ mod tests {
         assert_ne!(neutral.node_type(), charged.node_type());
         assert_ne!(neutral.node_type(), isotopic.node_type());
         assert_ne!(aromatic.node_type(), aliphatic.node_type());
+    }
+
+    #[test]
+    fn mces_atom_type_accessors_return_all_stored_fields() {
+        let atom = Atom::builder()
+            .with_symbol(AtomSymbol::Element(Element::Se))
+            .with_isotope(80)
+            .with_aromatic(true)
+            .with_charge(Charge::try_new(-1).unwrap())
+            .build();
+        let atom_type = atom.node_type();
+
+        assert_eq!(atom_type.symbol(), AtomSymbol::Element(Element::Se));
+        assert!(atom_type.aromatic());
+        assert_eq!(atom_type.isotope_mass_number(), Some(80));
+        assert_eq!(atom_type.formal_charge(), -1);
+    }
+
+    #[test]
+    fn internal_charge_override_and_render_helpers_cover_multidigit_paths() {
+        let atom = Atom::builder()
+            .with_symbol(ac_symbol())
+            .with_hydrogens(123)
+            .with_class(12_345)
+            .build()
+            .with_charge_value(-2);
+
+        assert_eq!(atom.charge_value(), -2);
+        assert_eq!(atom.rendered_len_hint(), "[AcH123-2:12345]".len());
+        assert_eq!(atom.rendered_string(), "[AcH123-2:12345]");
+
+        let organic = Atom::new_organic_subset(ac_symbol(), false);
+        assert_eq!(organic.rendered_len_hint(), 2);
+        assert_eq!(organic.rendered_string(), "Ac");
+    }
+
+    #[test]
+    fn rendered_cow_and_length_helpers_cover_remaining_branches() {
+        let borrowed = Atom::new_organic_subset(AtomSymbol::Element(Element::C), false);
+        let owned = Atom::builder()
+            .with_symbol(AtomSymbol::Element(Element::C))
+            .with_isotope(13)
+            .with_hydrogens(2)
+            .with_charge(Charge::try_new(-1).unwrap())
+            .with_class(7)
+            .build();
+
+        assert_eq!(borrowed.rendered_cow(), Cow::Borrowed("C"));
+        assert_eq!(owned.rendered_cow().as_ref(), "[13CH2-:7]");
+
+        assert_eq!(rendered_symbol_len(AtomSymbol::WildCard, false), 1);
+        assert_eq!(rendered_symbol_len(ac_symbol(), true), 2);
+
+        assert_eq!(decimal_len_u8(9), 1);
+        assert_eq!(decimal_len_u8(10), 2);
+        assert_eq!(decimal_len_u8(100), 3);
+
+        assert_eq!(decimal_len_u16(9), 1);
+        assert_eq!(decimal_len_u16(10), 2);
+        assert_eq!(decimal_len_u16(100), 3);
+        assert_eq!(decimal_len_u16(1_000), 4);
+        assert_eq!(decimal_len_u16(10_000), 5);
+    }
+
+    #[test]
+    fn write_smiles_and_write_symbol_cover_dynamic_branches() {
+        let bracket = Atom::builder()
+            .with_symbol(ac_symbol())
+            .with_isotope(227)
+            .with_hydrogens(1)
+            .with_charge(Charge::try_new(2).unwrap())
+            .with_class(7)
+            .build();
+        let mut rendered = String::new();
+        let mut symbol = String::new();
+
+        bracket.write_smiles(&mut rendered).unwrap();
+        write_symbol(&mut symbol, ac_symbol(), true).unwrap();
+
+        assert_eq!(rendered, "[227AcH+2:7]");
+        assert_eq!(symbol, "Ac");
+    }
+
+    #[test]
+    fn write_smiles_covers_minimal_bracket_atom_branch() {
+        let atom = Atom::builder().build();
+        let mut rendered = String::new();
+
+        atom.write_smiles(&mut rendered).unwrap();
+
+        assert_eq!(rendered, "[*]");
+    }
+
+    #[test]
+    fn rendered_symbol_len_falls_back_to_element_symbol_length_for_non_aromatic_element() {
+        assert_eq!(rendered_symbol_len(AtomSymbol::Element(Element::Cl), true), 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "internal aromaticity cleanup only uses valid charges")]
+    fn with_charge_value_panics_on_invalid_internal_charge() {
+        let _ = Atom::builder().build().with_charge_value(i8::MAX);
     }
 
     #[test]

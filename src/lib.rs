@@ -18,10 +18,20 @@ pub(crate) mod traversal;
 
 pub use crate::{
     errors::{SmilesError, SmilesErrorWithSpan},
-    smiles::Smiles,
+    smiles::{
+        AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
+        AromaticityModel, AromaticityPerception, AromaticityPolicy, AromaticityRingFamilyKind,
+        AromaticityStatus, RdkitDefaultAromaticity, RingMembership, RingMembershipError, Smiles,
+        SymmSssrResult, SymmSssrStatus,
+    },
 };
 
 /// Common imports for working with this crate.
 pub mod prelude {
-    pub use crate::{Smiles, SmilesError, SmilesErrorWithSpan};
+    pub use crate::{
+        AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
+        AromaticityModel, AromaticityPerception, AromaticityPolicy, AromaticityRingFamilyKind,
+        AromaticityStatus, RdkitDefaultAromaticity, RingMembership, RingMembershipError, Smiles,
+        SmilesError, SmilesErrorWithSpan, SymmSssrResult, SymmSssrStatus,
+    };
 }

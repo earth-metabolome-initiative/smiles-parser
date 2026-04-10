@@ -62,6 +62,15 @@ impl Bond {
             _ => self.smiles_symbol(),
         }
     }
+
+    #[inline]
+    #[must_use]
+    pub(crate) const fn without_direction(self) -> Self {
+        match self {
+            Self::Up | Self::Down => Self::Single,
+            _ => self,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -89,5 +98,13 @@ mod tests {
         for (bond, expected) in cases {
             assert_eq!(expected, bond.to_string());
         }
+    }
+
+    #[test]
+    fn directional_bonds_collapse_to_single() {
+        assert_eq!(Bond::Up.without_direction(), Bond::Single);
+        assert_eq!(Bond::Down.without_direction(), Bond::Single);
+        assert_eq!(Bond::Double.without_direction(), Bond::Double);
+        assert_eq!(Bond::Aromatic.without_direction(), Bond::Aromatic);
     }
 }
