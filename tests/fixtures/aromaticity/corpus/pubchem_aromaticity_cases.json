@@ -1,0 +1,1222 @@
+{
+  "cases": [
+    {
+      "id": "cid_101047328",
+      "smiles": "CC1=CC2=C(C(=C1)C3=CC(=CC4=C3OCCCOC5=C(C=C(C=C25)C)C6=C7C(=CC(=C6)C)C8=C(C(=CC(=C8)C)C9=CC(=CC4=C9OCCCO7)C)OC)C)OC",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "frontier",
+        "regression"
+      ]
+    },
+    {
+      "id": "cid_101082",
+      "smiles": "C1=CC2=C3C(=C(C=C2S(=O)(=O)[O-])S(=O)(=O)[O-])C=CC4=C(C=C(C1=C43)S(=O)(=O)[O-])S(=O)(=O)[O-].[Na+].[Na+].[Na+].[Na+]",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "sulfonated",
+        "fused-aromatic"
+      ]
+    },
+    {
+      "id": "cid_101460172",
+      "smiles": "C1COCCOCC2(COCCOCCO1)COC3=CC4=C(C=C3)C5=NC6=C7C=CC8=CC7=C(N6)N=C9C1=C3C=CC(=C1)OCC1(COCCOCCOCCOCCOC1)COC1=CC6=C(C=C1)C1=NC6=NC6=C7C=C(C=CC7=C(N6)N=C6C7=C(C=C(C=C7)OC2)C(=N6)NC2=NC(=N1)C1=C2C=C(C=C1)OCC1(COCCOCCOCCOCCOC1)COC1=CC2=C(C=C1)C(=NC3=N9)N=C2NC4=N5)OCC1(COCCOCCOCCOCCOC1)CO8",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "frontier",
+        "regression"
+      ]
+    },
+    {
+      "id": "cid_1067",
+      "smiles": "CC(C(=O)NC(CCC(=O)NC(CCC(=O)O)C(=O)O)C(=O)O)OP(=O)(O)OCC(C(C(CN1C2CC(CCC2CC3=C1NC(=O)NC3=O)O)O)O)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "partially-saturated-fused-imide"
+      ]
+    },
+    {
+      "id": "cid_1072",
+      "smiles": "CC1=CC2=C(C=C1C)N(C3=NC(=O)NC(=O)C3=N2)CC(C(C(CO)O)O)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "alloxazine-like"
+      ]
+    },
+    {
+      "id": "cid_11274824",
+      "smiles": "CC1=CC(=C(C(=C1)C)N2C=CN(C2=[Zn])C3=C(C=C(C=C3C)C)C)C.CC1=CC(=C(C(=C1)C)N2C=CN(C2=[Zn])C3=C(C=C(C=C3C)C)C)C.C1=CC=C(C=C1)CO.C1=CC=C(C=C1)CO.C1=CC=C(C=C1)CO.C1=CC=C(C=C1)CO",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "metallated",
+        "zinc-porphyrinoid-like"
+      ]
+    },
+    {
+      "id": "cid_119211",
+      "smiles": "C1=CC(=CC=[C]1)[N+](=O)[O-]",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "radical",
+        "nitro"
+      ]
+    },
+    {
+      "id": "cid_123591",
+      "smiles": "C12=C3C4=C5C6=C1C7=C8C9=C1C%10=C%11C(=C29)C3=C2C3=C4C4=C5C5=C9C6=C7C6=C7C8=C1C1=C8C%10=C%10C%11=C2C2=C3C3=C4C4=C5C5=C%11C%12=C(C6=C95)C7=C1C1=C%12C5=C%11C4=C3C3=C5C(=C81)C%10=C23",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "performance",
+        "polycyclic",
+        "carbon-cage"
+      ]
+    },
+    {
+      "id": "cid_143125",
+      "smiles": "C1CC2=CC3=C4CCC5=C(CC3)C=C1C(=C5)CCC2=C4",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "sssr-anomaly",
+        "polycycle"
+      ]
+    },
+    {
+      "id": "cid_145056",
+      "smiles": "C1CC2=CC3=C4CCC5=C(CC3)C=CC1=C(CCC2=C4)C=C5",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "sssr-anomaly",
+        "polycycle"
+      ]
+    },
+    {
+      "id": "cid_15417193",
+      "smiles": "C1=CC=C2C3C4C5C3C6=CC=CC=C6C7C8C(C7C2=C1)C9=CC(=CC=C9)C1C(C2C1C1=CC=CC=C1C1C(C(C1C1=CC=CC=C21)C1=CC=CC5=C1)C1=CC=CC4=C1)C1=CC=CC8=C1",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "cage-polyaryl",
+        "high-symmetry"
+      ]
+    },
+    {
+      "id": "cid_15857511",
+      "smiles": "CCCCCCCCCCCCCCN1C2=C3C=C(C=C2)C#CC4=CC5=C(C=C4)N(C6=C5C=C(C=C6)C#CC7=CC8=C(C=C7)N(C9=C8C=C(C=C9)C#CC2=CC4=C(C=C2)N(C2=C4C=C(C=C2)C#CC2=CC3=C1C=C2)CCCCCCCCCCCCCC)CCCCCCCCCCCCCC)CCCCCCCCCCCCCC",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "metallated",
+        "ethynyl-bridged-aza-polycycle"
+      ]
+    },
+    {
+      "id": "cid_162273140",
+      "smiles": "[3H]N=[W]=S.CC1=CC2=C3C4=C5C=C2C(=C1C6=C7CC8=C9C1=C2C%10=C%11C(=C(C=C%10C(=C71)C=C6)C(=O)O)C1=CC6=C(C=C1)C(=C4C1=C6C4=C6C(=C%11C7=C2C2=C9C9=C%10C%11=C%12C=C(C%13=C%14C=CC%15=C%16C=CC(=C%17C%16=C%16C(=C4C%17)C1=C5C1=C%16C%15=C%14C(=C1)C1=C(C8=C9C%12=C%131)C)C1=C(C4=C(C=C1C)C(=C%10C2=C4C7=C6C(=O)O)C(=C%11C(=O)O)C(=O)O)C(=O)O)C)C(=O)O)C(=C3C(=O)O)C(=O)O)C(=O)O.CC1=C2[C@H](C(=O)[C@@]3([C@H](C[C@@H]4[C@]([C@H]3[C@@H]([C@@](C2(C)C)(C[C@@H]1OC(=O)[C@@H]([C@H](C5=CC=CC=C5)NC(=O)C6=CC=CC=C6)O)O)OC(=O)C7=CC=CC=C7)(CO4)OC(=O)C)O)C)OC(=O)C.C1C2=C3C=CC4=C5C=CC6=C7C5=C8C9=C5C%10=C%11C%12=C%13C=C(C(=C(C%13=C%10)C(=O)O)C%10=C%13CC%14=C%15C%16=C%17C%18=C%19C(=C(C=C%18C(=C%13%16)C=C%10)C(=O)O)C%10=CC%13=C(C=C%10)C(=C%11C%10=C%13C(=C1C(=C5%10)C8=C24)C1=C(C%19=C2C%17=C4C%15=C5C8=C%10C(=CC(=C6C%10=C(C7=C9)C(=C%148)C(=O)O)C(=O)O)C6=C5C5=C(C7=CC(=C3C(=C7C(=C54)C2=C1C(=O)O)C(=O)O)C(=O)O)C(=C6C(=O)O)C(=O)O)C(=O)O)C(=C%12C(=O)O)C(=O)O)C(=O)O.C1=CC2=C3C=CC4=C5C=CC6=C7C=CC8=C9C=CC%10=C1C1=C2C2=C%11C3=C4C3=C4C5=C6C5=C6C7=C8C7=C8C9=C%10C9=C1C1=C2C2=C%10C%11=C3C3=C%11C4=C5C4=C5C6=C7C6=C7C8=C9C8=C1C1=C2C2=C9C%10=C3C3=C%10C%11=C4C4=C%11C5=C6C5=C6C7=C8C7=C1C1=C2C2=C8C9=C3C3=C9C%10=C4C4=C%10C%11=C5C5=C%11C6=C7C6=C1C1=C2C2=C7C8=C3C3=C8C9=C4C4=C9C%10=C5C5=C%10C%11=C6C6=C1C1=C2C2=C%11C7=C3C3=C7C8=C4C4=C8C9=C5C5=C9C%10=C6C6=C1C1=C2C=CC%11=C3C=CC7=C4C=CC8=C5C=CC9=C6C=C1.[N+](=O)(O)[O-]",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "frontier",
+        "regression"
+      ]
+    },
+    {
+      "id": "cid_163335646",
+      "smiles": "COC(=O)CCCC1(C23C14C5=C6C7=C8C9=C1C8=C6C6=C4C4=C8C%10=C%11C%12=C%13C%14=C%15C%16=C%17C%18=C%19C%20=C%17C%17=C%21C%16=C%16C(=C%13C%15=C%11C1=C%106)C9=C%16C%21=C7C1=C%17C6=C%20C7=C9C%19=C%10C%18=C%14C%11=C%12C8=C8C%11=C%10C%10=C9C9=C7C7=C6C1=C5C7=C2C9=C%10C8=C34)C1=CC=CC=C1",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "cid-163335646"
+      ]
+    },
+    {
+      "id": "cid_167",
+      "smiles": "C1CN=C2C(=N1)C=NC=N2",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "purine-like"
+      ]
+    },
+    {
+      "id": "cid_17776485",
+      "smiles": "C1=CC=C2C(=C1)C=CC=P2=O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "pnictogen",
+        "phosphinine-oxide"
+      ]
+    },
+    {
+      "id": "cid_17814188",
+      "smiles": "CC1(CC(CC(N1)(C)C)N=C2C3(CCCCCC3)C(N(C(C24C5=NC4=NC(=N5)NC(C)(C)CC(C)(C)C)(C)C)N)(C)C)C",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "amidino-diazine"
+      ]
+    },
+    {
+      "id": "cid_17824134",
+      "smiles": "C1=CC=C(C=C1)COC2(C3=CC2=CC=C3)OCC4=CC=CC=C4.N",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "bridged-benzo-fused"
+      ]
+    },
+    {
+      "id": "cid_17824135",
+      "smiles": "C1=CC=C(C=C1)COC2(C3=CC2=CC=C3)OCC4=CC=CC=C4",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "bridged-benzo-fused"
+      ]
+    },
+    {
+      "id": "cid_17942196",
+      "smiles": "CC(C)(C)C1=CN=C(O1)/C=C/C2=CN=C(S2)N3C4=CC3=NC=C4",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "thioazole-fused-aza"
+      ]
+    },
+    {
+      "id": "cid_18403774",
+      "smiles": "CC(C1=CC(=C(C=C1)OC)F)N2CCNCC23C4=CC3=NC=C4",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "bridged-aza-fused"
+      ]
+    },
+    {
+      "id": "cid_18768410",
+      "smiles": "C1C2=CC(=C(C1=C2SCC3=CC(=C(C=C3)F)F)F)F.[Cl-]",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "sulfur-bridged-halophenyl"
+      ]
+    },
+    {
+      "id": "cid_18768411",
+      "smiles": "C1C2=CC(=C(C1=C2SCC3=CC(=C(C=C3)F)F)F)F",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "sulfur-bridged-halophenyl"
+      ]
+    },
+    {
+      "id": "cid_18927557",
+      "smiles": "C1=CC=C(C=C1)[Si]2(C3=C(C2=CC=C3)C(C(C(Cl)Cl)(Cl)Cl)Cl)C4=CC=CC=C4.O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "sila-bridged-benzo-fused"
+      ]
+    },
+    {
+      "id": "cid_18927558",
+      "smiles": "C1=CC=C(C=C1)[Si]2(C3=C(C2=CC=C3)C(C(C(Cl)Cl)(Cl)Cl)Cl)C4=CC=CC=C4",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "sila-bridged-benzo-fused"
+      ]
+    },
+    {
+      "id": "cid_18927664",
+      "smiles": "C1=CC=C(C=C1)[Si]2(C3=C(C2=CC=C3)C(C(C(Br)Br)(Br)Br)Br)C4=CC=CC=C4.O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "sila-bridged-benzo-fused"
+      ]
+    },
+    {
+      "id": "cid_251",
+      "smiles": "CC1=C(C(=CC2=C(C(=C(N2)C=C3C(=C(C(=O)N3)C)C=C)C)CCC(=O)O)NC1=CC4=NC(=O)C(=C4C)C=C)CCC(=O)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "extended-fused-polylactam"
+      ]
+    },
+    {
+      "id": "cid_3577",
+      "smiles": "CC1=C(C2=CC3=NC(=CC4=C(C(=C([N-]4)C=C5C(=C(C(=N5)C=C1[N-]2)C(CCC=C(C)CCC=C(C)CCC=C(C)C)O)C)C=O)CCC(=O)O)C(=C3C)CCC(=O)O)C=C.[Fe+2]",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "macrocycle",
+        "metalloporphyrin-like"
+      ]
+    },
+    {
+      "id": "cid_3580",
+      "smiles": "CC=C1C(=C2C=C3C(=CC)C(=C(N3)C=C4C(=C(C(=CC5=C(C(=C(N5)C=C1N2)C)CCC(=O)O)N4)CCC(=O)O)C)C)C",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "macrocycle",
+        "porphyrinoid-like"
+      ]
+    },
+    {
+      "id": "cid_40568",
+      "smiles": "CC[NH+](CC)CCN1C2=C3C(=C(C=C2)C)SC4=CC=CC=C4C3=N1.CS(=O)(=O)[O-]",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "true-frontier"
+      ]
+    },
+    {
+      "id": "cid_4231",
+      "smiles": "C1=CC(=CC=C1C2=C3C=CC(=C(C4=NC(=C(C5=CC=C([N-]5)C(=C6C=CC2=N6)C7=CC=C(C=C7)C(=O)O)C8=CC=C(C=C8)C(=O)O)C=C4)C9=CC=C(C=C9)C(=O)O)[N-]3)C(=O)O.[Mn+3]",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "macrocycle",
+        "metalloporphyrin-like"
+      ]
+    },
+    {
+      "id": "cid_4233",
+      "smiles": "C[N+]1=CC=C(C=C1)C2=C3C=CC(=C(C4=NC(=C(C5=CC=C([N-]5)C(=C6C=CC2=N6)C7=CC=[N+](C=C7)C)C8=CC=[N+](C=C8)C)C=C4)C9=CC=[N+](C=C9)C)[N-]3.[Mn+3]",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "macrocycle",
+        "metalloporphyrin-like"
+      ]
+    },
+    {
+      "id": "cid_4234",
+      "smiles": "C[N+]1=CC=C(C=C1)C2=C3C=CC(=C(C4=CC=C(N4)C(=C5C=CC(=N5)C(=C6C=CC2=N6)C7=CC=[N+](C=C7)C)C8=CC=[N+](C=C8)C)C9=CC=[N+](C=C9)C)N3",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "macrocycle",
+        "aza-porphyrinoid-like"
+      ]
+    },
+    {
+      "id": "cid_43632",
+      "smiles": "CN1CCC2=C3[C@H]1CC4=C(C3=CC=C2)C(=C(C=C4)OC(=O)COC)OC(=O)COC.[C@@H]([C@H](C(=O)O)O)(C(=O)O)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "fused-ester",
+        "aromatic-underassignment"
+      ]
+    },
+    {
+      "id": "cid_57383442",
+      "smiles": "CCCOC1=C2CNC(=O)C3=CC(=CC(=C3)C(=O)NC(COCCC(=O)O)(COCCC(=O)O)COCCC(=O)O)C(=O)NCC4=C(C5=CC(=C4)C6=CC7=C(C(=C6)CNC(=O)C8=CC(=CC(=C8)C(=O)NCC9=CC(=CC(=C9OCCC)CNC(=O)C3=CC(=CC(=C3)C(=O)NC(COCCC(=O)O)(COCCC(=O)O)COCCC(=O)O)C(=O)NC7)C(=C2)C=C1CNC(=O)C1=CC(=CC(=C1)C(=O)NC(COCCC(=O)O)(COCCC(=O)O)COCCC(=O)O)C(=O)NC5)C(=O)NC(COCCC(=O)O)(COCCC(=O)O)COCCC(=O)O)OCCC)OCCC",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "cid-57383442"
+      ]
+    },
+    {
+      "id": "cid_58882885",
+      "smiles": "CC1=C2CC3=C(C4=C5C=C3[C@@H]6C2=CC7=C1CC8=C(C9=C1C=C8[C@@H]7CCC[C@@H]2C3=C7CC8=C2C=C2C%10CCCC%11C%12=CC%13=C%14CC(=C7C)C(=C3)[C@@H]%13CCC[C@H]3C7=C%13CC%15=C3C=C3C(CCCC%16C%17=CC(=C(C4)C(=C%17CC4=C%16C=C%16[C@H](CCC6)C(=C7)C(=C%13C)CC%16=C4C)C)C5CCCC1C1=CC%10=C(CC2=C8C)C(=C1C9)C)C1=CC%11=C(CC%12=C%14C)C(=C1CC3=C%15C)C)C)C",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "large-polycycle",
+        "late-frontier"
+      ]
+    },
+    {
+      "id": "cid_593",
+      "smiles": "C1=CN(C(=O)N=C1N)C2C(C(C(O2)COP(=O)(O)OP(=O)(O)OP(=O)(O)O)O)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "donor-model",
+        "pyrimidinone-like"
+      ]
+    },
+    {
+      "id": "cid_59438852",
+      "smiles": "CCOC(=O)C1=C2C3=C4C5CC6CCC5=C7C8=C4C9=C4C5=C%10CC%11=C4C4=C%12C9=C3CC3=C%12C9=C%12C4=C4C%11=C%11C%13=C%14C(=C%15C%16=C%17C%18=C(C%19=C(C(=C3C=C9)C=C(C%19=C%17C(=C%15C(=O)O)C(=O)O)C)C(=O)O)C(=C2C(=O)O)C2=C3C%18=C9C%16=C%14C(=C%11C(=O)O)C%11=C9C9=C%14C(=C(C=CC%14=C%14C=C(C6C(=C21)C%14=C93)C(=O)O)C1=C(C=C(C%10=C1C(=O)O)C(=C58)C(=C7C(=O)O)C(=O)O)C(=O)OCCOCCOCCOCCOCCOCCOCCOC)C%11)C=C(C%13C4C=C%12)C(=O)OCCOCCOCCOCCOCCOCCOCCOC",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "cid-59438852"
+      ]
+    },
+    {
+      "id": "cid_596",
+      "smiles": "C1=CN(C(=O)N=C1N)C2C(C(C(O2)CO)O)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "donor-model",
+        "pyrimidinone-like"
+      ]
+    },
+    {
+      "id": "cid_597",
+      "smiles": "C1=C(NC(=O)N=C1)N",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "donor-model",
+        "pyrimidinone-like"
+      ]
+    },
+    {
+      "id": "cid_623",
+      "smiles": "C1C(C(OC1N2C=CC(=NC2=O)N)COP(=O)(O)OP(=O)(O)O)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "donor-model",
+        "nucleobase-like"
+      ]
+    },
+    {
+      "id": "cid_624",
+      "smiles": "C1C(C(OC1N2C=CC(=NC2=O)N)COP(=O)(O)O)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "donor-model",
+        "nucleobase-like"
+      ]
+    },
+    {
+      "id": "cid_625",
+      "smiles": "C1C(C(OC1N2C=CC(=NC2=O)N)COP(=O)(O)OP(=O)(O)OP(=O)(O)O)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "donor-model",
+        "nucleobase-like"
+      ]
+    },
+    {
+      "id": "cid_629",
+      "smiles": "CN(CCC(CC(=O)NC1C=CC(OC1C(=O)O)N2C=CC(=O)NC2=O)N)C(=N)N",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "donor-model",
+        "uracil-like"
+      ]
+    },
+    {
+      "id": "cid_637",
+      "smiles": "C1C(C(OC1N2C=CC(=NC2=O)N)CO)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "donor-model",
+        "nucleobase-like"
+      ]
+    },
+    {
+      "id": "cid_640",
+      "smiles": "C1C(C(OC1N2C=CC(=O)NC2=O)CO)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "donor-model",
+        "uracil-like"
+      ]
+    },
+    {
+      "id": "cid_672",
+      "smiles": "CC1=C(N(C2=NC(=O)NC(=O)C2=N1)CC(C(C(CO)O)O)O)C",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "carbonylated-fused-heteroaromatic"
+      ]
+    },
+    {
+      "id": "cid_684",
+      "smiles": "CC1=CN(C(=O)NC1=O)C2CC(C(O2)COP(=O)(O)OP(=O)(O)OC3C(C(C(C(O3)CO)O)O)O)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "donor-model",
+        "thymine-like"
+      ]
+    },
+    {
+      "id": "cid_703",
+      "smiles": "CC1=CC2=C(C=C1C)N(C3=NC(=O)NC(=O)C3=N2)CC(C(C(COP(=O)(O)OP(=O)(O)OCC4C(C(C(O4)N5C=NC6=C(N=CN=C65)N)O)O)O)O)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "alloxazine-like"
+      ]
+    },
+    {
+      "id": "cid_705",
+      "smiles": "CC1=CC2=C(C=C1C)N(C3=C(N2)C(=O)NC(=O)N3)CC(C(C(COP(=O)(O)OP(=O)(O)OCC4C(C(C(O4)N5C=NC6=C(N=CN=C65)N)O)O)O)O)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "alloxazine-like"
+      ]
+    },
+    {
+      "id": "cid_710",
+      "smiles": "CC1=CC2=C(C=C1C)N(C3=NC(=O)NC(=O)C3=N2)CC(C(C(COP(=O)(O)O)O)O)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "alloxazine-like"
+      ]
+    },
+    {
+      "id": "cid_711",
+      "smiles": "CC1=CC2=C(C=C1C)N(C3=C(N2)C(=O)NC(=O)N3)CC(C(C(COP(=O)(O)O)O)O)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "alloxazine-like"
+      ]
+    },
+    {
+      "id": "cid_76030",
+      "smiles": "CN1C2=CC=CC=C2SC1=[Se]",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "chalcogen",
+        "selenium"
+      ]
+    },
+    {
+      "id": "cid_8978",
+      "smiles": "C1=CC=C2C(=C1)C3=NC4=NC(=NC5=NC(=NC6=NC(=NC2=N3)C7=CC=CC=C76)C8=CC=CC=C85)C9=CC=CC=C94.[Cu]",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "macrocycle",
+        "aza-macrocycle"
+      ]
+    },
+    {
+      "id": "cid_8979",
+      "smiles": "C1=CC=C2C(=C1)C3=NC2=NC4=NC(=NC5=NC(=NC6=C7C=CC=CC7=C(N6)N3)C8=CC=CC=C85)C9=CC=CC=C94",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "macrocycle",
+        "aza-macrocycle"
+      ]
+    },
+    {
+      "id": "cid_969",
+      "smiles": "CC(C(=O)NC(CCC(=O)NC(CCC(=O)O)C(=O)O)C(=O)O)OP(=O)(O)OCC(C(C(CN1C2=CC(=O)C=CC2=CC3=C1NC(=O)NC3=O)O)O)O",
+      "milestones": [
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem-gap",
+        "rdkit-default",
+        "alloxazine-like"
+      ]
+    },
+    {
+      "id": "pubchem_10286_chromone",
+      "smiles": "C1=CC=C2C(=C1)C(=O)C=CO2",
+      "note": "PubChem chromone-like fused oxygen heteroaromatic. PubChem CID 10286.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "exocyclic_carbonyl",
+        "fused"
+      ],
+      "pubchem_name": "chromone",
+      "pubchem_cid": 10286
+    },
+    {
+      "id": "pubchem_1048_pyrazole",
+      "smiles": "C1=CNN=C1",
+      "note": "PubChem five-member aromatic pyrazole. PubChem CID 1048.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "five_membered"
+      ],
+      "pubchem_name": "pyrazole",
+      "pubchem_cid": 1048
+    },
+    {
+      "id": "pubchem_1049_pyridine",
+      "smiles": "C1=CC=NC=C1",
+      "note": "PubChem six-member aromatic aza ring. PubChem CID 1049.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "single_ring"
+      ],
+      "pubchem_name": "pyridine",
+      "pubchem_cid": 1049
+    },
+    {
+      "id": "pubchem_10680_flavone",
+      "smiles": "C1=CC=C(C=C1)C2=CC(=O)C3=CC=CC=C3O2",
+      "note": "PubChem flavone-like fused oxygen heteroaromatic. PubChem CID 10680.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "exocyclic_carbonyl",
+        "fused"
+      ],
+      "pubchem_name": "flavone",
+      "pubchem_cid": 10680
+    },
+    {
+      "id": "pubchem_11000_cycloheptatriene",
+      "smiles": "C1C=CC=CC=C1",
+      "note": "PubChem alternating seven-member ring that should stay non-aromatic. PubChem CID 11000.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "non_aromatic",
+        "seven_membered"
+      ],
+      "pubchem_name": "cycloheptatriene",
+      "pubchem_cid": 11000
+    },
+    {
+      "id": "pubchem_241_benzene",
+      "smiles": "C1=CC=CC=C1",
+      "note": "PubChem aromatic benzene baseline. PubChem CID 241.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "benzenoid",
+        "single_ring"
+      ],
+      "pubchem_name": "benzene",
+      "pubchem_cid": 241
+    },
+    {
+      "id": "pubchem_31423_pyrene",
+      "smiles": "C1=CC2=C3C(=C1)C=CC4=CC=CC(=C43)C=C2",
+      "note": "PubChem fused benzenoid pyrene. PubChem CID 31423.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "benzenoid",
+        "fused"
+      ],
+      "pubchem_name": "pyrene",
+      "pubchem_cid": 31423
+    },
+    {
+      "id": "pubchem_323_coumarin",
+      "smiles": "C1=CC=C2C(=C1)C=CC(=O)O2",
+      "note": "PubChem fused oxygen heteroaromatic with exocyclic carbonyl. PubChem CID 323.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "exocyclic_carbonyl",
+        "fused"
+      ],
+      "pubchem_name": "coumarin",
+      "pubchem_cid": 323
+    },
+    {
+      "id": "pubchem_5798_benzimidazole",
+      "smiles": "C1=CC=C2C(=C1)NC=N2",
+      "note": "PubChem fused aromatic benzimidazole. PubChem CID 5798.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "fused"
+      ],
+      "pubchem_name": "benzimidazole",
+      "pubchem_cid": 5798
+    },
+    {
+      "id": "pubchem_637866_cyclooctatetraene",
+      "smiles": "C1=CC=CC=CC=C1",
+      "note": "PubChem alternating eight-member ring that should stay non-aromatic. PubChem CID 637866.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "non_aromatic",
+        "eight_membered"
+      ],
+      "pubchem_name": "cyclooctatetraene",
+      "pubchem_cid": 637866
+    },
+    {
+      "id": "pubchem_6854_carbazole",
+      "smiles": "C1=CC=C2C(=C1)C3=CC=CC=C3N2",
+      "note": "PubChem fused aza aromatic carbazole. PubChem CID 6854.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "fused"
+      ],
+      "pubchem_name": "carbazole",
+      "pubchem_cid": 6854
+    },
+    {
+      "id": "pubchem_7047_quinoline",
+      "smiles": "C1=CC=C2C(=C1)C=CC=N2",
+      "note": "PubChem fused aromatic quinoline. PubChem CID 7047.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "fused"
+      ],
+      "pubchem_name": "quinoline",
+      "pubchem_cid": 7047
+    },
+    {
+      "id": "pubchem_7221_benzothiophene",
+      "smiles": "C1=CC=C2C(=C1)C=CS2",
+      "note": "PubChem fused aromatic benzothiophene. PubChem CID 7221.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "fused"
+      ],
+      "pubchem_name": "benzothiophene",
+      "pubchem_cid": 7221
+    },
+    {
+      "id": "pubchem_7222_benzothiazole",
+      "smiles": "C1=CC=C2C(=C1)N=CS2",
+      "note": "PubChem fused aromatic benzothiazole. PubChem CID 7222.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "fused"
+      ],
+      "pubchem_name": "benzothiazole",
+      "pubchem_cid": 7222
+    },
+    {
+      "id": "pubchem_7612_cyclopentadiene",
+      "smiles": "C1C=CC=C1",
+      "note": "PubChem alternating five-member ring that should stay non-aromatic. PubChem CID 7612.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "non_aromatic",
+        "five_membered"
+      ],
+      "pubchem_name": "cyclopentadiene",
+      "pubchem_cid": 7612
+    },
+    {
+      "id": "pubchem_795_imidazole",
+      "smiles": "C1=CN=CN1",
+      "note": "PubChem five-member aromatic imidazole. PubChem CID 795.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "five_membered"
+      ],
+      "pubchem_name": "imidazole",
+      "pubchem_cid": 795
+    },
+    {
+      "id": "pubchem_798_indole",
+      "smiles": "C1=CC=C2C(=C1)C=CN2",
+      "note": "PubChem fused aromatic indole. PubChem CID 798.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "fused"
+      ],
+      "pubchem_name": "indole",
+      "pubchem_cid": 798
+    },
+    {
+      "id": "pubchem_8078_cyclohexane",
+      "smiles": "C1CCCCC1",
+      "note": "PubChem non-aromatic six-member ring. PubChem CID 8078.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "non_aromatic",
+        "single_ring"
+      ],
+      "pubchem_name": "cyclohexane",
+      "pubchem_cid": 8078
+    },
+    {
+      "id": "pubchem_8405_isoquinoline",
+      "smiles": "C1=CC=C2C=NC=CC2=C1",
+      "note": "PubChem fused aromatic isoquinoline. PubChem CID 8405.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "fused"
+      ],
+      "pubchem_name": "isoquinoline",
+      "pubchem_cid": 8405
+    },
+    {
+      "id": "pubchem_8418_anthracene",
+      "smiles": "C1=CC=C2C=C3C=CC=CC3=CC2=C1",
+      "note": "PubChem fused benzenoid anthracene. PubChem CID 8418.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "benzenoid",
+        "fused"
+      ],
+      "pubchem_name": "anthracene",
+      "pubchem_cid": 8418
+    },
+    {
+      "id": "pubchem_9215_acridine",
+      "smiles": "C1=CC=C2C(=C1)C=C3C=CC=CC3=N2",
+      "note": "PubChem fused aza aromatic acridine. PubChem CID 9215.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "fused"
+      ],
+      "pubchem_name": "acridine",
+      "pubchem_cid": 9215
+    },
+    {
+      "id": "pubchem_9223_benzofuran",
+      "smiles": "C1=CC=C2C(=C1)C=CO2",
+      "note": "PubChem fused aromatic benzofuran. PubChem CID 9223.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "fused"
+      ],
+      "pubchem_name": "benzofuran",
+      "pubchem_cid": 9223
+    },
+    {
+      "id": "pubchem_9228_benzoxazole",
+      "smiles": "C1=CC=C2C(=C1)N=CO2",
+      "note": "PubChem fused aromatic benzoxazole. PubChem CID 9228.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "fused"
+      ],
+      "pubchem_name": "benzoxazole",
+      "pubchem_cid": 9228
+    },
+    {
+      "id": "pubchem_9254_isoxazole",
+      "smiles": "C1=CON=C1",
+      "note": "PubChem five-member aromatic isoxazole. PubChem CID 9254.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "five_membered"
+      ],
+      "pubchem_name": "isoxazole",
+      "pubchem_cid": 9254
+    },
+    {
+      "id": "pubchem_9255_oxazole",
+      "smiles": "C1=COC=N1",
+      "note": "PubChem five-member aromatic oxazole. PubChem CID 9255.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "five_membered"
+      ],
+      "pubchem_name": "oxazole",
+      "pubchem_cid": 9255
+    },
+    {
+      "id": "pubchem_9256_thiazole",
+      "smiles": "C1=CSC=N1",
+      "note": "PubChem five-member aromatic thiazole. PubChem CID 9256.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "five_membered"
+      ],
+      "pubchem_name": "thiazole",
+      "pubchem_cid": 9256
+    },
+    {
+      "id": "pubchem_9259_pyridazine",
+      "smiles": "C1=CC=NN=C1",
+      "note": "PubChem ortho-diazine aromatic ring. PubChem CID 9259.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "single_ring"
+      ],
+      "pubchem_name": "pyridazine",
+      "pubchem_cid": 9259
+    },
+    {
+      "id": "pubchem_9260_pyrimidine",
+      "smiles": "C1=CN=CN=C1",
+      "note": "PubChem diazine aromatic ring. PubChem CID 9260.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "single_ring"
+      ],
+      "pubchem_name": "pyrimidine",
+      "pubchem_cid": 9260
+    },
+    {
+      "id": "pubchem_9261_pyrazine",
+      "smiles": "C1=CN=CC=N1",
+      "note": "PubChem para-diazine aromatic ring. PubChem CID 9261.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "heteroaromatic",
+        "single_ring"
+      ],
+      "pubchem_name": "pyrazine",
+      "pubchem_cid": 9261
+    },
+    {
+      "id": "pubchem_995_phenanthrene",
+      "smiles": "C1=CC=C2C(=C1)C=CC3=CC=CC=C32",
+      "note": "PubChem fused benzenoid phenanthrene. PubChem CID 995.",
+      "milestones": [
+        "ring-membership",
+        "symm-sssr",
+        "aromaticity"
+      ],
+      "tags": [
+        "pubchem",
+        "benzenoid",
+        "fused"
+      ],
+      "pubchem_name": "phenanthrene",
+      "pubchem_cid": 995
+    }
+  ]
+}
