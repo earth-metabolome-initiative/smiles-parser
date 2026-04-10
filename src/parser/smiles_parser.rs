@@ -460,7 +460,7 @@ mod tests {
         let mut state = ParserState::new(0);
 
         assert!(state.stack_empty());
-        assert_eq!(state.branch_stack, []);
+        assert!(state.branch_stack.is_empty());
 
         state.push_stack(1);
         state.push_stack(3);

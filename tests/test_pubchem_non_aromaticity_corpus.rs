@@ -12,12 +12,16 @@ use std::{
 use flate2::read::GzDecoder;
 use rayon::prelude::*;
 use serde::Deserialize;
-use smiles_parser::prelude::{AromaticityStatus, Smiles};
+use smiles_parser::prelude::{AromaticityPolicy, AromaticityStatus, Smiles};
 
 const DEFAULT_CORPUS_PATH: &str =
     "target/pubchem_aromaticity/default/pubchem_non_aromaticity_default.jsonl.gz";
 const DEFAULT_MANIFEST_PATH: &str =
     "target/pubchem_aromaticity/default/pubchem_non_aromaticity_default.manifest.json";
+const MDL_CORPUS_PATH: &str =
+    "target/pubchem_aromaticity/mdl/pubchem_non_aromaticity_mdl.jsonl.gz";
+const MDL_MANIFEST_PATH: &str =
+    "target/pubchem_aromaticity/mdl/pubchem_non_aromaticity_mdl.manifest.json";
 const DEFAULT_VALIDATION_BATCH_SIZE: usize = 4_096;
 const DEFAULT_PROGRESS_EVERY: usize = 100_000;
 
@@ -42,23 +46,49 @@ struct PubChemNonAromaticRecord {
 #[ignore = "This test streams a whole-PubChem non-aromatic corpus and checks that aromatic assignments stay empty."]
 fn validate_rdkit_default_pubchem_non_aromaticity_corpus() -> Result<(), Box<dyn std::error::Error>>
 {
+    validate_pubchem_non_aromaticity_corpus(
+        AromaticityPolicy::RdkitDefault,
+        "PUBCHEM_NON_AROMATICITY",
+        DEFAULT_CORPUS_PATH,
+        DEFAULT_MANIFEST_PATH,
+    )
+}
+
+#[test]
+#[ignore = "This test streams a whole-PubChem non-aromatic corpus and checks that aromatic assignments stay empty for RDKit MDL."]
+fn validate_rdkit_mdl_pubchem_non_aromaticity_corpus() -> Result<(), Box<dyn std::error::Error>>
+{
+    validate_pubchem_non_aromaticity_corpus(
+        AromaticityPolicy::RdkitMdl,
+        "PUBCHEM_MDL_NON_AROMATICITY",
+        MDL_CORPUS_PATH,
+        MDL_MANIFEST_PATH,
+    )
+}
+
+fn validate_pubchem_non_aromaticity_corpus(
+    policy: AromaticityPolicy,
+    env_prefix: &str,
+    default_corpus_path: &str,
+    default_manifest_path: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     require_release_build()?;
 
-    let corpus_path = non_aromatic_corpus_path()?;
-    let manifest_path = non_aromatic_manifest_path();
+    let corpus_path = non_aromatic_corpus_path(env_prefix, default_corpus_path)?;
+    let manifest_path = non_aromatic_manifest_path(env_prefix, default_manifest_path);
     let expected_total = manifest_path
         .exists()
         .then(|| load_manifest(&manifest_path))
         .transpose()?
         .map(|m| m.non_aromatic_records);
 
-    let limit = env_usize("PUBCHEM_NON_AROMATICITY_VALIDATE_LIMIT");
+    let limit = env_usize(&format!("{env_prefix}_VALIDATE_LIMIT"));
     let progress_every =
-        env_usize("PUBCHEM_NON_AROMATICITY_PROGRESS_EVERY").unwrap_or(DEFAULT_PROGRESS_EVERY);
+        env_usize(&format!("{env_prefix}_PROGRESS_EVERY")).unwrap_or(DEFAULT_PROGRESS_EVERY);
     let batch_size =
-        env_usize("PUBCHEM_NON_AROMATICITY_BATCH_SIZE").unwrap_or(DEFAULT_VALIDATION_BATCH_SIZE);
-    let mismatch_limit = env_usize("PUBCHEM_NON_AROMATICITY_MAX_MISMATCHES");
-    let rejects_path = env::var("PUBCHEM_NON_AROMATICITY_REJECTS_PATH").ok().map(PathBuf::from);
+        env_usize(&format!("{env_prefix}_BATCH_SIZE")).unwrap_or(DEFAULT_VALIDATION_BATCH_SIZE);
+    let mismatch_limit = env_usize(&format!("{env_prefix}_MAX_MISMATCHES"));
+    let rejects_path = env::var(format!("{env_prefix}_REJECTS_PATH")).ok().map(PathBuf::from);
     let mut rejects_writer =
         rejects_path.as_ref().map(|path| File::create(path).map(BufWriter::new)).transpose()?;
 
@@ -75,6 +105,7 @@ fn validate_rdkit_default_pubchem_non_aromaticity_corpus() -> Result<(), Box<dyn
         if batch.len() == batch_size {
             mismatch_count += handle_batch_result(
                 &batch,
+                policy,
                 &mut rejects_writer,
                 mismatch_limit,
                 mismatch_count,
@@ -98,6 +129,7 @@ fn validate_rdkit_default_pubchem_non_aromaticity_corpus() -> Result<(), Box<dyn
     {
         mismatch_count += handle_batch_result(
             &batch,
+            policy,
             &mut rejects_writer,
             mismatch_limit,
             mismatch_count,
@@ -146,13 +178,16 @@ fn validate_rdkit_default_pubchem_non_aromaticity_corpus() -> Result<(), Box<dyn
 
 fn handle_batch_result(
     batch: &[String],
+    policy: AromaticityPolicy,
     rejects_writer: &mut Option<BufWriter<File>>,
     mismatch_limit: Option<usize>,
     mismatches_seen_so_far: usize,
     stopped_for_mismatch_limit: &mut bool,
 ) -> Result<usize, Box<dyn std::error::Error>> {
-    let mismatches =
-        batch.par_iter().map(|line| validate_record_line(line).err()).collect::<Vec<_>>();
+    let mismatches = batch
+        .par_iter()
+        .map(|line| validate_record_line_with_policy(line, policy).err())
+        .collect::<Vec<_>>();
 
     if rejects_writer.is_none() {
         if let Some(error) = mismatches.into_iter().flatten().next() {
@@ -178,7 +213,7 @@ fn handle_batch_result(
     }
 }
 
-fn validate_record_line(line: &str) -> Result<(), String> {
+fn validate_record_line_with_policy(line: &str, policy: AromaticityPolicy) -> Result<(), String> {
     let record = serde_json::from_str::<PubChemNonAromaticRecord>(line)
         .map_err(|error| format!("failed to parse corpus record JSON: {error}\nline={line}"))?;
 
@@ -220,7 +255,7 @@ fn validate_record_line(line: &str) -> Result<(), String> {
         ));
     }
 
-    let aromaticity = smiles.aromaticity_assignment();
+    let aromaticity = smiles.aromaticity_assignment_for(policy);
     if aromaticity.status() == AromaticityStatus::Unsupported {
         return Err(format!(
             "cid={} aromaticity status is unsupported: parser={:?} smiles={}",
@@ -282,9 +317,12 @@ fn require_release_build() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn non_aromatic_corpus_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let path = env::var("PUBCHEM_NON_AROMATICITY_CORPUS_PATH")
-        .map_or_else(|_| PathBuf::from(DEFAULT_CORPUS_PATH), PathBuf::from);
+fn non_aromatic_corpus_path(
+    env_prefix: &str,
+    default_path: &str,
+) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let path = env::var(format!("{env_prefix}_CORPUS_PATH"))
+        .map_or_else(|_| PathBuf::from(default_path), PathBuf::from);
 
     if path.exists() {
         Ok(path)
@@ -300,9 +338,9 @@ fn non_aromatic_corpus_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
     }
 }
 
-fn non_aromatic_manifest_path() -> PathBuf {
-    env::var("PUBCHEM_NON_AROMATICITY_MANIFEST_PATH")
-        .map_or_else(|_| PathBuf::from(DEFAULT_MANIFEST_PATH), PathBuf::from)
+fn non_aromatic_manifest_path(env_prefix: &str, default_path: &str) -> PathBuf {
+    env::var(format!("{env_prefix}_MANIFEST_PATH"))
+        .map_or_else(|_| PathBuf::from(default_path), PathBuf::from)
 }
 
 fn load_manifest(path: &Path) -> Result<PubChemNonAromaticManifest, Box<dyn std::error::Error>> {
@@ -327,13 +365,21 @@ fn records_per_second(validated: usize, elapsed: std::time::Duration) -> usize {
 #[test]
 fn exact_pubchem_non_aromatic_record_validation_accepts_matching_empty_assignment() {
     let line = r#"{"cid":6324,"smiles":"CC","atoms":2,"bonds":1,"aromatic_atom_ids":[],"aromatic_bond_edges":[],"aromatic_atom_count":0,"aromatic_bond_count":0}"#;
-    validate_record_line(line).expect("matching non-aromatic assignment should validate");
+    validate_record_line_with_policy(line, AromaticityPolicy::RdkitDefault)
+        .expect("matching non-aromatic assignment should validate");
 }
 
 #[test]
 fn exact_pubchem_non_aromatic_record_validation_rejects_unexpected_aromatic_atoms() {
     let line = r#"{"cid":241,"smiles":"c1ccccc1","atoms":6,"bonds":6,"aromatic_atom_ids":[],"aromatic_bond_edges":[],"aromatic_atom_count":0,"aromatic_bond_count":0}"#;
-    let error =
-        validate_record_line(line).expect_err("benzene should not validate as non-aromatic");
+    let error = validate_record_line_with_policy(line, AromaticityPolicy::RdkitDefault)
+        .expect_err("benzene should not validate as non-aromatic");
     assert!(error.contains("unexpected aromatic atoms"), "{error}");
+}
+
+#[test]
+fn exact_pubchem_mdl_non_aromatic_record_validation_accepts_imidazole() {
+    let line = r#"{"cid":795,"smiles":"c1ncc[nH]1","atoms":5,"bonds":5,"aromatic_atom_ids":[],"aromatic_bond_edges":[],"aromatic_atom_count":0,"aromatic_bond_count":0}"#;
+    validate_record_line_with_policy(line, AromaticityPolicy::RdkitMdl)
+        .expect("imidazole should validate as non-aromatic under MDL");
 }

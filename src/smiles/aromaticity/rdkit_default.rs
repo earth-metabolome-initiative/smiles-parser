@@ -6,7 +6,7 @@ use hashbrown::{HashMap, HashSet};
 
 use super::{
     AromaticityAssignment, AromaticityDiagnostic, AromaticityModel, AromaticityRingFamilyKind,
-    AromaticityStatus, RdkitDefaultAromaticity, Smiles,
+    AromaticityStatus, RdkitDefaultAromaticity, RdkitMdlAromaticity, Smiles,
 };
 #[cfg(test)]
 use crate::smiles::RingComponent;
@@ -18,15 +18,54 @@ use crate::{
 
 impl AromaticityModel for RdkitDefaultAromaticity {
     fn assignment(&self, smiles: &Smiles) -> AromaticityAssignment {
+        RdkitAromaticityFlavor::Default.assignment(smiles)
+    }
+}
+
+impl AromaticityModel for RdkitMdlAromaticity {
+    fn assignment(&self, smiles: &Smiles) -> AromaticityAssignment {
+        RdkitAromaticityFlavor::Mdl.assignment(smiles)
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum RdkitAromaticityFlavor {
+    Default,
+    Mdl,
+}
+
+impl RdkitAromaticityFlavor {
+    fn candidate_rules(self) -> RdkitDefaultCandidateRules {
+        match self {
+            Self::Default => RdkitDefaultCandidateRules::DEFAULT,
+            Self::Mdl => RdkitDefaultCandidateRules::MDL,
+        }
+    }
+
+    fn exocyclic_bonds_steal_electrons(self) -> bool {
+        match self {
+            Self::Default | Self::Mdl => true,
+        }
+    }
+
+    fn allows_standalone_five_member_aromatic_cycles(self) -> bool {
+        match self {
+            Self::Default => true,
+            Self::Mdl => false,
+        }
+    }
+
+    fn assignment(self, smiles: &Smiles) -> AromaticityAssignment {
         if let Some(prepared_smiles) = RdkitPreAromaticityNormalization::apply(smiles) {
             RdkitDefaultContext::new(
+                self,
                 &prepared_smiles.smiles,
                 &prepared_smiles.implicit_hydrogen_overrides,
             )
             .assignment()
         } else {
             let implicit_hydrogen_overrides = HashMap::new();
-            RdkitDefaultContext::new(smiles, &implicit_hydrogen_overrides).assignment()
+            RdkitDefaultContext::new(self, smiles, &implicit_hydrogen_overrides).assignment()
         }
     }
 }
@@ -164,6 +203,7 @@ struct RdkitDefaultCandidateRules {
     allow_higher_exceptions: bool,
     only_c_or_n: bool,
     allow_exocyclic_multiple_bonds: bool,
+    only_one_electron_donors: bool,
 }
 
 impl RdkitDefaultCandidateRules {
@@ -173,6 +213,16 @@ impl RdkitDefaultCandidateRules {
         allow_higher_exceptions: true,
         only_c_or_n: false,
         allow_exocyclic_multiple_bonds: true,
+        only_one_electron_donors: false,
+    };
+
+    const MDL: Self = Self {
+        allow_third_row: false,
+        allow_triple_bonds: false,
+        allow_higher_exceptions: false,
+        only_c_or_n: true,
+        allow_exocyclic_multiple_bonds: false,
+        only_one_electron_donors: true,
     };
 }
 
@@ -284,6 +334,7 @@ struct RdkitDefaultElectronModel;
 
 impl RdkitDefaultElectronModel {
     fn build_states(
+        flavor: RdkitAromaticityFlavor,
         smiles: &Smiles,
         ring_membership: &RingMembership,
         implicit_hydrogen_overrides: &HashMap<usize, u8>,
@@ -298,9 +349,9 @@ impl RdkitDefaultElectronModel {
                     &radical_electrons,
                     atom_id,
                 );
-                let donor_type = Self::donor_type(&context, true);
-                let candidate =
-                    Self::is_candidate(&context, donor_type, RdkitDefaultCandidateRules::DEFAULT);
+                let donor_type =
+                    Self::donor_type(&context, flavor.exocyclic_bonds_steal_electrons());
+                let candidate = Self::is_candidate(&context, donor_type, flavor.candidate_rules());
                 RdkitPerAtomAromaticityState { donor_type, candidate }
             })
             .collect()
@@ -413,6 +464,11 @@ impl RdkitDefaultElectronModel {
                 | ElectronDonorType::Two
                 | ElectronDonorType::Any
         ) {
+            return false;
+        }
+        if candidate_rules.only_one_electron_donors
+            && !matches!(donor_type, ElectronDonorType::One)
+        {
             return false;
         }
         if let Some(default_valence) = context.adjusted_default_valence()
@@ -632,6 +688,7 @@ impl RdkitFamilyEvaluation {
 
 #[derive(Debug)]
 struct RdkitDefaultContext<'a> {
+    flavor: RdkitAromaticityFlavor,
     smiles: &'a Smiles,
     atom_states: Vec<RdkitPerAtomAromaticityState>,
     symm_sssr_cycles: Vec<Vec<usize>>,
@@ -642,17 +699,20 @@ impl RdkitDefaultContext<'_> {
     const MAX_FUSED_AROMATIC_RING_SIZE: usize = 24;
 
     fn new<'a>(
+        flavor: RdkitAromaticityFlavor,
         smiles: &'a Smiles,
         implicit_hydrogen_overrides: &HashMap<usize, u8>,
     ) -> RdkitDefaultContext<'a> {
         let ring_membership = smiles.ring_membership();
         let symm_sssr = rdkit_symm_sssr::symmetrize_sssr_with_status(smiles);
         let atom_states = RdkitDefaultElectronModel::build_states(
+            flavor,
             smiles,
             &ring_membership,
             implicit_hydrogen_overrides,
         );
         RdkitDefaultContext {
+            flavor,
             smiles,
             atom_states,
             symm_sssr_cycles: symm_sssr.cycles().to_vec(),
@@ -731,6 +791,11 @@ impl RdkitDefaultContext<'_> {
         &self,
         family: &RdkitDefaultRingFamily,
     ) -> Option<RdkitFamilyEvaluation> {
+        if !self.flavor.allows_standalone_five_member_aromatic_cycles()
+            && family.atom_ids.len() == 5
+        {
+            return None;
+        }
         if !family.atom_ids.iter().copied().all(|atom_id| self.atom_states[atom_id].candidate) {
             return None;
         }
@@ -1728,6 +1793,7 @@ mod tests {
 
     use super::{
         AromaticityStatusAccumulator, ElectronDonorType, RdkitAtomAromContext,
+        RdkitAromaticityFlavor,
         RdkitConnectedSubsystemEvent, RdkitConnectedSubsystemQuery, RdkitConnectedSubsystemSearch,
         RdkitConnectedSubsystemState, RdkitDefaultContext, RdkitDefaultElectronModel,
         RdkitDefaultRingKind, RdkitFusedSubsystemBudget, RdkitPreAromaticityNormalization, Smiles,
@@ -1972,6 +2038,7 @@ mod tests {
         let ring_membership = smiles.ring_membership();
         let implicit_hydrogen_overrides = HashMap::new();
         let atom_states = RdkitDefaultElectronModel::build_states(
+            RdkitAromaticityFlavor::Default,
             &smiles,
             &ring_membership,
             &implicit_hydrogen_overrides,
@@ -1994,6 +2061,7 @@ mod tests {
         let ring_membership = smiles.ring_membership();
         let implicit_hydrogen_overrides = HashMap::new();
         let atom_states = RdkitDefaultElectronModel::build_states(
+            RdkitAromaticityFlavor::Default,
             &smiles,
             &ring_membership,
             &implicit_hydrogen_overrides,
@@ -2032,6 +2100,7 @@ mod tests {
         assert_eq!(phosphorus_context.total_unsaturations, 1);
         assert_eq!(RdkitDefaultElectronModel::count_atom_electrons(&phosphorus_context), 1);
         let atom_states = RdkitDefaultElectronModel::build_states(
+            RdkitAromaticityFlavor::Default,
             &cleaned.smiles,
             &ring_membership,
             &cleaned.implicit_hydrogen_overrides,
@@ -2075,7 +2144,12 @@ mod tests {
         let implicit_hydrogen_overrides = HashMap::new();
 
         let raw_assignment =
-            RdkitDefaultContext::new(&smiles, &implicit_hydrogen_overrides).assignment();
+            RdkitDefaultContext::new(
+                RdkitAromaticityFlavor::Default,
+                &smiles,
+                &implicit_hydrogen_overrides,
+            )
+            .assignment();
         let cleaned_assignment = smiles.aromaticity_assignment();
 
         assert!(
@@ -2101,6 +2175,7 @@ mod tests {
             .expect("cleanup should rewrite phosphorus");
         let ring_membership = cleaned.smiles.ring_membership();
         let atom_states = RdkitDefaultElectronModel::build_states(
+            RdkitAromaticityFlavor::Default,
             &cleaned.smiles,
             &ring_membership,
             &cleaned.implicit_hydrogen_overrides,
@@ -2125,7 +2200,11 @@ mod tests {
     #[test]
     fn fused_family_ring_budget_marks_azulene_partial_when_two_ring_search_is_disallowed() {
         let smiles: Smiles = "c1cccc2cccc2c1".parse().expect("valid azulene");
-        let context = RdkitDefaultContext::new(&smiles, &HashMap::new());
+        let context = RdkitDefaultContext::new(
+            RdkitAromaticityFlavor::Default,
+            &smiles,
+            &HashMap::new(),
+        );
         let family = context
             .ring_families()
             .into_iter()
@@ -2159,7 +2238,11 @@ mod tests {
     #[test]
     fn fused_family_combination_budget_marks_azulene_partial_when_two_ring_step_is_blocked() {
         let smiles: Smiles = "c1cccc2cccc2c1".parse().expect("valid azulene");
-        let context = RdkitDefaultContext::new(&smiles, &HashMap::new());
+        let context = RdkitDefaultContext::new(
+            RdkitAromaticityFlavor::Default,
+            &smiles,
+            &HashMap::new(),
+        );
         let family = context
             .ring_families()
             .into_iter()
@@ -2190,7 +2273,11 @@ mod tests {
     #[test]
     fn unsupported_family_reports_explicit_diagnostic() {
         let smiles: Smiles = "c1ccccc1".parse().expect("valid benzene");
-        let context = RdkitDefaultContext::new(&smiles, &HashMap::new());
+        let context = RdkitDefaultContext::new(
+            RdkitAromaticityFlavor::Default,
+            &smiles,
+            &HashMap::new(),
+        );
         let unsupported_family = super::RdkitDefaultRingFamily {
             kind: super::RdkitDefaultRingKind::SimpleCycle,
             member_cycles: Vec::new(),
