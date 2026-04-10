@@ -72,17 +72,75 @@ impl RdkitAromaticityFlavor {
 
     fn assignment(self, smiles: &Smiles) -> AromaticityAssignment {
         if let Some(prepared_smiles) = RdkitPreAromaticityNormalization::apply(smiles) {
-            RdkitDefaultContext::new(
-                self,
+            self.assignment_with_overrides(
                 &prepared_smiles.smiles,
                 &prepared_smiles.implicit_hydrogen_overrides,
             )
-            .assignment()
         } else {
             let implicit_hydrogen_overrides = HashMap::new();
-            RdkitDefaultContext::new(self, smiles, &implicit_hydrogen_overrides).assignment()
+            self.assignment_with_overrides(smiles, &implicit_hydrogen_overrides)
         }
     }
+
+    fn assignment_with_overrides(
+        self,
+        smiles: &Smiles,
+        implicit_hydrogen_overrides: &HashMap<usize, u8>,
+    ) -> AromaticityAssignment {
+        match self.quick_assignment(smiles, implicit_hydrogen_overrides) {
+            QuickAssignment::Ready(assignment) => assignment,
+            QuickAssignment::NeedsFullEvaluation { ring_membership, atom_states } => {
+                RdkitDefaultContext::new_with_ring_membership_and_atom_states(
+                    self,
+                    smiles,
+                    &ring_membership,
+                    atom_states,
+                )
+                .assignment()
+            }
+        }
+    }
+
+    fn quick_assignment(
+        self,
+        smiles: &Smiles,
+        implicit_hydrogen_overrides: &HashMap<usize, u8>,
+    ) -> QuickAssignment {
+        let ring_membership = smiles.ring_membership();
+        if ring_membership.atom_ids().is_empty() {
+            return QuickAssignment::Ready(AromaticityAssignment::new(
+                AromaticityStatus::Complete,
+                Vec::new(),
+                Vec::new(),
+            ));
+        }
+
+        let atom_states = RdkitDefaultElectronModel::build_states(
+            self,
+            smiles,
+            &ring_membership,
+            implicit_hydrogen_overrides,
+        );
+        if !ring_membership.atom_ids().iter().copied().any(|atom_id| atom_states[atom_id].candidate)
+        {
+            return QuickAssignment::Ready(AromaticityAssignment::new(
+                AromaticityStatus::Complete,
+                Vec::new(),
+                Vec::new(),
+            ));
+        }
+
+        QuickAssignment::NeedsFullEvaluation { ring_membership, atom_states }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum QuickAssignment {
+    Ready(AromaticityAssignment),
+    NeedsFullEvaluation {
+        ring_membership: RingMembership,
+        atom_states: Vec<RdkitPerAtomAromaticityState>,
+    },
 }
 
 /// Compatibility normalization for the subset of `RDKit` `cleanUp` behavior
@@ -344,6 +402,12 @@ struct RdkitPerAtomAromaticityState {
     candidate: bool,
 }
 
+impl Default for RdkitPerAtomAromaticityState {
+    fn default() -> Self {
+        Self { donor_type: ElectronDonorType::None, candidate: false }
+    }
+}
+
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
 struct RdkitDefaultElectronModel;
 
@@ -355,21 +419,20 @@ impl RdkitDefaultElectronModel {
         implicit_hydrogen_overrides: &HashMap<usize, u8>,
     ) -> Vec<RdkitPerAtomAromaticityState> {
         let radical_electrons = assign_radicals(smiles);
-        (0..smiles.nodes().len())
-            .map(|atom_id| {
-                let context = RdkitAtomAromContext::build(
-                    smiles,
-                    ring_membership,
-                    implicit_hydrogen_overrides,
-                    &radical_electrons,
-                    atom_id,
-                );
-                let donor_type =
-                    Self::donor_type(&context, flavor.exocyclic_bonds_steal_electrons());
-                let candidate = Self::is_candidate(&context, donor_type, flavor.candidate_rules());
-                RdkitPerAtomAromaticityState { donor_type, candidate }
-            })
-            .collect()
+        let mut atom_states = vec![RdkitPerAtomAromaticityState::default(); smiles.nodes().len()];
+        for atom_id in ring_membership.atom_ids().iter().copied() {
+            let context = RdkitAtomAromContext::build(
+                smiles,
+                ring_membership,
+                implicit_hydrogen_overrides,
+                &radical_electrons,
+                atom_id,
+            );
+            let donor_type = Self::donor_type(&context, flavor.exocyclic_bonds_steal_electrons());
+            let candidate = Self::is_candidate(&context, donor_type, flavor.candidate_rules());
+            atom_states[atom_id] = RdkitPerAtomAromaticityState { donor_type, candidate };
+        }
+        atom_states
     }
 
     fn count_atom_electrons(context: &RdkitAtomAromContext) -> i8 {
@@ -555,6 +618,7 @@ impl From<RdkitDefaultRingKind> for AromaticityRingFamilyKind {
 struct RdkitDefaultRingFamily {
     kind: RdkitDefaultRingKind,
     member_cycles: Vec<Vec<usize>>,
+    member_cycle_bond_edges: Vec<Vec<[usize; 2]>>,
     atom_ids: Vec<usize>,
     bond_edges: Vec<[usize; 2]>,
 }
@@ -712,19 +776,35 @@ struct RdkitDefaultContext<'a> {
 impl RdkitDefaultContext<'_> {
     const MAX_FUSED_AROMATIC_RING_SIZE: usize = 24;
 
+    #[cfg(test)]
     fn new<'a>(
         flavor: RdkitAromaticityFlavor,
         smiles: &'a Smiles,
         implicit_hydrogen_overrides: &HashMap<usize, u8>,
     ) -> RdkitDefaultContext<'a> {
         let ring_membership = smiles.ring_membership();
-        let symm_sssr = rdkit_symm_sssr::symmetrize_sssr_with_status(smiles);
         let atom_states = RdkitDefaultElectronModel::build_states(
             flavor,
             smiles,
             &ring_membership,
             implicit_hydrogen_overrides,
         );
+        Self::new_with_ring_membership_and_atom_states(
+            flavor,
+            smiles,
+            &ring_membership,
+            atom_states,
+        )
+    }
+
+    fn new_with_ring_membership_and_atom_states<'a>(
+        flavor: RdkitAromaticityFlavor,
+        smiles: &'a Smiles,
+        ring_membership: &RingMembership,
+        atom_states: Vec<RdkitPerAtomAromaticityState>,
+    ) -> RdkitDefaultContext<'a> {
+        let symm_sssr =
+            rdkit_symm_sssr::symmetrize_sssr_with_ring_membership(smiles, ring_membership);
         RdkitDefaultContext {
             flavor,
             smiles,
@@ -746,6 +826,11 @@ impl RdkitDefaultContext<'_> {
             }
         }
 
+        if self.flavor == RdkitAromaticityFlavor::Simple {
+            self.extend_simple_cycle_assignment(&mut draft);
+            return draft.finish();
+        }
+
         for family in self.ring_families() {
             let outcome = self.evaluate_family(&family);
             match outcome.status {
@@ -762,6 +847,16 @@ impl RdkitDefaultContext<'_> {
         draft.finish()
     }
 
+    fn extend_simple_cycle_assignment(&self, draft: &mut AromaticityDraft) {
+        for cycle in &self.symm_sssr_cycles {
+            let bond_edges = cycle_edges(cycle);
+            if let Some(evaluation) = self.evaluate_simple_cycle_parts(cycle, &bond_edges) {
+                draft.status.mark_supported();
+                draft.extend_subgraph(evaluation.into_delocalization_subgraph());
+            }
+        }
+    }
+
     fn ring_families(&self) -> Vec<RdkitDefaultRingFamily> {
         Smiles::rdkit_fused_symm_sssr_cycle_families_from_cycles(
             &self.symm_sssr_cycles,
@@ -769,13 +864,14 @@ impl RdkitDefaultContext<'_> {
         )
         .into_iter()
         .map(|family_seed| {
-            let RdkitCycleFamilySeed { member_cycles, .. } = family_seed;
+            let RdkitCycleFamilySeed { member_cycles, member_cycle_bond_edges } = family_seed;
             if member_cycles.len() == 1 {
-                RdkitDefaultRingFamily::simple_cycle(
+                RdkitDefaultRingFamily::simple_cycle_with_bond_edges(
                     member_cycles.into_iter().next().unwrap_or_default(),
+                    member_cycle_bond_edges.into_iter().next().unwrap_or_default(),
                 )
             } else {
-                RdkitDefaultRingFamily::fused_component(member_cycles)
+                RdkitDefaultRingFamily::fused_component(member_cycles, member_cycle_bond_edges)
             }
         })
         .collect()
@@ -805,25 +901,31 @@ impl RdkitDefaultContext<'_> {
         &self,
         family: &RdkitDefaultRingFamily,
     ) -> Option<RdkitFamilyEvaluation> {
-        if !self.flavor.allows_simple_cycle_size(family.atom_ids.len()) {
+        self.evaluate_simple_cycle_parts(&family.atom_ids, &family.bond_edges)
+    }
+
+    fn evaluate_simple_cycle_parts(
+        &self,
+        atom_ids: &[usize],
+        bond_edges: &[[usize; 2]],
+    ) -> Option<RdkitFamilyEvaluation> {
+        if !self.flavor.allows_simple_cycle_size(atom_ids.len()) {
             return None;
         }
-        if !self.flavor.allows_standalone_five_member_aromatic_cycles()
-            && family.atom_ids.len() == 5
-        {
+        if !self.flavor.allows_standalone_five_member_aromatic_cycles() && atom_ids.len() == 5 {
             return None;
         }
-        if !family.atom_ids.iter().copied().all(|atom_id| self.atom_states[atom_id].candidate) {
+        if !atom_ids.iter().copied().all(|atom_id| self.atom_states[atom_id].candidate) {
             return None;
         }
-        if !self.apply_huckel(&family.atom_ids) {
+        if !self.apply_huckel(atom_ids) {
             return None;
         }
 
         Some(RdkitFamilyEvaluation {
             delocalization_subgraph: RdkitDelocalizationSubgraph {
-                atom_ids: family.atom_ids.clone(),
-                bond_edges: family.bond_edges.clone(),
+                atom_ids: atom_ids.to_vec(),
+                bond_edges: bond_edges.to_vec(),
             },
         })
     }
@@ -842,12 +944,13 @@ impl RdkitDefaultContext<'_> {
         let mut atom_ids = Vec::<usize>::new();
         let mut bond_edges = Vec::<[usize; 2]>::new();
 
-        for cycle in &family.member_cycles {
+        for (cycle, cycle_bond_edges) in
+            family.member_cycles.iter().zip(family.member_cycle_bond_edges.iter())
+        {
             if !self.flavor.allows_simple_cycle_size(cycle.len()) {
                 continue;
             }
-            let cycle_family = RdkitDefaultRingFamily::simple_cycle(cycle.clone());
-            let Some(evaluation) = self.evaluate_simple_cycle(&cycle_family) else {
+            let Some(evaluation) = self.evaluate_simple_cycle_parts(cycle, cycle_bond_edges) else {
                 continue;
             };
             atom_ids.extend(evaluation.delocalization_subgraph.atom_ids);
@@ -1034,31 +1137,30 @@ impl Default for RdkitFusedSubsystemBudget {
 
 impl RdkitPreparedFusedFamily {
     fn new(family: &RdkitDefaultRingFamily) -> Self {
-        let member_cycle_bond_edges =
-            family.member_cycles.iter().map(|cycle| cycle_edges(cycle)).collect::<Vec<_>>();
         let mut ring_neighbors = vec![Vec::<usize>::new(); family.member_cycles.len()];
-        for left_index in 0..member_cycle_bond_edges.len() {
-            for right_index in left_index + 1..member_cycle_bond_edges.len() {
+        for left_index in 0..family.member_cycle_bond_edges.len() {
+            for right_index in left_index + 1..family.member_cycle_bond_edges.len() {
                 if RdkitFusedNeighborRule::are_neighbors(
-                    &member_cycle_bond_edges[left_index],
-                    &member_cycle_bond_edges[right_index],
+                    &family.member_cycle_bond_edges[left_index],
+                    &family.member_cycle_bond_edges[right_index],
                 ) {
                     ring_neighbors[left_index].push(right_index);
                     ring_neighbors[right_index].push(left_index);
                 }
             }
         }
-        let bond_index_by_edge = family
-            .bond_edges
-            .iter()
-            .copied()
-            .enumerate()
-            .map(|(bond_index, edge)| (edge, bond_index))
-            .collect::<HashMap<_, _>>();
-        let member_cycle_bond_indices = member_cycle_bond_edges
+        let member_cycle_bond_indices = family
+            .member_cycle_bond_edges
             .iter()
             .map(|cycle_edges| {
-                cycle_edges.iter().map(|edge| bond_index_by_edge[edge]).collect::<Vec<_>>()
+                cycle_edges
+                    .iter()
+                    .map(|edge| {
+                        family.bond_edges.binary_search(edge).unwrap_or_else(|_| {
+                            unreachable!("family bond edges include each member cycle bond edge")
+                        })
+                    })
+                    .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
 
@@ -1286,27 +1388,39 @@ impl RdkitFusedFamilyAccumulator {
 }
 
 impl RdkitDefaultRingFamily {
-    fn simple_cycle(cycle: Vec<usize>) -> Self {
-        let bond_edges = cycle_edges(&cycle);
+    fn simple_cycle_with_bond_edges(cycle: Vec<usize>, bond_edges: Vec<[usize; 2]>) -> Self {
         Self {
             kind: RdkitDefaultRingKind::SimpleCycle,
             member_cycles: vec![cycle.clone()],
+            member_cycle_bond_edges: vec![bond_edges.clone()],
             atom_ids: cycle,
             bond_edges,
         }
     }
 
-    fn fused_component(member_cycles: Vec<Vec<usize>>) -> Self {
+    fn fused_component(
+        member_cycles: Vec<Vec<usize>>,
+        member_cycle_bond_edges: Vec<Vec<[usize; 2]>>,
+    ) -> Self {
+        debug_assert_eq!(member_cycles.len(), member_cycle_bond_edges.len());
         let mut atom_ids =
             member_cycles.iter().flat_map(|cycle| cycle.iter().copied()).collect::<Vec<_>>();
-        let mut bond_edges =
-            member_cycles.iter().flat_map(|cycle| cycle_edges(cycle)).collect::<Vec<_>>();
+        let mut bond_edges = member_cycle_bond_edges
+            .iter()
+            .flat_map(|cycle_bond_edges| cycle_bond_edges.iter().copied())
+            .collect::<Vec<_>>();
         atom_ids.sort_unstable();
         atom_ids.dedup();
         bond_edges.sort_unstable();
         bond_edges.dedup();
 
-        Self { kind: RdkitDefaultRingKind::FusedComponent, member_cycles, atom_ids, bond_edges }
+        Self {
+            kind: RdkitDefaultRingKind::FusedComponent,
+            member_cycles,
+            member_cycle_bond_edges,
+            atom_ids,
+            bond_edges,
+        }
     }
 
     fn is_supported(&self) -> bool {
@@ -1535,13 +1649,9 @@ impl<'a> RdkitConnectedSubsystemSearch<'a> {
     where
         F: FnMut(&[usize]) -> bool,
     {
-        self.for_each_exact_size_stateful(subsystem_size, |event| {
-            match event {
-                RdkitConnectedSubsystemEvent::Enter(_) | RdkitConnectedSubsystemEvent::Exit(_) => {
-                    true
-                }
-                RdkitConnectedSubsystemEvent::Visit(subsystem) => visit(subsystem),
-            }
+        self.for_each_exact_size_stateful(subsystem_size, |event| match event {
+            RdkitConnectedSubsystemEvent::Enter(_) | RdkitConnectedSubsystemEvent::Exit(_) => true,
+            RdkitConnectedSubsystemEvent::Visit(subsystem) => visit(subsystem),
         })
     }
 
@@ -1812,19 +1922,17 @@ impl Smiles {
             RdkitDefaultContext::MAX_FUSED_AROMATIC_RING_SIZE,
         )
         .into_iter()
-        .map(|family_seed| {
-            RingComponent {
-                atom_ids: family_seed
-                    .member_cycles
-                    .iter()
-                    .flat_map(|cycle| cycle.iter().copied())
-                    .collect::<Vec<_>>(),
-                bond_edges: family_seed
-                    .member_cycle_bond_edges
-                    .iter()
-                    .flat_map(|cycle_edges| cycle_edges.iter().copied())
-                    .collect::<Vec<_>>(),
-            }
+        .map(|family_seed| RingComponent {
+            atom_ids: family_seed
+                .member_cycles
+                .iter()
+                .flat_map(|cycle| cycle.iter().copied())
+                .collect::<Vec<_>>(),
+            bond_edges: family_seed
+                .member_cycle_bond_edges
+                .iter()
+                .flat_map(|cycle_edges| cycle_edges.iter().copied())
+                .collect::<Vec<_>>(),
         })
         .map(|mut component| {
             component.atom_ids.sort_unstable();
@@ -2085,6 +2193,64 @@ mod tests {
     }
 
     #[test]
+    fn prepared_fused_family_maps_member_cycle_bond_edges_without_recomputing_cycles() {
+        let family = super::RdkitDefaultRingFamily::fused_component(
+            vec![vec![0, 1, 2, 3], vec![2, 3, 4, 5]],
+            vec![vec![[0, 1], [1, 2], [2, 3], [0, 3]], vec![[2, 3], [3, 4], [4, 5], [2, 5]]],
+        );
+
+        let prepared = super::RdkitPreparedFusedFamily::new(&family);
+
+        assert_eq!(
+            prepared.family_bond_edges,
+            vec![[0, 1], [0, 3], [1, 2], [2, 3], [2, 5], [3, 4], [4, 5]]
+        );
+        assert_eq!(prepared.member_cycle_bond_indices, vec![vec![0, 2, 3, 1], vec![3, 5, 6, 4]]);
+        assert_eq!(prepared.ring_neighbors, vec![vec![1], vec![0]]);
+    }
+
+    #[test]
+    fn quick_assignment_short_circuits_acyclic_molecule() {
+        let smiles: Smiles = "CCO".parse().expect("valid acyclic molecule");
+
+        let assignment = RdkitAromaticityFlavor::Default.quick_assignment(&smiles, &HashMap::new());
+
+        assert_eq!(
+            assignment,
+            super::QuickAssignment::Ready(super::AromaticityAssignment::new(
+                super::AromaticityStatus::Complete,
+                Vec::new(),
+                Vec::new(),
+            ))
+        );
+    }
+
+    #[test]
+    fn quick_assignment_short_circuits_ring_without_candidates() {
+        let smiles: Smiles = "C1CCCCC1".parse().expect("valid cyclohexane");
+
+        let assignment = RdkitAromaticityFlavor::Default.quick_assignment(&smiles, &HashMap::new());
+
+        assert_eq!(
+            assignment,
+            super::QuickAssignment::Ready(super::AromaticityAssignment::new(
+                super::AromaticityStatus::Complete,
+                Vec::new(),
+                Vec::new(),
+            ))
+        );
+    }
+
+    #[test]
+    fn quick_assignment_does_not_short_circuit_benzene() {
+        let smiles: Smiles = "C1=CC=CC=C1".parse().expect("valid benzene");
+
+        let assignment = RdkitAromaticityFlavor::Default.quick_assignment(&smiles, &HashMap::new());
+
+        assert!(matches!(assignment, super::QuickAssignment::NeedsFullEvaluation { .. }));
+    }
+
+    #[test]
     fn rdkit_default_chalcogen_gap_atom_states_match_current_expectation() {
         let smiles: Smiles = "CN1C2=CC=CC=C2SC1=[Se]".parse().expect("valid chalcogen gap case");
         let ring_membership = smiles.ring_membership();
@@ -2323,6 +2489,7 @@ mod tests {
         let unsupported_family = super::RdkitDefaultRingFamily {
             kind: super::RdkitDefaultRingKind::SimpleCycle,
             member_cycles: Vec::new(),
+            member_cycle_bond_edges: Vec::new(),
             atom_ids: Vec::new(),
             bond_edges: Vec::new(),
         };

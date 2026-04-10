@@ -7,7 +7,9 @@ use core::{cell::Cell, cmp::Ordering};
 use geometric_traits::traits::{SparseMatrix2D, SparseValuedMatrix2DRef, SparseValuedMatrixRef};
 use hashbrown::{HashMap, HashSet};
 
-use super::{Smiles, SymmSssrResult, SymmSssrStatus, canonicalize_cycle, cycle_edges};
+use super::{
+    RingMembership, Smiles, SymmSssrResult, SymmSssrStatus, canonicalize_cycle, cycle_edges,
+};
 use crate::bond::bond_edge::BondEdge;
 
 const WHITE: u8 = 0;
@@ -16,6 +18,87 @@ const BLACK: u8 = 2;
 
 pub(crate) fn symmetrize_sssr_with_status(smiles: &Smiles) -> SymmSssrResult {
     RingSearchState::new(smiles).symmetrize_sssr_with_status()
+}
+
+pub(crate) fn symmetrize_sssr_with_ring_membership(
+    smiles: &Smiles,
+    ring_membership: &RingMembership,
+) -> SymmSssrResult {
+    if let Some(cycles) =
+        try_disjoint_simple_cycles_from_ring_membership(ring_membership, smiles.nodes().len())
+    {
+        return SymmSssrResult { cycles, status: SymmSssrStatus::default() };
+    }
+
+    RingSearchState::new(smiles).symmetrize_sssr_with_status()
+}
+
+fn try_disjoint_simple_cycles_from_ring_membership(
+    ring_membership: &RingMembership,
+    atom_count: usize,
+) -> Option<Vec<Vec<usize>>> {
+    if ring_membership.atom_ids().is_empty() {
+        return Some(Vec::new());
+    }
+    if ring_membership.bond_edges().len() != ring_membership.atom_ids().len() {
+        return None;
+    }
+
+    let mut ring_neighbors = vec![Vec::<usize>::new(); atom_count];
+    for &[left, right] in ring_membership.bond_edges() {
+        ring_neighbors[left].push(right);
+        ring_neighbors[right].push(left);
+    }
+    for &atom_id in ring_membership.atom_ids() {
+        if ring_neighbors[atom_id].len() != 2 {
+            return None;
+        }
+    }
+
+    let mut seen = vec![false; atom_count];
+    let mut cycles = Vec::<Vec<usize>>::new();
+    for &start_atom_id in ring_membership.atom_ids() {
+        if seen[start_atom_id] {
+            continue;
+        }
+
+        let mut cycle = Vec::<usize>::new();
+        let mut previous_atom_id = None;
+        let mut current_atom_id = start_atom_id;
+        loop {
+            if current_atom_id == start_atom_id && !cycle.is_empty() {
+                break;
+            }
+            if seen[current_atom_id] {
+                return None;
+            }
+            seen[current_atom_id] = true;
+            cycle.push(current_atom_id);
+
+            let next_atom_id = match previous_atom_id {
+                None => ring_neighbors[current_atom_id][0],
+                Some(previous_atom_id) => {
+                    let neighbor_atom_ids = &ring_neighbors[current_atom_id];
+                    if neighbor_atom_ids[0] == previous_atom_id {
+                        neighbor_atom_ids[1]
+                    } else {
+                        neighbor_atom_ids[0]
+                    }
+                }
+            };
+            previous_atom_id = Some(current_atom_id);
+            current_atom_id = next_atom_id;
+        }
+
+        if cycle.len() < 3 {
+            return None;
+        }
+        cycles.push(canonicalize_cycle(&cycle));
+    }
+
+    cycles.sort_unstable();
+    cycles.dedup();
+    Some(cycles)
 }
 
 #[derive(Debug, Clone, Default)]
@@ -1091,7 +1174,8 @@ mod tests {
 
     use super::{
         RdkitBfsBudget, RingSearchState, compute_ring_invariant, cyclomatic_ring_count,
-        symmetrize_sssr_with_status,
+        symmetrize_sssr_with_ring_membership, symmetrize_sssr_with_status,
+        try_disjoint_simple_cycles_from_ring_membership,
     };
     use crate::smiles::Smiles;
 
@@ -1128,6 +1212,43 @@ mod tests {
         assert!(!result.status().used_fallback());
         assert!(!result.status().hit_queue_cutoff());
         assert_eq!(result.cycles(), &[vec![0, 1, 2, 3, 4, 5]]);
+    }
+
+    #[test]
+    fn disjoint_simple_cycle_shortcut_handles_biphenyl_ring_subgraph() {
+        let smiles: Smiles = "C1=CC=CC=C1C2=CC=CC=C2".parse().expect("valid biphenyl");
+        let ring_membership = smiles.ring_membership();
+
+        let cycles =
+            try_disjoint_simple_cycles_from_ring_membership(&ring_membership, smiles.nodes().len())
+                .expect("disjoint simple cycles should short-circuit");
+
+        assert_eq!(cycles, vec![vec![0, 1, 2, 3, 4, 5], vec![6, 7, 8, 9, 10, 11]]);
+        let result = symmetrize_sssr_with_ring_membership(&smiles, &ring_membership);
+        assert!(result.status().is_complete());
+        assert_eq!(result.cycles(), cycles);
+    }
+
+    #[test]
+    fn disjoint_simple_cycle_shortcut_rejects_fused_ring_subgraph() {
+        let smiles: Smiles = "C1=CC2=CC=CC=C2C=C1".parse().expect("valid naphthalene");
+        let ring_membership = smiles.ring_membership();
+
+        assert!(
+            try_disjoint_simple_cycles_from_ring_membership(&ring_membership, smiles.nodes().len())
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn disjoint_simple_cycle_shortcut_rejects_spiro_ring_subgraph() {
+        let smiles: Smiles = "C1CCC2(CC1)CCC2".parse().expect("valid spiro system");
+        let ring_membership = smiles.ring_membership();
+
+        assert!(
+            try_disjoint_simple_cycles_from_ring_membership(&ring_membership, smiles.nodes().len())
+                .is_none()
+        );
     }
 
     #[test]

@@ -4,7 +4,7 @@
 //! This bench uses two corpora:
 //! - `tests/fixtures/benchmark_smiles_corpus.txt` for the legacy parse/display
 //!   and implicit-hydrogen groups
-//! - `tests/fixtures/aromaticity/corpus/pubchem_aromaticity_cases.json` for the
+//! - `tests/fixtures/aromaticity/corpus/pubchem_benchmark_cases.json` for the
 //!   PubChem parse/ring/SSSR/aromaticity groups
 //!
 //! The benchmarked operations are kept separate:
@@ -13,8 +13,8 @@
 //! - implicit-only: `Smiles::implicit_hydrogen_counts()` on already parsed
 //!   molecules
 //!
-//! The aromaticity-oriented groups use the frozen PubChem fixture corpus in
-//! `tests/fixtures/aromaticity/corpus/pubchem_aromaticity_cases.json`.
+//! The aromaticity-oriented groups use the frozen PubChem benchmark corpus in
+//! `tests/fixtures/aromaticity/corpus/pubchem_benchmark_cases.json`.
 
 use std::{hint::black_box, str::FromStr};
 
@@ -24,7 +24,7 @@ use smiles_parser::smiles::Smiles;
 
 const CORPUS: &str = include_str!("../tests/fixtures/benchmark_smiles_corpus.txt");
 const PUBCHEM_CORPUS: &str =
-    include_str!("../tests/fixtures/aromaticity/corpus/pubchem_aromaticity_cases.json");
+    include_str!("../tests/fixtures/aromaticity/corpus/pubchem_benchmark_cases.json");
 
 #[derive(Debug, Deserialize)]
 struct PubChemCorpus {
