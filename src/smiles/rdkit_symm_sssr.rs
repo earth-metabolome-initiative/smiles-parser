@@ -16,6 +16,7 @@ const WHITE: u8 = 0;
 const GRAY: u8 = 1;
 const BLACK: u8 = 2;
 
+#[cfg(test)]
 pub(crate) fn symmetrize_sssr_with_status(smiles: &Smiles) -> SymmSssrResult {
     RingSearchState::new(smiles).symmetrize_sssr_with_status()
 }
@@ -25,7 +26,7 @@ pub(crate) fn symmetrize_sssr_with_ring_membership(
     ring_membership: &RingMembership,
 ) -> SymmSssrResult {
     if let Some(cycles) =
-        try_disjoint_simple_cycles_from_ring_membership(ring_membership, smiles.nodes().len())
+        try_simple_cycle_blocks_from_ring_membership(ring_membership, smiles.nodes().len())
     {
         return SymmSssrResult { cycles, status: SymmSssrStatus::default() };
     }
@@ -33,6 +34,146 @@ pub(crate) fn symmetrize_sssr_with_ring_membership(
     RingSearchState::new(smiles).symmetrize_sssr_with_status()
 }
 
+fn try_simple_cycle_blocks_from_ring_membership(
+    ring_membership: &RingMembership,
+    atom_count: usize,
+) -> Option<Vec<Vec<usize>>> {
+    if ring_membership.atom_ids().is_empty() {
+        return Some(Vec::new());
+    }
+
+    let mut ring_neighbors = vec![Vec::<usize>::new(); atom_count];
+    for &[left, right] in ring_membership.bond_edges() {
+        ring_neighbors[left].push(right);
+        ring_neighbors[right].push(left);
+    }
+    if ring_membership
+        .bond_edges()
+        .iter()
+        .any(|&[left, right]| ring_neighbors[left].len() > 2 && ring_neighbors[right].len() > 2)
+    {
+        return None;
+    }
+
+    let mut search = SimpleCycleBlockSearch {
+        ring_neighbors: &ring_neighbors,
+        discovery_order: vec![0_usize; atom_count],
+        lowlink: vec![0_usize; atom_count],
+        parent: vec![None::<usize>; atom_count],
+        edge_stack: Vec::<[usize; 2]>::with_capacity(ring_membership.bond_edges().len()),
+        time: 0,
+        cycles: Vec::<Vec<usize>>::new(),
+    };
+
+    for &start_atom_id in ring_membership.atom_ids() {
+        if search.discovery_order[start_atom_id] != 0 {
+            continue;
+        }
+        search.collect_depth_first(start_atom_id)?;
+    }
+
+    search.cycles.sort_unstable();
+    search.cycles.dedup();
+    Some(search.cycles)
+}
+
+struct SimpleCycleBlockSearch<'a> {
+    ring_neighbors: &'a [Vec<usize>],
+    discovery_order: Vec<usize>,
+    lowlink: Vec<usize>,
+    parent: Vec<Option<usize>>,
+    edge_stack: Vec<[usize; 2]>,
+    time: usize,
+    cycles: Vec<Vec<usize>>,
+}
+
+impl SimpleCycleBlockSearch<'_> {
+    fn collect_depth_first(&mut self, atom_id: usize) -> Option<()> {
+        self.time += 1;
+        self.discovery_order[atom_id] = self.time;
+        self.lowlink[atom_id] = self.time;
+
+        for &neighbor_atom_id in &self.ring_neighbors[atom_id] {
+            if self.discovery_order[neighbor_atom_id] == 0 {
+                self.parent[neighbor_atom_id] = Some(atom_id);
+                self.edge_stack.push(edge_key(atom_id, neighbor_atom_id));
+                self.collect_depth_first(neighbor_atom_id)?;
+                self.lowlink[atom_id] = self.lowlink[atom_id].min(self.lowlink[neighbor_atom_id]);
+                if self.lowlink[neighbor_atom_id] >= self.discovery_order[atom_id] {
+                    let mut component_edges = Vec::<[usize; 2]>::new();
+                    while let Some(edge) = self.edge_stack.pop() {
+                        component_edges.push(edge);
+                        if edge == edge_key(atom_id, neighbor_atom_id) {
+                            break;
+                        }
+                    }
+                    self.cycles.push(simple_cycle_from_block_edges(&component_edges)?);
+                }
+            } else if self.parent[atom_id] != Some(neighbor_atom_id)
+                && self.discovery_order[neighbor_atom_id] < self.discovery_order[atom_id]
+            {
+                self.lowlink[atom_id] =
+                    self.lowlink[atom_id].min(self.discovery_order[neighbor_atom_id]);
+                self.edge_stack.push(edge_key(atom_id, neighbor_atom_id));
+            }
+        }
+
+        Some(())
+    }
+}
+
+fn simple_cycle_from_block_edges(component_edges: &[[usize; 2]]) -> Option<Vec<usize>> {
+    let mut component_neighbors = HashMap::<usize, Vec<usize>>::new();
+    for &[left, right] in component_edges {
+        component_neighbors.entry(left).or_default().push(right);
+        component_neighbors.entry(right).or_default().push(left);
+    }
+
+    if component_neighbors.len() < 3 || component_edges.len() != component_neighbors.len() {
+        return None;
+    }
+    if component_neighbors.values().any(|neighbors| neighbors.len() != 2) {
+        return None;
+    }
+
+    let start_atom_id = *component_neighbors.keys().min()?;
+    let mut cycle = Vec::<usize>::with_capacity(component_edges.len());
+    let mut previous_atom_id = None;
+    let mut current_atom_id = start_atom_id;
+
+    loop {
+        if cycle.contains(&current_atom_id) {
+            return None;
+        }
+        cycle.push(current_atom_id);
+
+        let neighbor_atom_ids = component_neighbors.get(&current_atom_id)?;
+        let next_atom_id = match previous_atom_id {
+            None => neighbor_atom_ids[0],
+            Some(previous_atom_id) if neighbor_atom_ids[0] == previous_atom_id => {
+                neighbor_atom_ids[1]
+            }
+            Some(previous_atom_id) if neighbor_atom_ids[1] == previous_atom_id => {
+                neighbor_atom_ids[0]
+            }
+            Some(_) => return None,
+        };
+
+        previous_atom_id = Some(current_atom_id);
+        current_atom_id = next_atom_id;
+        if current_atom_id == start_atom_id {
+            break;
+        }
+    }
+
+    if cycle.len() != component_edges.len() {
+        return None;
+    }
+
+    Some(canonicalize_cycle(&cycle))
+}
+
+#[cfg(test)]
 fn try_disjoint_simple_cycles_from_ring_membership(
     ring_membership: &RingMembership,
     atom_count: usize,
@@ -1176,6 +1317,7 @@ mod tests {
         RdkitBfsBudget, RingSearchState, compute_ring_invariant, cyclomatic_ring_count,
         symmetrize_sssr_with_ring_membership, symmetrize_sssr_with_status,
         try_disjoint_simple_cycles_from_ring_membership,
+        try_simple_cycle_blocks_from_ring_membership,
     };
     use crate::smiles::Smiles;
 
@@ -1252,6 +1394,29 @@ mod tests {
     }
 
     #[test]
+    fn simple_cycle_block_shortcut_handles_spiro_ring_subgraph() {
+        let smiles: Smiles = "C1CCC2(CC1)CCC2".parse().expect("valid spiro system");
+        let ring_membership = smiles.ring_membership();
+
+        let cycles =
+            try_simple_cycle_blocks_from_ring_membership(&ring_membership, smiles.nodes().len())
+                .expect("spiro ring blocks should short-circuit");
+
+        assert_eq!(cycles, vec![vec![0, 1, 2, 3, 4, 5], vec![3, 6, 7, 8]]);
+    }
+
+    #[test]
+    fn simple_cycle_block_shortcut_rejects_fused_ring_subgraph() {
+        let smiles: Smiles = "C1=CC2=CC=CC=C2C=C1".parse().expect("valid naphthalene");
+        let ring_membership = smiles.ring_membership();
+
+        assert!(
+            try_simple_cycle_blocks_from_ring_membership(&ring_membership, smiles.nodes().len())
+                .is_none()
+        );
+    }
+
+    #[test]
     fn symm_sssr_forced_bfs_budget_marks_benzene_incomplete_and_hits_queue_cutoff() {
         let smiles: Smiles = "C1=CC=CC=C1".parse().expect("valid benzene");
         let result =
@@ -1308,6 +1473,43 @@ mod tests {
         let exact_result = symmetrize_sssr_with_status(&smiles);
         assert!(exact_result.status().used_fallback());
         assert_eq!(exact_result.cycles().len(), exact_rings.len() + 1);
+    }
+
+    #[test]
+    fn symm_sssr_with_ring_membership_matches_full_search_for_substituted_naphthalene() {
+        let smiles: Smiles =
+            "Cc1cccc2ccccc12".parse().expect("valid substituted fused-ring system");
+        let ring_membership = smiles.ring_membership();
+
+        let shortcut_result = symmetrize_sssr_with_ring_membership(&smiles, &ring_membership);
+        let full_result = symmetrize_sssr_with_status(&smiles);
+
+        assert_eq!(shortcut_result.status(), full_result.status());
+        assert_eq!(shortcut_result.cycles(), full_result.cycles());
+    }
+
+    #[test]
+    fn symm_sssr_with_ring_membership_matches_full_search_for_large_polycycle_frontier_case() {
+        let smiles: Smiles = CID_58882885.parse().expect("valid large-polycycle frontier case");
+        let ring_membership = smiles.ring_membership();
+
+        let shortcut_result = symmetrize_sssr_with_ring_membership(&smiles, &ring_membership);
+        let full_result = symmetrize_sssr_with_status(&smiles);
+
+        assert_eq!(shortcut_result.status(), full_result.status());
+        assert_eq!(shortcut_result.cycles(), full_result.cycles());
+    }
+
+    #[test]
+    fn symm_sssr_with_ring_membership_matches_full_search_for_spiro_system() {
+        let smiles: Smiles = "C1CCC2(CC1)CCC2".parse().expect("valid spiro system");
+        let ring_membership = smiles.ring_membership();
+
+        let shortcut_result = symmetrize_sssr_with_ring_membership(&smiles, &ring_membership);
+        let full_result = symmetrize_sssr_with_status(&smiles);
+
+        assert_eq!(shortcut_result.status(), full_result.status());
+        assert_eq!(shortcut_result.cycles(), full_result.cycles());
     }
 
     fn exact_stage_state(smiles: &Smiles) -> ExactStageState {

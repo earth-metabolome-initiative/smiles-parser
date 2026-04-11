@@ -26,9 +26,10 @@ use alloc::{string::String, vec::Vec};
 use core::fmt;
 
 use geometric_traits::traits::{
-    BiconnectedComponents, SizedSparseMatrix2D, SizedSparseValuedMatrixRef, SparseMatrix2D,
-    SparseValuedMatrix2DRef, SparseValuedMatrixRef,
+    SizedSparseMatrix2D, SizedSparseValuedMatrixRef, SparseMatrix2D, SparseValuedMatrix2DRef,
+    SparseValuedMatrixRef,
 };
+use hashbrown::HashSet;
 
 use crate::{
     atom::Atom,
@@ -213,24 +214,50 @@ impl Smiles {
     /// Returns a [`RingMembershipError`] if the underlying graph violates the
     /// simple undirected assumptions of the biconnected-components algorithm.
     pub fn try_ring_membership(&self) -> Result<RingMembership, RingMembershipError> {
-        let decomposition = self.biconnected_components()?;
-        let mut atom_ids = Vec::new();
-        let mut bond_edges = Vec::new();
+        if self.atom_nodes.is_empty() || self.number_of_bonds() == 0 {
+            return Ok(RingMembership { atom_ids: Vec::new(), bond_edges: Vec::new() });
+        }
 
-        for component_id in decomposition.cyclic_biconnected_component_ids() {
-            for edge in decomposition.edge_biconnected_component(component_id) {
-                let bond_edge =
-                    if edge[0] <= edge[1] { [edge[0], edge[1]] } else { [edge[1], edge[0]] };
-                atom_ids.push(bond_edge[0]);
-                atom_ids.push(bond_edge[1]);
-                bond_edges.push(bond_edge);
+        let mut discovery_order = vec![0_usize; self.atom_nodes.len()];
+        let mut lowlink = vec![0_usize; self.atom_nodes.len()];
+        let mut parent = vec![None::<usize>; self.atom_nodes.len()];
+        let mut time = 0_usize;
+        let mut bridge_edges = HashSet::<[usize; 2]>::new();
+
+        for start_atom_id in 0..self.atom_nodes.len() {
+            if discovery_order[start_atom_id] == 0 {
+                self.find_bridge_edges_depth_first(
+                    start_atom_id,
+                    &mut time,
+                    &mut discovery_order,
+                    &mut lowlink,
+                    &mut parent,
+                    &mut bridge_edges,
+                );
             }
         }
 
-        atom_ids.sort_unstable();
-        atom_ids.dedup();
-        bond_edges.sort_unstable();
-        bond_edges.dedup();
+        let mut ring_atom_flags = vec![false; self.atom_nodes.len()];
+        let mut bond_edges =
+            Vec::with_capacity(self.number_of_bonds().saturating_sub(bridge_edges.len()));
+        for ((row, column), _) in self.bond_matrix.sparse_entries() {
+            if row >= column {
+                continue;
+            }
+            let edge = [row, column];
+            if bridge_edges.contains(&edge) {
+                continue;
+            }
+            ring_atom_flags[row] = true;
+            ring_atom_flags[column] = true;
+            bond_edges.push(edge);
+        }
+
+        let atom_ids = ring_atom_flags
+            .into_iter()
+            .enumerate()
+            .filter_map(|(atom_id, is_ring_atom)| is_ring_atom.then_some(atom_id))
+            .collect();
 
         Ok(RingMembership { atom_ids, bond_edges })
     }
@@ -257,7 +284,8 @@ impl Smiles {
     /// systems.
     #[must_use]
     pub fn symm_sssr_result(&self) -> SymmSssrResult {
-        rdkit_symm_sssr::symmetrize_sssr_with_status(self)
+        let ring_membership = self.ring_membership();
+        rdkit_symm_sssr::symmetrize_sssr_with_ring_membership(self, &ring_membership)
     }
 
     /// Returns a graph with directional single bonds collapsed to ordinary
@@ -296,6 +324,44 @@ impl Smiles {
             RenderVisitor::with_capacity(self.nodes().len(), self.number_of_bonds());
         walk(self, &mut render_visitor)?;
         Ok(render_visitor)
+    }
+
+    fn find_bridge_edges_depth_first(
+        &self,
+        atom_id: usize,
+        time: &mut usize,
+        discovery_order: &mut [usize],
+        lowlink: &mut [usize],
+        parent: &mut [Option<usize>],
+        bridge_edges: &mut HashSet<[usize; 2]>,
+    ) {
+        *time += 1;
+        discovery_order[atom_id] = *time;
+        lowlink[atom_id] = *time;
+
+        for neighbor_atom_id in self.bond_matrix.sparse_row(atom_id) {
+            if discovery_order[neighbor_atom_id] == 0 {
+                parent[neighbor_atom_id] = Some(atom_id);
+                self.find_bridge_edges_depth_first(
+                    neighbor_atom_id,
+                    time,
+                    discovery_order,
+                    lowlink,
+                    parent,
+                    bridge_edges,
+                );
+                lowlink[atom_id] = lowlink[atom_id].min(lowlink[neighbor_atom_id]);
+                if lowlink[neighbor_atom_id] > discovery_order[atom_id] {
+                    bridge_edges.insert(if atom_id < neighbor_atom_id {
+                        [atom_id, neighbor_atom_id]
+                    } else {
+                        [neighbor_atom_id, atom_id]
+                    });
+                }
+            } else if parent[atom_id] != Some(neighbor_atom_id) {
+                lowlink[atom_id] = lowlink[atom_id].min(discovery_order[neighbor_atom_id]);
+            }
+        }
     }
 }
 
