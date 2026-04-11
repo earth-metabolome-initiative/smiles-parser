@@ -92,16 +92,18 @@ fn implicit_hydrogens_for_node(smiles: &Smiles, node_id: usize, node: &Atom) -> 
     let explicit_valence = explicit_valence(smiles, node_id);
     match node.syntax() {
         AtomSyntax::Bracket => 0,
-        AtomSyntax::OrganicSubset => match node.symbol() {
-            AtomSymbol::WildCard => 0,
-            AtomSymbol::Element(element) => {
-                if node.aromatic() {
-                    aromatic_implicit_hydrogens(element, explicit_valence)
-                } else {
-                    aliphatic_implicit_hydrogens(element, explicit_valence)
+        AtomSyntax::OrganicSubset => {
+            match node.symbol() {
+                AtomSymbol::WildCard => 0,
+                AtomSymbol::Element(element) => {
+                    if node.aromatic() {
+                        aromatic_implicit_hydrogens(element, explicit_valence)
+                    } else {
+                        aliphatic_implicit_hydrogens(element, explicit_valence)
+                    }
                 }
             }
-        },
+        }
     }
 }
 

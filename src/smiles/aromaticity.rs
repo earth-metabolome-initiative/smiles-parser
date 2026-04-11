@@ -397,10 +397,7 @@ impl AromaticityPerception {
     /// let original = Smiles::from_str("C1=CN=CN1").expect("valid Kekule imidazole");
     /// let perception = original.perceive_aromaticity().expect("perception should succeed");
     ///
-    /// assert_eq!(
-    ///     perception.kekulize().expect("kekulization should succeed"),
-    ///     original
-    /// );
+    /// assert_eq!(perception.kekulize().expect("kekulization should succeed"), original);
     /// ```
     ///
     /// # Errors
@@ -452,9 +449,7 @@ impl AromaticityPerception {
     ///     .expect("valid Kekule benzene")
     ///     .perceive_aromaticity()
     ///     .expect("perception should succeed");
-    /// let kekule = perception
-    ///     .kekulize_standalone()
-    ///     .expect("standalone kekulization should succeed");
+    /// let kekule = perception.kekulize_standalone().expect("standalone kekulization should succeed");
     ///
     /// assert!(kekule.to_string().contains('='));
     /// ```

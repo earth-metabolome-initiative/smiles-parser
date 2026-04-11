@@ -52,9 +52,9 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
 name = "elements_rs"
-version = "0.1.6"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1ad24c9333b5837294f7fd74668f2801b23f28ea24fd32f8b05d1392fe7444b"
+checksum = "7d14cc73153142686975ba5b2207271cd8af10f70a0012e7fe81b3144fe557f5"
 dependencies = [
  "serde",
  "strum",
@@ -95,7 +95,7 @@ checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
 [[package]]
 name = "geometric-traits"
 version = "0.1.0"
-source = "git+https://github.com/earth-metabolome-initiative/geometric-traits?branch=main#9749e7d8121a28a770765ad1c3353a46d32073b8"
+source = "git+https://github.com/earth-metabolome-initiative/geometric-traits?rev=fc79f945805bae4f3f6cba49dfb3ce191c0355ec#fc79f945805bae4f3f6cba49dfb3ce191c0355ec"
 dependencies = [
  "bitvec",
  "hashbrown",
@@ -103,7 +103,6 @@ dependencies = [
  "multi_ranged",
  "num-traits",
  "rand",
- "serde",
  "thiserror",
 ]
 
@@ -286,6 +285,7 @@ version = "0.1.0"
 dependencies = [
  "elements_rs",
  "geometric-traits",
+ "hashbrown",
  "thiserror",
 ]
 

@@ -13,8 +13,10 @@ use flate2::read::GzDecoder;
 use geometric_traits::traits::SparseValuedMatrixRef;
 use rayon::prelude::*;
 use serde::Deserialize;
-use smiles_parser::bond::Bond;
-use smiles_parser::prelude::{AromaticityPolicy, AromaticityStatus, Smiles};
+use smiles_parser::{
+    bond::Bond,
+    prelude::{AromaticityPolicy, AromaticityStatus, Smiles},
+};
 
 const PUBCHEM_AROMATIC_CASES_PATH: &str =
     "tests/fixtures/aromaticity/corpus/pubchem_aromaticity_cases.json";
@@ -409,12 +411,11 @@ fn report_progress(
 
 fn records_per_second(validated: usize, elapsed: std::time::Duration) -> usize {
     let elapsed_millis = elapsed.as_millis();
-    if elapsed_millis == 0 {
-        0
-    } else {
-        let validated = u128::try_from(validated).unwrap_or(u128::MAX);
-        let rounded_rate =
-            validated.saturating_mul(1000).saturating_add(elapsed_millis / 2) / elapsed_millis;
-        usize::try_from(rounded_rate).unwrap_or(usize::MAX)
-    }
+    let validated = u128::try_from(validated).unwrap_or(u128::MAX);
+    let rounded_rate = validated
+        .saturating_mul(1000)
+        .saturating_add(elapsed_millis / 2)
+        .checked_div(elapsed_millis)
+        .unwrap_or(0);
+    usize::try_from(rounded_rate).unwrap_or(usize::MAX)
 }

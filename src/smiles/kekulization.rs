@@ -4,12 +4,12 @@
 use alloc::vec::Vec;
 
 use geometric_traits::traits::{
-    Gabow1976, Matrix2D, SizedSparseMatrix2D, SizedSparseValuedMatrixRef,
-    SparseValuedMatrix2DRef, SparseValuedMatrixRef,
+    Gabow1976, Matrix2D, SizedSparseMatrix2D, SizedSparseValuedMatrixRef, SparseValuedMatrix2DRef,
+    SparseValuedMatrixRef,
 };
 use thiserror::Error;
 
-use super::{BondMatrix, BondEntry, Smiles};
+use super::{BondEntry, BondMatrix, Smiles};
 use crate::bond::Bond;
 
 /// Error raised while converting aromatic bonds into a Kekule form.
@@ -30,7 +30,8 @@ pub enum KekulizationError {
 pub enum KekulizationMode {
     /// Reuse the preserved pre-aromatic source graph when present.
     ///
-    /// This is the natural inverse of [`Smiles::perceive_aromaticity`](super::Smiles::perceive_aromaticity)
+    /// This is the natural inverse of
+    /// [`Smiles::perceive_aromaticity`](super::Smiles::perceive_aromaticity)
     /// and keeps the original localized form when the aromatic graph was
     /// produced by this crate's aromaticity perception pipeline.
     PreserveSource,
@@ -58,10 +59,7 @@ impl Smiles {
     ///
     /// let original = Smiles::from_str("C1=CN=CN1").expect("valid Kekule imidazole");
     /// let perception = original.perceive_aromaticity().expect("perception should succeed");
-    /// let restored = perception
-    ///     .aromaticized()
-    ///     .kekulize()
-    ///     .expect("kekulization should succeed");
+    /// let restored = perception.aromaticized().kekulize().expect("kekulization should succeed");
     ///
     /// assert_eq!(restored, original);
     /// ```
@@ -121,7 +119,20 @@ impl Smiles {
             return Ok((**source).clone());
         }
 
-        let candidate_graph = KekulizationCandidateGraph::new(self, &aromatic_bonds);
+        let candidate_atom_ids = candidate_atom_ids(self);
+        if has_unlocalizable_aromatic_component(
+            self.nodes().len(),
+            &aromatic_bonds,
+            &candidate_atom_ids,
+        ) {
+            return Err(KekulizationError::NoPerfectMatching { candidate_atom_count: 0 });
+        }
+
+        let candidate_graph =
+            KekulizationCandidateGraph::new(self, &aromatic_bonds, &candidate_atom_ids);
+        if candidate_graph.graph.number_of_rows() == 0 {
+            return Err(KekulizationError::NoPerfectMatching { candidate_atom_count: 0 });
+        }
         let matched_orders = candidate_graph.matched_original_orders()?;
         let mut matched_order_flags = vec![false; self.number_of_bonds()];
         for matched_order in matched_orders {
@@ -167,6 +178,10 @@ impl Smiles {
     ///
     /// This ignores any preserved pre-aromatic source graph.
     ///
+    /// Aromatic graphs that do not retain enough local chemistry to be
+    /// localized from their current state alone, such as some dummy-atom
+    /// aromatic systems, return an error instead of guessing a bond pattern.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -175,9 +190,7 @@ impl Smiles {
     /// use smiles_parser::prelude::Smiles;
     ///
     /// let aromatic = Smiles::from_str("c1ccccc1").expect("valid aromatic benzene");
-    /// let kekule = aromatic
-    ///     .kekulize_standalone()
-    ///     .expect("standalone kekulization should succeed");
+    /// let kekule = aromatic.kekulize_standalone().expect("standalone kekulization should succeed");
     ///
     /// assert!(kekule.to_string().contains('='));
     /// ```
@@ -202,8 +215,7 @@ struct KekulizationCandidateGraph {
 }
 
 impl KekulizationCandidateGraph {
-    fn new(smiles: &Smiles, aromatic_bonds: &[AromaticBond]) -> Self {
-        let local_atom_ids = candidate_atom_ids(smiles);
+    fn new(smiles: &Smiles, aromatic_bonds: &[AromaticBond], local_atom_ids: &[usize]) -> Self {
         let mut original_to_local = vec![None; smiles.nodes().len()];
         for (local_id, atom_id) in local_atom_ids.iter().copied().enumerate() {
             original_to_local[atom_id] = Some(local_id);
@@ -225,13 +237,11 @@ impl KekulizationCandidateGraph {
             local_edges.sort_unstable_by_key(|(row, column, _)| (*row, *column));
         }
 
-        let graph = BondMatrix::from_sorted_upper_triangular_entries(
-            local_atom_ids.len(),
-            local_edges,
-        )
-        .unwrap_or_else(|_| {
-            unreachable!("candidate graph only adds unique non-self upper-triangular edges")
-        });
+        let graph =
+            BondMatrix::from_sorted_upper_triangular_entries(local_atom_ids.len(), local_edges)
+                .unwrap_or_else(|_| {
+                    unreachable!("candidate graph only adds unique non-self upper-triangular edges")
+                });
 
         Self { graph }
     }
@@ -253,14 +263,60 @@ impl KekulizationCandidateGraph {
         Ok(matches
             .into_iter()
             .map(|(left, right)| {
-                let rank = self
-                    .graph
-                    .try_rank(left.min(right), left.max(right))
-                    .unwrap_or_else(|| unreachable!("matching edges always come from the candidate graph"));
+                let rank =
+                    self.graph.try_rank(left.min(right), left.max(right)).unwrap_or_else(|| {
+                        unreachable!("matching edges always come from the candidate graph")
+                    });
                 self.graph.select_value_ref(rank).order()
             })
             .collect())
     }
+}
+
+fn has_unlocalizable_aromatic_component(
+    atom_count: usize,
+    aromatic_bonds: &[AromaticBond],
+    candidate_atom_ids: &[usize],
+) -> bool {
+    let mut adjacency = vec![Vec::new(); atom_count];
+    for bond in aromatic_bonds {
+        adjacency[bond.node_a].push(bond.node_b);
+        adjacency[bond.node_b].push(bond.node_a);
+    }
+
+    let mut candidate_flags = vec![false; atom_count];
+    for atom_id in candidate_atom_ids {
+        candidate_flags[*atom_id] = true;
+    }
+
+    let mut visited = vec![false; atom_count];
+    let mut stack = Vec::new();
+
+    for start in 0..atom_count {
+        if visited[start] || adjacency[start].is_empty() {
+            continue;
+        }
+
+        visited[start] = true;
+        stack.push(start);
+        let mut component_candidate_count = 0usize;
+
+        while let Some(node) = stack.pop() {
+            component_candidate_count += usize::from(candidate_flags[node]);
+            for &neighbor in &adjacency[node] {
+                if !visited[neighbor] {
+                    visited[neighbor] = true;
+                    stack.push(neighbor);
+                }
+            }
+        }
+
+        if component_candidate_count == 0 {
+            return true;
+        }
+    }
+
+    false
 }
 
 fn candidate_atom_ids(smiles: &Smiles) -> Vec<usize> {
@@ -270,13 +326,8 @@ fn candidate_atom_ids(smiles: &Smiles) -> Vec<usize> {
         .iter()
         .enumerate()
         .filter_map(|(atom_id, atom)| {
-            needs_localized_double_bond(
-                smiles,
-                atom_id,
-                atom,
-                implicit_hydrogen_counts[atom_id],
-            )
-            .then_some(atom_id)
+            needs_localized_double_bond(smiles, atom_id, atom, implicit_hydrogen_counts[atom_id])
+                .then_some(atom_id)
         })
         .collect()
 }
@@ -306,8 +357,7 @@ fn needs_localized_double_bond(
         }
     }
 
-    let total_hydrogens =
-        usize::from(atom.hydrogen_count()) + usize::from(implicit_hydrogen_count);
+    let total_hydrogens = usize::from(atom.hydrogen_count()) + usize::from(implicit_hydrogen_count);
     let valence = degree + total_hydrogens + preexisting_pi_bonds;
 
     match element {
@@ -502,7 +552,8 @@ mod tests {
             .expect("imidazole should aromaticize")
             .into_aromaticized();
 
-        let restored = aromaticized.kekulize().expect("preserve-source kekulization should succeed");
+        let restored =
+            aromaticized.kekulize().expect("preserve-source kekulization should succeed");
         assert_eq!(restored, smiles);
     }
 
@@ -596,7 +647,9 @@ mod tests {
                 })
             })
             .collect::<Vec<_>>();
-        let candidate_graph = KekulizationCandidateGraph::new(&smiles, &aromatic_bonds);
+        let candidate_atom_ids = candidate_atom_ids(&smiles);
+        let candidate_graph =
+            KekulizationCandidateGraph::new(&smiles, &aromatic_bonds, &candidate_atom_ids);
 
         assert_eq!(
             candidate_graph.matched_original_orders(),
@@ -716,10 +769,18 @@ mod tests {
     }
 
     #[test]
-    fn rendered_aromatic_phosphorus_cage_roundtrips_under_default_perception() {
-        assert_rendered_aromatic_roundtrip_for_policy(
-            "CP1P2P(P3P1P3P2C)C",
-            crate::smiles::AromaticityPolicy::RdkitDefault,
+    fn rendered_aromatic_phosphorus_cage_requires_preserved_source_under_default_perception() {
+        let smiles = Smiles::from_str("CP1P2P(P3P1P3P2C)C").expect("valid smiles");
+        let perceived = smiles
+            .perceive_aromaticity_for(crate::smiles::AromaticityPolicy::RdkitDefault)
+            .expect("initial perception should succeed");
+        let aromatic_smiles = perceived.aromaticized().to_string();
+        let reparsed =
+            Smiles::from_str(&aromatic_smiles).expect("rendered aromatic smiles should parse");
+
+        assert_eq!(
+            reparsed.kekulize_standalone(),
+            Err(KekulizationError::NoPerfectMatching { candidate_atom_count: 0 })
         );
     }
 
@@ -739,4 +800,138 @@ mod tests {
         );
     }
 
+    #[test]
+    fn fuzz_regression_star_hash_2o_star_star_2() {
+        let smiles = Smiles::from_str("*#2O**2").expect("fuzz input should parse");
+
+        for policy in [
+            crate::smiles::AromaticityPolicy::RdkitDefault,
+            crate::smiles::AromaticityPolicy::RdkitSimple,
+            crate::smiles::AromaticityPolicy::RdkitMdl,
+        ] {
+            let Ok(perception) = smiles.perceive_aromaticity_for(policy) else {
+                continue;
+            };
+
+            let preserved = perception
+                .kekulize()
+                .expect("preserve-source kekulization should succeed after perception");
+            assert_eq!(&preserved, &smiles);
+
+            if perception.status() == crate::smiles::AromaticityStatus::Unsupported {
+                continue;
+            }
+
+            if perception.assignment().bond_edges().is_empty() {
+                assert_eq!(
+                    perception
+                        .kekulize_standalone()
+                        .expect("non-aromatic standalone kekulization should succeed"),
+                    *perception.aromaticized(),
+                    "policy={policy:?}; input={smiles}; aromaticized={}",
+                    perception.aromaticized()
+                );
+            } else {
+                match perception.kekulize_standalone() {
+                    Ok(standalone) => {
+                        let reperceived = standalone
+                            .perceive_aromaticity_for(policy)
+                            .expect("reperception should succeed after standalone kekulization");
+
+                        assert_eq!(
+                            reperceived.assignment().atom_ids(),
+                            perception.assignment().atom_ids(),
+                            "policy={policy:?}; input={smiles}; aromaticized={}; standalone={}",
+                            perception.aromaticized(),
+                            standalone
+                        );
+                        assert_eq!(
+                            reperceived.assignment().bond_edges(),
+                            perception.assignment().bond_edges(),
+                            "policy={policy:?}; input={smiles}; aromaticized={}; standalone={}",
+                            perception.aromaticized(),
+                            standalone
+                        );
+                    }
+                    Err(error) => {
+                        assert_eq!(
+                            error,
+                            KekulizationError::NoPerfectMatching { candidate_atom_count: 0 },
+                            "policy={policy:?}; input={smiles}; aromaticized={}",
+                            perception.aromaticized()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn fuzz_regression_complex_wildcard_ring_case() {
+        let smiles = Smiles::from_str(
+            "*13**#C*#O*#O*12*Br**13**-N5NNNNN5NNN5NNNNN5NNN*N5N=NNNN5N*N5N=NNNN5N1*2#2O**2*",
+        )
+        .expect("fuzz input should parse");
+
+        for policy in [
+            crate::smiles::AromaticityPolicy::RdkitDefault,
+            crate::smiles::AromaticityPolicy::RdkitSimple,
+            crate::smiles::AromaticityPolicy::RdkitMdl,
+        ] {
+            let Ok(perception) = smiles.perceive_aromaticity_for(policy) else {
+                continue;
+            };
+
+            let preserved = perception
+                .kekulize()
+                .expect("preserve-source kekulization should succeed after perception");
+            assert_eq!(&preserved, &smiles);
+
+            if perception.status() == crate::smiles::AromaticityStatus::Unsupported {
+                continue;
+            }
+
+            if perception.assignment().bond_edges().is_empty() {
+                assert_eq!(
+                    perception
+                        .kekulize_standalone()
+                        .expect("non-aromatic standalone kekulization should succeed"),
+                    *perception.aromaticized(),
+                    "policy={policy:?}; input={smiles}; aromaticized={}",
+                    perception.aromaticized()
+                );
+            } else {
+                match perception.kekulize_standalone() {
+                    Ok(standalone) => {
+                        let reperceived = standalone
+                            .perceive_aromaticity_for(policy)
+                            .expect("reperception should succeed after standalone kekulization");
+
+                        assert_eq!(
+                            reperceived.assignment().atom_ids(),
+                            perception.assignment().atom_ids(),
+                            "policy={policy:?}; input={smiles}; aromaticized={}; standalone={}",
+                            perception.aromaticized(),
+                            standalone
+                        );
+                        assert_eq!(
+                            reperceived.assignment().bond_edges(),
+                            perception.assignment().bond_edges(),
+                            "policy={policy:?}; input={smiles}; aromaticized={}; standalone={}",
+                            perception.aromaticized(),
+                            standalone
+                        );
+                    }
+                    Err(error) => {
+                        assert_eq!(
+                            error,
+                            KekulizationError::NoPerfectMatching { candidate_atom_count: 0 },
+                            "policy={policy:?}; input={smiles}; aromaticized={}",
+                            perception.aromaticized()
+                        );
+                    }
+                }
+            }
+        }
+    }
 }

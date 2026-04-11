@@ -1649,9 +1649,13 @@ impl<'a> RdkitConnectedSubsystemSearch<'a> {
     where
         F: FnMut(&[usize]) -> bool,
     {
-        self.for_each_exact_size_stateful(subsystem_size, |event| match event {
-            RdkitConnectedSubsystemEvent::Enter(_) | RdkitConnectedSubsystemEvent::Exit(_) => true,
-            RdkitConnectedSubsystemEvent::Visit(subsystem) => visit(subsystem),
+        self.for_each_exact_size_stateful(subsystem_size, |event| {
+            match event {
+                RdkitConnectedSubsystemEvent::Enter(_) | RdkitConnectedSubsystemEvent::Exit(_) => {
+                    true
+                }
+                RdkitConnectedSubsystemEvent::Visit(subsystem) => visit(subsystem),
+            }
         })
     }
 
@@ -1922,17 +1926,19 @@ impl Smiles {
             RdkitDefaultContext::MAX_FUSED_AROMATIC_RING_SIZE,
         )
         .into_iter()
-        .map(|family_seed| RingComponent {
-            atom_ids: family_seed
-                .member_cycles
-                .iter()
-                .flat_map(|cycle| cycle.iter().copied())
-                .collect::<Vec<_>>(),
-            bond_edges: family_seed
-                .member_cycle_bond_edges
-                .iter()
-                .flat_map(|cycle_edges| cycle_edges.iter().copied())
-                .collect::<Vec<_>>(),
+        .map(|family_seed| {
+            RingComponent {
+                atom_ids: family_seed
+                    .member_cycles
+                    .iter()
+                    .flat_map(|cycle| cycle.iter().copied())
+                    .collect::<Vec<_>>(),
+                bond_edges: family_seed
+                    .member_cycle_bond_edges
+                    .iter()
+                    .flat_map(|cycle_edges| cycle_edges.iter().copied())
+                    .collect::<Vec<_>>(),
+            }
         })
         .map(|mut component| {
             component.atom_ids.sort_unstable();
