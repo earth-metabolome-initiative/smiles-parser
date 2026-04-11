@@ -1,8 +1,11 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use smiles_parser::prelude::{AromaticityPolicy, AromaticityStatus, Smiles};
 use smiles_parser::bond::Bond;
+use smiles_parser::prelude::{AromaticityPolicy, AromaticityStatus, Smiles};
+
+const MAX_FUZZ_SMILES_BYTES: usize = 512;
+const MAX_FUZZ_ATOMS: usize = 512;
 
 fn has_source_aromatic_labels(smiles: &Smiles) -> bool {
     smiles.nodes().iter().any(|atom| atom.aromatic())
@@ -54,10 +57,20 @@ fn assert_policy_roundtrip(smiles: &Smiles, policy: AromaticityPolicy) {
     );
 }
 
-fuzz_target!(|data: &str| {
+fuzz_target!(|data: &[u8]| {
+    if data.len() > MAX_FUZZ_SMILES_BYTES {
+        return;
+    }
+
+    let Ok(data) = core::str::from_utf8(data) else {
+        return;
+    };
     let Ok(smiles) = data.parse::<Smiles>() else {
         return;
     };
+    if smiles.nodes().len() > MAX_FUZZ_ATOMS {
+        return;
+    }
     if has_source_aromatic_labels(&smiles) {
         return;
     }

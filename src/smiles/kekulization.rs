@@ -736,6 +736,71 @@ mod tests {
         assert_eq!(reperceived.assignment().bond_edges(), expected_bond_edges);
     }
 
+    fn assert_fuzz_roundtrip_regression_for_all_policies(input: &str) {
+        let smiles = Smiles::from_str(input).expect("fuzz input should parse");
+
+        for policy in [
+            crate::smiles::AromaticityPolicy::RdkitDefault,
+            crate::smiles::AromaticityPolicy::RdkitSimple,
+            crate::smiles::AromaticityPolicy::RdkitMdl,
+        ] {
+            let Ok(perception) = smiles.perceive_aromaticity_for(policy) else {
+                continue;
+            };
+
+            let preserved = perception
+                .kekulize()
+                .expect("preserve-source kekulization should succeed after perception");
+            assert_eq!(&preserved, &smiles);
+
+            if perception.status() == crate::smiles::AromaticityStatus::Unsupported {
+                continue;
+            }
+
+            if perception.assignment().bond_edges().is_empty() {
+                assert_eq!(
+                    perception
+                        .kekulize_standalone()
+                        .expect("non-aromatic standalone kekulization should succeed"),
+                    *perception.aromaticized(),
+                    "policy={policy:?}; input={smiles}; aromaticized={}",
+                    perception.aromaticized()
+                );
+            } else {
+                match perception.kekulize_standalone() {
+                    Ok(standalone) => {
+                        let reperceived = standalone
+                            .perceive_aromaticity_for(policy)
+                            .expect("reperception should succeed after standalone kekulization");
+
+                        assert_eq!(
+                            reperceived.assignment().atom_ids(),
+                            perception.assignment().atom_ids(),
+                            "policy={policy:?}; input={smiles}; aromaticized={}; standalone={}",
+                            perception.aromaticized(),
+                            standalone
+                        );
+                        assert_eq!(
+                            reperceived.assignment().bond_edges(),
+                            perception.assignment().bond_edges(),
+                            "policy={policy:?}; input={smiles}; aromaticized={}; standalone={}",
+                            perception.aromaticized(),
+                            standalone
+                        );
+                    }
+                    Err(error) => {
+                        assert_eq!(
+                            error,
+                            KekulizationError::NoPerfectMatching { candidate_atom_count: 0 },
+                            "policy={policy:?}; input={smiles}; aromaticized={}",
+                            perception.aromaticized()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn phosphorus_cage_roundtrips_under_default_perception() {
         assert_roundtrip_for_policy(
@@ -802,136 +867,20 @@ mod tests {
 
     #[test]
     fn fuzz_regression_star_hash_2o_star_star_2() {
-        let smiles = Smiles::from_str("*#2O**2").expect("fuzz input should parse");
-
-        for policy in [
-            crate::smiles::AromaticityPolicy::RdkitDefault,
-            crate::smiles::AromaticityPolicy::RdkitSimple,
-            crate::smiles::AromaticityPolicy::RdkitMdl,
-        ] {
-            let Ok(perception) = smiles.perceive_aromaticity_for(policy) else {
-                continue;
-            };
-
-            let preserved = perception
-                .kekulize()
-                .expect("preserve-source kekulization should succeed after perception");
-            assert_eq!(&preserved, &smiles);
-
-            if perception.status() == crate::smiles::AromaticityStatus::Unsupported {
-                continue;
-            }
-
-            if perception.assignment().bond_edges().is_empty() {
-                assert_eq!(
-                    perception
-                        .kekulize_standalone()
-                        .expect("non-aromatic standalone kekulization should succeed"),
-                    *perception.aromaticized(),
-                    "policy={policy:?}; input={smiles}; aromaticized={}",
-                    perception.aromaticized()
-                );
-            } else {
-                match perception.kekulize_standalone() {
-                    Ok(standalone) => {
-                        let reperceived = standalone
-                            .perceive_aromaticity_for(policy)
-                            .expect("reperception should succeed after standalone kekulization");
-
-                        assert_eq!(
-                            reperceived.assignment().atom_ids(),
-                            perception.assignment().atom_ids(),
-                            "policy={policy:?}; input={smiles}; aromaticized={}; standalone={}",
-                            perception.aromaticized(),
-                            standalone
-                        );
-                        assert_eq!(
-                            reperceived.assignment().bond_edges(),
-                            perception.assignment().bond_edges(),
-                            "policy={policy:?}; input={smiles}; aromaticized={}; standalone={}",
-                            perception.aromaticized(),
-                            standalone
-                        );
-                    }
-                    Err(error) => {
-                        assert_eq!(
-                            error,
-                            KekulizationError::NoPerfectMatching { candidate_atom_count: 0 },
-                            "policy={policy:?}; input={smiles}; aromaticized={}",
-                            perception.aromaticized()
-                        );
-                    }
-                }
-            }
-        }
+        assert_fuzz_roundtrip_regression_for_all_policies("*#2O**2");
     }
 
     #[test]
     fn fuzz_regression_complex_wildcard_ring_case() {
-        let smiles = Smiles::from_str(
+        assert_fuzz_roundtrip_regression_for_all_policies(
             "*13**#C*#O*#O*12*Br**13**-N5NNNNN5NNN5NNNNN5NNN*N5N=NNNN5N*N5N=NNNN5N1*2#2O**2*",
-        )
-        .expect("fuzz input should parse");
+        );
+    }
 
-        for policy in [
-            crate::smiles::AromaticityPolicy::RdkitDefault,
-            crate::smiles::AromaticityPolicy::RdkitSimple,
-            crate::smiles::AromaticityPolicy::RdkitMdl,
-        ] {
-            let Ok(perception) = smiles.perceive_aromaticity_for(policy) else {
-                continue;
-            };
-
-            let preserved = perception
-                .kekulize()
-                .expect("preserve-source kekulization should succeed after perception");
-            assert_eq!(&preserved, &smiles);
-
-            if perception.status() == crate::smiles::AromaticityStatus::Unsupported {
-                continue;
-            }
-
-            if perception.assignment().bond_edges().is_empty() {
-                assert_eq!(
-                    perception
-                        .kekulize_standalone()
-                        .expect("non-aromatic standalone kekulization should succeed"),
-                    *perception.aromaticized(),
-                    "policy={policy:?}; input={smiles}; aromaticized={}",
-                    perception.aromaticized()
-                );
-            } else {
-                match perception.kekulize_standalone() {
-                    Ok(standalone) => {
-                        let reperceived = standalone
-                            .perceive_aromaticity_for(policy)
-                            .expect("reperception should succeed after standalone kekulization");
-
-                        assert_eq!(
-                            reperceived.assignment().atom_ids(),
-                            perception.assignment().atom_ids(),
-                            "policy={policy:?}; input={smiles}; aromaticized={}; standalone={}",
-                            perception.aromaticized(),
-                            standalone
-                        );
-                        assert_eq!(
-                            reperceived.assignment().bond_edges(),
-                            perception.assignment().bond_edges(),
-                            "policy={policy:?}; input={smiles}; aromaticized={}; standalone={}",
-                            perception.aromaticized(),
-                            standalone
-                        );
-                    }
-                    Err(error) => {
-                        assert_eq!(
-                            error,
-                            KekulizationError::NoPerfectMatching { candidate_atom_count: 0 },
-                            "policy={policy:?}; input={smiles}; aromaticized={}",
-                            perception.aromaticized()
-                        );
-                    }
-                }
-            }
-        }
+    #[test]
+    fn fuzz_regression_large_mixed_wildcard_case() {
+        assert_fuzz_roundtrip_regression_for_all_policies(
+            "N5NNN*NNNNNNFNN*=N*N5NN5NBBBBBBBBBBBBBBBBBBBBBBSSSSSSSSSSSSNPPPPPPPPPPPPPPPPPPPPPPPPPPPPPSSSSSSSSSSSSSSSSSSSSSSSSPSSSP5NNNNNN4N*NNNNNNN5NNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNNN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNN#NNNN*5NNN*FNN*FN5#NNNN*5N*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*NNNNNNNFNN*NN*FNN2NN5*FNN2NN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*FN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5N*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNN#NNNN*5NNN*FNN*FN5#NNNN*5N*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*NNNNNNNFNN*NN*FNN2NN5*FNN2NN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*FN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNN#NNNN*5NNN*FNN*FN5#NNNN*5N*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN2NN5*NN2FNN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNN#NNNN*5NNN*FNN*FN5#NNNN4*NSPNO$OPPPPPPPPPPPSSSSPPPPPPPPPPPPPPPPBrPPPPPPPPPPPPPPNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNNN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*FNN*FNNNPSSPPPPPPPPPPPPPPPPPPPP$PPPPPPSSSSSSSSSSSSSSSSSSSSSSSSPSSSP5NNNNNN4N*NNNNNNN5N=NNNNNNNN4*NSPNO$OPPPPPPPPPPPSSNN*5SSPPPPPPPNNN*FNBBBBBBBBBBBBBBBBBBBBBFNNNNNNN*FN*5NNNNNN",
+        );
     }
 }
