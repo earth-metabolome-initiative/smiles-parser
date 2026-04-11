@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::hash::{Hash, Hasher};
 
@@ -204,7 +205,33 @@ impl Smiles {
     #[inline]
     #[must_use]
     pub(crate) fn from_bond_matrix_parts(atom_nodes: Vec<Atom>, bond_matrix: BondMatrix) -> Self {
-        Self { atom_nodes, bond_matrix }
+        Self::from_bond_matrix_parts_with_caches(atom_nodes, bond_matrix, None, None)
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn from_bond_matrix_parts_with_implicit_hydrogen_cache(
+        atom_nodes: Vec<Atom>,
+        bond_matrix: BondMatrix,
+        implicit_hydrogen_cache: Vec<u8>,
+    ) -> Self {
+        Self::from_bond_matrix_parts_with_caches(
+            atom_nodes,
+            bond_matrix,
+            Some(implicit_hydrogen_cache),
+            None,
+        )
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn from_bond_matrix_parts_with_caches(
+        atom_nodes: Vec<Atom>,
+        bond_matrix: BondMatrix,
+        implicit_hydrogen_cache: Option<Vec<u8>>,
+        kekulization_source: Option<Box<Self>>,
+    ) -> Self {
+        Self { atom_nodes, bond_matrix, implicit_hydrogen_cache, kekulization_source }
     }
 
     /// Returns the symmetric valued sparse matrix storing the graph bonds.

@@ -5,8 +5,8 @@ use alloc::vec::Vec;
 use geometric_traits::traits::SparseValuedMatrixRef;
 use thiserror::Error;
 
-use super::Smiles;
-use crate::bond::Bond;
+use super::{KekulizationError, KekulizationMode, Smiles};
+use crate::{atom::Atom, bond::Bond};
 
 mod rdkit_default;
 
@@ -380,6 +380,91 @@ impl AromaticityPerception {
     pub fn into_aromaticized(self) -> Smiles {
         self.aromaticized
     }
+
+    /// Returns a Kekule form of the aromaticized graph while preserving the
+    /// original pre-aromatic source graph when available.
+    ///
+    /// This is the natural inverse of aromaticity perception on graphs that
+    /// were aromaticized by this crate.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use core::str::FromStr;
+    ///
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let original = Smiles::from_str("C1=CN=CN1").expect("valid Kekule imidazole");
+    /// let perception = original.perceive_aromaticity().expect("perception should succeed");
+    ///
+    /// assert_eq!(
+    ///     perception.kekulize().expect("kekulization should succeed"),
+    ///     original
+    /// );
+    /// ```
+    ///
+    /// # Errors
+    /// Returns a [`KekulizationError`] if no valid localized form exists for
+    /// the aromaticized graph.
+    pub fn kekulize(&self) -> Result<Smiles, KekulizationError> {
+        self.aromaticized.kekulize()
+    }
+
+    /// Returns a Kekule form of the aromaticized graph using the provided
+    /// kekulization mode.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use core::str::FromStr;
+    ///
+    /// use smiles_parser::prelude::{KekulizationMode, Smiles};
+    ///
+    /// let perception = Smiles::from_str("C1=CC=CC=C1")
+    ///     .expect("valid Kekule benzene")
+    ///     .perceive_aromaticity()
+    ///     .expect("perception should succeed");
+    /// let kekule = perception
+    ///     .kekulize_with(KekulizationMode::Standalone)
+    ///     .expect("standalone kekulization should succeed");
+    ///
+    /// assert!(kekule.to_string().contains('='));
+    /// ```
+    ///
+    /// # Errors
+    /// Returns a [`KekulizationError`] if no valid localized form exists for
+    /// the aromaticized graph.
+    pub fn kekulize_with(&self, mode: KekulizationMode) -> Result<Smiles, KekulizationError> {
+        self.aromaticized.kekulize_with(mode)
+    }
+
+    /// Returns a Kekule form of the aromaticized graph by solving from the
+    /// aromatic graph alone.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use core::str::FromStr;
+    ///
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let perception = Smiles::from_str("C1=CC=CC=C1")
+    ///     .expect("valid Kekule benzene")
+    ///     .perceive_aromaticity()
+    ///     .expect("perception should succeed");
+    /// let kekule = perception
+    ///     .kekulize_standalone()
+    ///     .expect("standalone kekulization should succeed");
+    ///
+    /// assert!(kekule.to_string().contains('='));
+    /// ```
+    ///
+    /// # Errors
+    /// Returns a [`KekulizationError`] if no valid localized form exists for
+    /// the aromaticized graph.
+    pub fn kekulize_standalone(&self) -> Result<Smiles, KekulizationError> {
+        self.aromaticized.kekulize_standalone()
+    }
 }
 
 impl Smiles {
@@ -471,16 +556,22 @@ impl Smiles {
         assignment: &AromaticityAssignment,
     ) -> Result<Self, AromaticityAssignmentApplicationError> {
         assignment.validate_for(self)?;
+        let source_implicit_hydrogen_cache = self.implicit_hydrogen_counts();
+        let kekulization_source = Some(self.resolved_kekulization_source());
 
-        let atom_nodes =
-            self.atom_nodes
-                .iter()
-                .copied()
-                .enumerate()
-                .map(|(atom_id, atom)| {
-                    if assignment.contains_atom(atom_id) { atom.with_aromatic(true) } else { atom }
-                })
-                .collect::<Vec<_>>();
+        let mut atom_nodes = Vec::with_capacity(self.atom_nodes.len());
+        let mut implicit_hydrogen_cache = Vec::with_capacity(self.atom_nodes.len());
+        for (atom_id, atom) in self.atom_nodes.iter().copied().enumerate() {
+            if assignment.contains_atom(atom_id) {
+                let (aromatic_atom, aromatic_implicit_hydrogens) =
+                    aromaticized_atom_for_rendering(atom, source_implicit_hydrogen_cache[atom_id]);
+                atom_nodes.push(aromatic_atom);
+                implicit_hydrogen_cache.push(aromatic_implicit_hydrogens);
+            } else {
+                atom_nodes.push(atom);
+                implicit_hydrogen_cache.push(source_implicit_hydrogen_cache[atom_id]);
+            }
+        }
 
         let bond_matrix = super::BondMatrix::from_sorted_upper_triangular_entries(
             atom_nodes.len(),
@@ -498,6 +589,49 @@ impl Smiles {
         )
         .unwrap_or_else(|_| unreachable!("existing bond matrix entries are already valid"));
 
-        Ok(Self { atom_nodes, bond_matrix })
+        Ok(Self::from_bond_matrix_parts_with_caches(
+            atom_nodes,
+            bond_matrix,
+            Some(implicit_hydrogen_cache),
+            kekulization_source,
+        ))
     }
+}
+
+fn aromaticized_atom_for_rendering(atom: Atom, implicit_hydrogens: u8) -> (Atom, u8) {
+    let materialize_implicit_hydrogens =
+        implicit_hydrogens != 0 && atom.element() != Some(elements_rs::Element::C);
+    let explicit_hydrogens = atom
+        .hydrogen_count()
+        .saturating_add(if materialize_implicit_hydrogens { implicit_hydrogens } else { 0 });
+    let remaining_implicit_hydrogens =
+        if materialize_implicit_hydrogens { 0 } else { implicit_hydrogens };
+
+    if should_use_bracket_aromatic_syntax(atom, explicit_hydrogens) {
+        let mut builder = Atom::builder()
+            .with_symbol(atom.symbol())
+            .with_aromatic(true)
+            .with_hydrogens(explicit_hydrogens)
+            .with_charge(atom.charge())
+            .with_class(atom.class());
+        if let Some(isotope) = atom.isotope_mass_number() {
+            builder = builder.with_isotope(isotope);
+        }
+        if let Some(chirality) = atom.chirality() {
+            builder = builder.with_chirality(chirality);
+        }
+        (builder.build(), remaining_implicit_hydrogens)
+    } else {
+        (Atom::new_organic_subset(atom.symbol(), true), remaining_implicit_hydrogens)
+    }
+}
+
+fn should_use_bracket_aromatic_syntax(atom: Atom, explicit_hydrogens: u8) -> bool {
+    atom.is_bracket_atom()
+        || atom.isotope_mass_number().is_some()
+        || atom.charge_value() != 0
+        || explicit_hydrogens != 0
+        || atom.class() != 0
+        || atom.chirality().is_some()
+        || atom.element().is_none_or(|element| element.aromatic_smiles_symbol().is_none())
 }

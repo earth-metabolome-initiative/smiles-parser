@@ -22,7 +22,7 @@
 //!
 //! # Ok::<(), smiles_parser::errors::SmilesErrorWithSpan>(())
 //! ```
-use alloc::{string::String, vec::Vec};
+use alloc::{boxed::Box, string::String, vec::Vec};
 use core::fmt;
 
 use geometric_traits::traits::{
@@ -42,6 +42,7 @@ mod aromaticity;
 mod from_str;
 mod geometric_traits_impl;
 mod implicit_hydrogens;
+mod kekulization;
 mod rdkit_symm_sssr;
 
 pub(crate) use self::geometric_traits_impl::BondMatrixBuilder;
@@ -52,6 +53,7 @@ pub use self::{
         AromaticityStatus, RdkitDefaultAromaticity, RdkitMdlAromaticity, RdkitSimpleAromaticity,
     },
     geometric_traits_impl::{BondEntry, BondMatrix},
+    kekulization::{KekulizationError, KekulizationMode},
 };
 
 /// Error raised while deriving ring membership from a [`Smiles`] graph.
@@ -145,10 +147,12 @@ impl RingMembership {
 }
 
 /// Represents a parsed SMILES graph.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Smiles {
     atom_nodes: Vec<Atom>,
     bond_matrix: BondMatrix,
+    implicit_hydrogen_cache: Option<Vec<u8>>,
+    kekulization_source: Option<Box<Self>>,
 }
 
 impl Smiles {
@@ -156,7 +160,12 @@ impl Smiles {
     #[inline]
     #[must_use]
     pub fn new() -> Self {
-        Self { atom_nodes: Vec::new(), bond_matrix: BondMatrix::default() }
+        Self {
+            atom_nodes: Vec::new(),
+            bond_matrix: BondMatrix::default(),
+            implicit_hydrogen_cache: None,
+            kekulization_source: None,
+        }
     }
 
     /// Returns a slice of all parsed [`Atom`] values.
@@ -309,7 +318,31 @@ impl Smiles {
         )
         .unwrap_or_else(|_| unreachable!("existing bond matrix entries are already valid"));
 
-        Self { atom_nodes: self.atom_nodes.clone(), bond_matrix }
+        Self {
+            atom_nodes: self.atom_nodes.clone(),
+            bond_matrix,
+            implicit_hydrogen_cache: self.implicit_hydrogen_cache.clone(),
+            kekulization_source: self.kekulization_source.clone(),
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn clone_without_kekulization_source(&self) -> Self {
+        Self {
+            atom_nodes: self.atom_nodes.clone(),
+            bond_matrix: self.bond_matrix.clone(),
+            implicit_hydrogen_cache: self.implicit_hydrogen_cache.clone(),
+            kekulization_source: None,
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn resolved_kekulization_source(&self) -> Box<Self> {
+        self.kekulization_source
+            .clone()
+            .unwrap_or_else(|| Box::new(self.clone_without_kekulization_source()))
     }
 
     /// Renders the graph back into a valid SMILES string.
@@ -412,6 +445,12 @@ pub(crate) struct RingComponent {
 impl Default for Smiles {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl PartialEq for Smiles {
+    fn eq(&self, other: &Self) -> bool {
+        self.atom_nodes == other.atom_nodes && self.bond_matrix == other.bond_matrix
     }
 }
 
