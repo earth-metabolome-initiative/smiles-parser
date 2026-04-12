@@ -56,10 +56,10 @@ impl Bond {
 
     #[inline]
     #[must_use]
-    pub(crate) const fn ring_closure_symbol(self) -> &'static str {
+    pub(crate) const fn without_direction(self) -> Self {
         match self {
-            Self::Single | Self::Aromatic => "",
-            _ => self.smiles_symbol(),
+            Self::Up | Self::Down => Self::Single,
+            _ => self,
         }
     }
 }
@@ -89,5 +89,13 @@ mod tests {
         for (bond, expected) in cases {
             assert_eq!(expected, bond.to_string());
         }
+    }
+
+    #[test]
+    fn directional_bonds_collapse_to_single() {
+        assert_eq!(Bond::Up.without_direction(), Bond::Single);
+        assert_eq!(Bond::Down.without_direction(), Bond::Single);
+        assert_eq!(Bond::Double.without_direction(), Bond::Double);
+        assert_eq!(Bond::Aromatic.without_direction(), Bond::Aromatic);
     }
 }

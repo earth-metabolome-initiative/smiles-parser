@@ -132,4 +132,13 @@ mod tests {
 
         assert!(result.is_err());
     }
+
+    #[test]
+    fn display_len_covers_multi_digit_magnitudes() -> Result<(), SmilesError> {
+        assert_eq!(Charge::try_new(10)?.display_len(), 3);
+        assert_eq!(Charge::try_new(15)?.display_len(), 3);
+        assert_eq!(Charge::try_new(-10)?.display_len(), 4);
+        assert_eq!(Charge::try_new(-15)?.display_len(), 4);
+        Ok(())
+    }
 }

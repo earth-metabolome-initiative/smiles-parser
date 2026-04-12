@@ -457,41 +457,15 @@ fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
         Some(b'-') => {
             stream.position += 1;
             match stream.peek_byte() {
-                Some(b'-') => {
-                    let mut num = -1;
-                    while stream.peek_byte() == Some(b'-') {
-                        num -= 1;
-                        stream.position += 1;
-                    }
-                    Charge::try_new(num)
-                }
-                _ => {
-                    if let Some(possible_num) = try_fold_number::<i8, 2>(stream) {
-                        Charge::try_new(-possible_num?)
-                    } else {
-                        Charge::try_new(-1)
-                    }
-                }
+                Some(b'-') => repeated_sign_charge(stream, ChargeSign::Negative),
+                _ => parse_signed_charge_magnitude(stream, ChargeSign::Negative),
             }
         }
         Some(b'+') => {
             stream.position += 1;
             match stream.peek_byte() {
-                Some(b'+') => {
-                    let mut num = 1;
-                    while stream.peek_byte() == Some(b'+') {
-                        num += 1;
-                        stream.position += 1;
-                    }
-                    Charge::try_new(num)
-                }
-                _ => {
-                    if let Some(possible_num) = try_fold_number::<i8, 2>(stream) {
-                        Charge::try_new(possible_num?)
-                    } else {
-                        Charge::try_new(1)
-                    }
-                }
+                Some(b'+') => repeated_sign_charge(stream, ChargeSign::Positive),
+                _ => parse_signed_charge_magnitude(stream, ChargeSign::Positive),
             }
         }
         Some(byte) if byte.is_ascii_digit() => {
@@ -513,6 +487,76 @@ fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
             }
         }
         _ => Ok(Charge::default()),
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum ChargeSign {
+    Positive,
+    Negative,
+}
+
+impl ChargeSign {
+    #[inline]
+    fn apply(self, magnitude: i8) -> i8 {
+        match self {
+            Self::Positive => magnitude,
+            Self::Negative => -magnitude,
+        }
+    }
+
+    #[inline]
+    fn sign_byte(self) -> u8 {
+        match self {
+            Self::Positive => b'+',
+            Self::Negative => b'-',
+        }
+    }
+
+    #[inline]
+    fn try_new_charge(self, magnitude: i8) -> Result<Charge, SmilesError> {
+        Charge::try_new(self.apply(magnitude))
+    }
+
+    #[inline]
+    fn overflow_error(self) -> SmilesError {
+        match self {
+            Self::Positive => SmilesError::ChargeOverflow(16),
+            Self::Negative => SmilesError::ChargeUnderflow(-16),
+        }
+    }
+}
+
+#[inline]
+fn parse_signed_charge_magnitude(
+    stream: &mut TokenIter<'_>,
+    sign: ChargeSign,
+) -> Result<Charge, SmilesError> {
+    if let Some(possible_num) = try_fold_number::<i8, 2>(stream) {
+        sign.try_new_charge(possible_num?)
+    } else {
+        sign.try_new_charge(1)
+    }
+}
+
+#[inline]
+fn repeated_sign_charge(
+    stream: &mut TokenIter<'_>,
+    sign: ChargeSign,
+) -> Result<Charge, SmilesError> {
+    const MAX_ABSOLUTE_CHARGE: u16 = 15;
+
+    let mut magnitude: u16 = 1;
+    while stream.peek_byte() == Some(sign.sign_byte()) {
+        stream.position += 1;
+        magnitude = magnitude.saturating_add(1);
+    }
+    if magnitude > MAX_ABSOLUTE_CHARGE {
+        Err(sign.overflow_error())
+    } else {
+        let magnitude = i8::try_from(magnitude)
+            .unwrap_or_else(|_| unreachable!("charge magnitude is checked above"));
+        sign.try_new_charge(magnitude)
     }
 }
 
@@ -583,7 +627,7 @@ fn try_bond(byte: u8, bracket: bool) -> Result<Token, SmilesError> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec::Vec;
+    use alloc::{format, vec::Vec};
 
     use elements_rs::Element;
 
@@ -948,6 +992,16 @@ mod tests {
         let mut stream = TokenIter::from("15+");
         assert_eq!(try_charge(&mut stream), Ok(Charge::try_new(15).unwrap()));
     }
+
+    #[test]
+    fn repeated_charge_runs_fail_cleanly_instead_of_overflowing() {
+        let plus_err = next_err(&format!("[s{}P]", "+".repeat(200)));
+        assert_eq!(plus_err.smiles_error(), SmilesError::ChargeOverflow(16));
+
+        let minus_err = next_err(&format!("[s{}P]", "-".repeat(200)));
+        assert_eq!(minus_err.smiles_error(), SmilesError::ChargeUnderflow(-16));
+    }
+
     #[test]
     fn test_charge_parsing_number_before_sign() {
         let test_cases = vec![("[C2-]", -2), ("[C2+]", 2), ("[Fe15+]", 15), ("[Fe15-]", -15)];

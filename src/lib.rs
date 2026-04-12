@@ -14,14 +14,25 @@ pub mod errors;
 pub(crate) mod parser;
 pub mod smiles;
 pub mod token;
-pub(crate) mod traversal;
 
 pub use crate::{
     errors::{SmilesError, SmilesErrorWithSpan},
-    smiles::Smiles,
+    smiles::{
+        AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
+        AromaticityModel, AromaticityPerception, AromaticityPolicy, AromaticityRingFamilyKind,
+        AromaticityStatus, KekulizationError, KekulizationMode, RdkitDefaultAromaticity,
+        RdkitMdlAromaticity, RdkitSimpleAromaticity, RingMembership, RingMembershipError, Smiles,
+        SmilesComponents, SymmSssrResult, SymmSssrStatus,
+    },
 };
 
 /// Common imports for working with this crate.
 pub mod prelude {
-    pub use crate::{Smiles, SmilesError, SmilesErrorWithSpan};
+    pub use crate::{
+        AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
+        AromaticityModel, AromaticityPerception, AromaticityPolicy, AromaticityRingFamilyKind,
+        AromaticityStatus, KekulizationError, KekulizationMode, RdkitDefaultAromaticity,
+        RdkitMdlAromaticity, RdkitSimpleAromaticity, RingMembership, RingMembershipError, Smiles,
+        SmilesComponents, SmilesError, SmilesErrorWithSpan, SymmSssrResult, SymmSssrStatus,
+    };
 }

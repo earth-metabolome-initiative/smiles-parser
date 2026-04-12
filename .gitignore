@@ -4,3 +4,5 @@ tests/CID-SMILES
 .vscode/*
 fuzzer_pub_chem_corpus/
 tests/fixtures/*.tsv.gz
+*.log
+fuzz/corpus
