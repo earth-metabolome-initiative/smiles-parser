@@ -251,8 +251,8 @@ mod tests {
 
     use elements_rs::Element;
     use geometric_traits::traits::{
-        Graph, GraphSimilarities, McesBuilder, MonopartiteGraph, MonoplexGraph,
-        SizedSparseMatrix, SizedSparseMatrix2D,
+        Graph, GraphSimilarities, McesBuilder, MonopartiteGraph, MonoplexGraph, SizedSparseMatrix,
+        SizedSparseMatrix2D,
     };
 
     use super::{
