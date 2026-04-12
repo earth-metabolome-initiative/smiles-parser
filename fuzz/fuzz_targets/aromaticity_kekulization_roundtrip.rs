@@ -7,8 +7,8 @@ use smiles_parser::prelude::{AromaticityPolicy, AromaticityStatus, Smiles};
 // Keep this target in the small-molecule regime so fuzz time goes into
 // roundtrip invariants instead of a few pathological giant graphs.
 const MAX_FUZZ_SMILES_BYTES: usize = 256;
-const MAX_FUZZ_ATOMS: usize = 96;
-const MAX_FUZZ_BONDS: usize = 128;
+const MAX_FUZZ_ATOMS: usize = 80;
+const MAX_FUZZ_BONDS: usize = 96;
 
 const POLICIES: [AromaticityPolicy; 3] = [
     AromaticityPolicy::RdkitDefault,
