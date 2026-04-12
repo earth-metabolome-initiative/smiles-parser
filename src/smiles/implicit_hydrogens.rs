@@ -194,7 +194,8 @@ mod tests {
     use elements_rs::{AllowedValences, ChargedValences, Element};
 
     use super::{
-        Smiles, aromatic_implicit_hydrogens, bond_order, explicit_valence, target_valence,
+        Smiles, aromatic_implicit_hydrogens, bond_order, explicit_valence,
+        implicit_hydrogens_for_node, target_valence,
     };
     use crate::bond::Bond;
 
@@ -214,6 +215,13 @@ mod tests {
     fn wildcard_atoms_never_gain_implicit_hydrogens() {
         let smiles = Smiles::from_str("*").unwrap();
         assert_eq!(smiles.implicit_hydrogen_counts(), vec![0]);
+    }
+
+    #[test]
+    fn implicit_hydrogens_for_node_covers_direct_organic_subset_path() {
+        let smiles = Smiles::from_str("C").unwrap();
+        let node = smiles.node_by_id(0).unwrap();
+        assert_eq!(implicit_hydrogens_for_node(&smiles, 0, node), 4);
     }
 
     #[test]

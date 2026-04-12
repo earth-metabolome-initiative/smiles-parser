@@ -43,6 +43,8 @@ const SMILES_STR: &[&str] = &[
     "C1CC2CC3C4C5C6C7C8C9C%10C%11C%12C%13C%14C%15C%16CC%17C%16%16C%15%15C%14%14C%13%13C%12%12C%11%11C%10%10C99C88C77C66C55C44C33C2C2C33C44C55C66C77C88C99C%10%10C%11%11C%12%12C%13%13C%14%14C%15%15C%16%16C%17C%17C%16%16C%15%15C%14%14C%13%13C%12%12C%11%11C%10%10C99C88C77C66C55C44C33C2C2C33C44C55C66C77C88C99C%10%10C%11%11C%12%12C%13%13C%14%14C%15%15C%16%16C%17C%17C%16%16C%15%15C%14%14C%13%13C%12%12C%11%11C%10%10C99C88C77C66C55C44C33C2C2C33C44C55C66C77C88C99C%10%10C%11%11C%12%12C%13%13C%14%14C%15%15C%16%16C%17C%17C%16%16C%15%15C%14%14C%13%13C%12%12C%11%11C%10%10C99C88C77C66C55C44C33C2C(C1)C3C4C5C6C7C8C9C%10C%11C%12C%13C%14C%15C%16C%17",
     "C1[C@H]([C@H]([C@@H](C(O1)(CO)O)O)O)O",
     "C(C(F)(F)I)(CC1=CC=CC=C1N=C=NC2=CC=CC=OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOF)(F)FOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOC2C",
+    "CC(=O)OC(CC(=O)[O-])C",
+    "CC(=O)OC(CC(=O)[O-])C",
 ];
 
 fn parse_or_panic(s: &str) -> Smiles {
@@ -57,53 +59,69 @@ fn bond_count(smiles: &Smiles, bond: Bond) -> usize {
         .count()
 }
 
+fn single_family_count(smiles: &Smiles) -> usize {
+    bond_count(smiles, Bond::Single) + bond_count(smiles, Bond::Up) + bond_count(smiles, Bond::Down)
+}
+
+fn assert_render_round_trip_preserves_invariants(original: &str) {
+    let parsed = parse_or_panic(original);
+    let rendered = parsed.to_string();
+    let reparsed = Smiles::from_str(&rendered).unwrap_or_else(|e| {
+        panic!(
+            "Failed to parse rendered SMILES.\nOriginal:\n{original}\nRendered:\n{rendered}\n{}",
+            e.render(&rendered)
+        )
+    });
+    let rerendered = reparsed.to_string();
+
+    assert_eq!(
+        rendered, rerendered,
+        "Rendered SMILES did not reach a fixed point.\nOriginal:\n{original}\nRendered:\n{rendered}\nRerendered:\n{rerendered}"
+    );
+
+    assert_eq!(
+        parsed.nodes().len(),
+        reparsed.nodes().len(),
+        "Node count changed after render round trip.\nOriginal:\n{original}\nRendered:\n{rendered}"
+    );
+
+    assert_eq!(
+        parsed.number_of_bonds(),
+        reparsed.number_of_bonds(),
+        "Edge count changed after render round trip.\nOriginal:\n{original}\nRendered:\n{rendered}"
+    );
+
+    let parsed_aromatic = parsed.nodes().iter().filter(|n| n.aromatic()).count();
+    let reparsed_aromatic = reparsed.nodes().iter().filter(|n| n.aromatic()).count();
+
+    assert_eq!(
+        parsed_aromatic, reparsed_aromatic,
+        "Aromatic atom count changed after render round trip.\nOriginal:\n{original}\nRendered:\n{rendered}"
+    );
+
+    assert_eq!(
+        single_family_count(&parsed),
+        single_family_count(&reparsed),
+        "Single-bond family count changed after render round trip.\nOriginal:\n{original}\nRendered:\n{rendered}"
+    );
+
+    for bond in [Bond::Double, Bond::Triple, Bond::Quadruple, Bond::Aromatic] {
+        assert_eq!(
+            bond_count(&parsed, bond),
+            bond_count(&reparsed, bond),
+            "Bond count for {bond:?} changed after render round trip.\nOriginal:\n{original}\nRendered:\n{rendered}"
+        );
+    }
+}
+
 #[test]
 fn test_render_round_trip_all_inputs() {
     for &original in SMILES_STR {
-        let parsed = parse_or_panic(original);
-        let rendered = parsed.to_string();
-
-        let reparsed = Smiles::from_str(&rendered).unwrap_or_else(|e| {
-            panic!(
-                "Failed to parse rendered SMILES.\nOriginal:\n{original}\nRendered:\n{rendered}\n{}",
-                e.render(&rendered)
-            )
-        });
-
-        assert_eq!(
-            parsed.nodes().len(),
-            reparsed.nodes().len(),
-            "Node count changed after render round trip.\nOriginal:\n{original}\nRendered:\n{rendered}"
-        );
-
-        assert_eq!(
-            parsed.number_of_bonds(),
-            reparsed.number_of_bonds(),
-            "Edge count changed after render round trip.\nOriginal:\n{original}\nRendered:\n{rendered}"
-        );
-
-        let parsed_aromatic = parsed.nodes().iter().filter(|n| n.aromatic()).count();
-        let reparsed_aromatic = reparsed.nodes().iter().filter(|n| n.aromatic()).count();
-
-        assert_eq!(
-            parsed_aromatic, reparsed_aromatic,
-            "Aromatic atom count changed after render round trip.\nOriginal:\n{original}\nRendered:\n{rendered}"
-        );
-
-        for bond in [
-            Bond::Single,
-            Bond::Double,
-            Bond::Triple,
-            Bond::Quadruple,
-            Bond::Aromatic,
-            Bond::Up,
-            Bond::Down,
-        ] {
-            assert_eq!(
-                bond_count(&parsed, bond),
-                bond_count(&reparsed, bond),
-                "Bond count for {bond:?} changed after render round trip.\nOriginal:\n{original}\nRendered:\n{rendered}"
-            );
-        }
+        assert_render_round_trip_preserves_invariants(original);
     }
+}
+
+#[test]
+fn benzene_kekule_roundtrip_preserves_bond_inventory() {
+    assert_render_round_trip_preserves_invariants("C1=CC=CC=C1");
 }

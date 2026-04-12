@@ -204,33 +204,49 @@ impl Smiles {
     #[inline]
     #[must_use]
     pub(crate) fn from_bond_matrix_parts(atom_nodes: Vec<Atom>, bond_matrix: BondMatrix) -> Self {
-        Self::from_bond_matrix_parts_with_caches(atom_nodes, bond_matrix, None, None)
-    }
-
-    #[inline]
-    #[must_use]
-    pub(crate) fn from_bond_matrix_parts_with_implicit_hydrogen_cache(
-        atom_nodes: Vec<Atom>,
-        bond_matrix: BondMatrix,
-        implicit_hydrogen_cache: Vec<u8>,
-    ) -> Self {
-        Self::from_bond_matrix_parts_with_caches(
+        let parsed_stereo_neighbors = vec![Vec::new(); atom_nodes.len()];
+        Self::from_bond_matrix_parts_with_sidecars(
             atom_nodes,
             bond_matrix,
-            Some(implicit_hydrogen_cache),
+            parsed_stereo_neighbors,
+            None,
             None,
         )
     }
 
     #[inline]
     #[must_use]
-    pub(crate) fn from_bond_matrix_parts_with_caches(
+    pub(crate) fn from_bond_matrix_parts_with_parsed_stereo(
         atom_nodes: Vec<Atom>,
         bond_matrix: BondMatrix,
+        parsed_stereo_neighbors: Vec<Vec<super::StereoNeighbor>>,
+    ) -> Self {
+        Self::from_bond_matrix_parts_with_sidecars(
+            atom_nodes,
+            bond_matrix,
+            parsed_stereo_neighbors,
+            None,
+            None,
+        )
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn from_bond_matrix_parts_with_sidecars(
+        atom_nodes: Vec<Atom>,
+        bond_matrix: BondMatrix,
+        parsed_stereo_neighbors: Vec<Vec<super::StereoNeighbor>>,
         implicit_hydrogen_cache: Option<Vec<u8>>,
         kekulization_source: Option<Box<Self>>,
     ) -> Self {
-        Self { atom_nodes, bond_matrix, implicit_hydrogen_cache, kekulization_source }
+        debug_assert_eq!(atom_nodes.len(), parsed_stereo_neighbors.len());
+        Self {
+            atom_nodes,
+            bond_matrix,
+            parsed_stereo_neighbors,
+            implicit_hydrogen_cache,
+            kekulization_source,
+        }
     }
 
     /// Returns the symmetric valued sparse matrix storing the graph bonds.

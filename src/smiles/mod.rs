@@ -31,30 +31,38 @@ use geometric_traits::traits::{
 };
 use hashbrown::HashSet;
 
-use crate::{
-    atom::Atom,
-    bond::bond_edge::BondEdge,
-    errors::SmilesError,
-    traversal::{render_visitor::RenderVisitor, walker::walk},
-};
+use crate::{atom::Atom, bond::bond_edge::BondEdge, errors::SmilesError};
 
 mod aromaticity;
+mod branches;
+mod connected_components;
+mod double_bond_stereo;
+mod emitter;
 mod from_str;
 mod geometric_traits_impl;
 mod implicit_hydrogens;
+mod invariants;
 mod kekulization;
+mod neighbors;
 mod rdkit_symm_sssr;
+mod refinement;
+mod render_plan;
+mod roots;
+mod spanning_tree;
+mod stereo;
+mod symmetry;
 
-pub(crate) use self::geometric_traits_impl::BondMatrixBuilder;
 pub use self::{
     aromaticity::{
         AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
         AromaticityModel, AromaticityPerception, AromaticityPolicy, AromaticityRingFamilyKind,
         AromaticityStatus, RdkitDefaultAromaticity, RdkitMdlAromaticity, RdkitSimpleAromaticity,
     },
+    connected_components::SmilesComponents,
     geometric_traits_impl::{BondEntry, BondMatrix},
     kekulization::{KekulizationError, KekulizationMode},
 };
+pub(crate) use self::{geometric_traits_impl::BondMatrixBuilder, stereo::StereoNeighbor};
 
 /// Error raised while deriving ring membership from a [`Smiles`] graph.
 pub type RingMembershipError = geometric_traits::errors::MonopartiteError<Smiles>;
@@ -151,6 +159,7 @@ impl RingMembership {
 pub struct Smiles {
     atom_nodes: Vec<Atom>,
     bond_matrix: BondMatrix,
+    parsed_stereo_neighbors: Vec<Vec<StereoNeighbor>>,
     implicit_hydrogen_cache: Option<Vec<u8>>,
     kekulization_source: Option<Box<Self>>,
 }
@@ -163,6 +172,7 @@ impl Smiles {
         Self {
             atom_nodes: Vec::new(),
             bond_matrix: BondMatrix::default(),
+            parsed_stereo_neighbors: Vec::new(),
             implicit_hydrogen_cache: None,
             kekulization_source: None,
         }
@@ -321,6 +331,7 @@ impl Smiles {
         Self {
             atom_nodes: self.atom_nodes.clone(),
             bond_matrix,
+            parsed_stereo_neighbors: self.parsed_stereo_neighbors.clone(),
             implicit_hydrogen_cache: self.implicit_hydrogen_cache.clone(),
             kekulization_source: self.kekulization_source.clone(),
         }
@@ -332,6 +343,7 @@ impl Smiles {
         Self {
             atom_nodes: self.atom_nodes.clone(),
             bond_matrix: self.bond_matrix.clone(),
+            parsed_stereo_neighbors: self.parsed_stereo_neighbors.clone(),
             implicit_hydrogen_cache: self.implicit_hydrogen_cache.clone(),
             kekulization_source: None,
         }
@@ -345,18 +357,39 @@ impl Smiles {
             .unwrap_or_else(|| Box::new(self.clone_without_kekulization_source()))
     }
 
-    /// Renders the graph back into a valid SMILES string.
+    /// Renders the graph back into a SMILES string.
+    ///
+    /// This is the main entry point for display. Rendering is split into a
+    /// deterministic planning phase followed by a write-only emission phase:
+    ///
+    /// 1. compute atom-local invariants
+    /// 2. run seeded Weisfeiler-Lehman refinement over the labeled molecular
+    ///    graph
+    /// 3. derive rooted symmetry tie-break classes on top of the refined
+    ///    partition
+    /// 4. choose one root per connected component
+    /// 5. order each atom's incident edges deterministically
+    /// 6. build a rooted DFS spanning forest
+    /// 7. choose continuation versus branch children from subtree signatures
+    /// 8. compute a final preorder for each component
+    /// 9. schedule closure events and assign reusable ring labels
+    /// 10. normalize stereo relative to the final traversal, with a raw
+    ///     directional-single fallback for unsupported double-bond environments
+    /// 11. emit a string from the finished plan
+    ///
+    /// The key design constraint is that ordering decisions come from
+    /// graph-derived keys and explicit plan objects. The emitter does not
+    /// canonicalize, search, or preview alternate strings while writing.
+    ///
+    /// [`fmt::Display`] uses this exact pipeline by delegating to `render()`
+    /// and then writing the finished string into the formatter.
     ///
     /// # Errors
-    /// - Returns a [`SmilesError`] if traversal fails.
+    ///
+    /// This currently returns `Ok` for every in-memory graph produced by the
+    /// crate and reserves `Err` for future render-time validation failures.
     pub fn render(&self) -> Result<String, SmilesError> {
-        self.render_visitor().map(RenderVisitor::into_string)
-    }
-    fn render_visitor(&self) -> Result<RenderVisitor, SmilesError> {
-        let mut render_visitor =
-            RenderVisitor::with_capacity(self.nodes().len(), self.number_of_bonds());
-        walk(self, &mut render_visitor)?;
-        Ok(render_visitor)
+        Ok(self::emitter::emit(self))
     }
 
     fn find_bridge_edges_depth_first(
@@ -455,9 +488,14 @@ impl PartialEq for Smiles {
 }
 
 impl fmt::Display for Smiles {
+    /// Formats the graph by running the full render pipeline and writing the
+    /// resulting SMILES string into `f`.
+    ///
+    /// See [`Smiles::render`] for the full algorithm stack and the rationale
+    /// behind the split between planning and emission.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let render_visitor = self.render_visitor().map_err(|_| fmt::Error)?;
-        render_visitor.write_into_formatter(f)
+        let rendered = self.render().map_err(|_| fmt::Error)?;
+        f.write_str(&rendered)
     }
 }
 
@@ -1343,10 +1381,9 @@ mod tests {
     }
 
     #[test]
-    fn branch_render_regression_non_aromatic() {
+    fn branch_render_regression_non_aromatic_reaches_a_fixed_point() {
         let smiles: Smiles = "C(O)N".parse().unwrap();
         let rendered = smiles.to_string();
-        assert_eq!(rendered, "C(O)N");
         let resmiles: Smiles = rendered.parse().unwrap();
         let rerendered = resmiles.to_string();
         assert_eq!(rendered, rerendered);
@@ -1364,9 +1401,12 @@ mod tests {
     }
 
     #[test]
-    fn render_b_s_branch_should_preserve_branch_origin() {
+    fn render_b_s_branch_reaches_a_fixed_point() {
         let smiles: Smiles = "B(s)s".parse().unwrap();
-        assert_eq!(smiles.to_string(), "B(s)s");
+        let rendered = smiles.to_string();
+        let reparsed: Smiles = rendered.parse().unwrap();
+
+        assert_eq!(rendered, reparsed.to_string());
     }
 
     #[test]
@@ -1398,9 +1438,13 @@ mod tests {
     }
 
     #[test]
-    fn explicit_single_between_aromatic_atoms_is_preserved() {
+    fn explicit_single_between_aromatic_atoms_survives_render_roundtrip() {
         let smiles: Smiles = "*c-c".parse().unwrap();
-        assert_eq!(smiles.to_string(), "*c-c");
+        let rendered = smiles.to_string();
+        let reparsed: Smiles = rendered.parse().unwrap();
+
+        assert_eq!(rendered, reparsed.to_string());
+        assert_eq!(reparsed.edge_for_node_pair((0, 1)).unwrap().bond(), Bond::Single);
     }
 
     #[test]

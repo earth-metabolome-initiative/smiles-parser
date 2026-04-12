@@ -2,7 +2,9 @@
 pub mod atom_symbol;
 pub mod bracketed;
 
-use alloc::{borrow::Cow, string::String};
+#[cfg(test)]
+use alloc::borrow::Cow;
+use alloc::string::String;
 use core::fmt;
 
 use elements_rs::{Element, Isotope};
@@ -261,6 +263,7 @@ impl Atom {
         self.chirality
     }
 
+    #[cfg(test)]
     #[inline]
     #[must_use]
     pub(crate) fn rendered_string(&self) -> String {
@@ -270,6 +273,7 @@ impl Atom {
         rendered
     }
 
+    #[cfg(test)]
     #[inline]
     #[must_use]
     pub(crate) fn rendered_cow(&self) -> Cow<'static, str> {
@@ -280,16 +284,23 @@ impl Atom {
         }
     }
 
+    #[cfg(test)]
     #[inline]
     #[must_use]
     pub(crate) fn rendered_len_hint(&self) -> usize {
+        self.rendered_len_hint_with_chirality(self.chirality)
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn rendered_len_hint_with_chirality(&self, chirality: Option<Chirality>) -> usize {
         let mut len = rendered_symbol_len(self.symbol, self.aromatic);
         if self.syntax == AtomSyntax::Bracket {
             len += 2;
             if let Some(isotope) = self.isotope_mass_number {
                 len += decimal_len_u16(isotope);
             }
-            if let Some(chirality) = self.chirality {
+            if let Some(chirality) = chirality {
                 len += chirality.display_len();
             }
             if self.hydrogens != 0 {
@@ -307,6 +318,24 @@ impl Atom {
     }
 
     pub(crate) fn write_smiles<W: fmt::Write>(&self, target: &mut W) -> fmt::Result {
+        self.write_smiles_with_chirality(target, self.chirality)
+    }
+
+    #[inline]
+    pub(crate) fn write_smiles_with_chirality_to_string(
+        &self,
+        target: &mut String,
+        chirality: Option<Chirality>,
+    ) {
+        self.write_smiles_with_chirality(target, chirality)
+            .unwrap_or_else(|_| unreachable!("writing to String cannot fail"));
+    }
+
+    pub(crate) fn write_smiles_with_chirality<W: fmt::Write>(
+        &self,
+        target: &mut W,
+        chirality: Option<Chirality>,
+    ) -> fmt::Result {
         match self.syntax {
             AtomSyntax::OrganicSubset => write_symbol(target, self.symbol, self.aromatic),
             AtomSyntax::Bracket => {
@@ -315,7 +344,7 @@ impl Atom {
                     write!(target, "{isotope}")?;
                 }
                 write_symbol(target, self.symbol, self.aromatic)?;
-                if let Some(chirality) = self.chirality {
+                if let Some(chirality) = chirality {
                     write!(target, "{chirality}")?;
                 }
                 match self.hydrogens {
@@ -332,6 +361,7 @@ impl Atom {
         }
     }
 
+    #[cfg(test)]
     #[inline]
     fn rendered_static(&self) -> Option<&'static str> {
         match self.syntax {

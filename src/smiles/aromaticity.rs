@@ -640,9 +640,10 @@ impl Smiles {
         )
         .unwrap_or_else(|_| unreachable!("existing bond matrix entries are already valid"));
 
-        Ok(Self::from_bond_matrix_parts_with_caches(
+        Ok(Self::from_bond_matrix_parts_with_sidecars(
             atom_nodes,
             bond_matrix,
+            self.parsed_stereo_neighbors.clone(),
             Some(implicit_hydrogen_cache),
             kekulization_source,
         ))
