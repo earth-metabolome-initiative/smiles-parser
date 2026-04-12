@@ -58,6 +58,9 @@ impl Smiles {
     #[inline]
     #[must_use]
     pub fn implicit_hydrogen_counts(&self) -> Vec<u8> {
+        if let Some(cached) = &self.implicit_hydrogen_cache {
+            return cached.clone();
+        }
         self.nodes()
             .iter()
             .enumerate()
@@ -72,6 +75,9 @@ impl Smiles {
     #[inline]
     #[must_use]
     pub fn implicit_hydrogen_count(&self, id: usize) -> Option<u8> {
+        if let Some(cached) = &self.implicit_hydrogen_cache {
+            return cached.get(id).copied();
+        }
         self.node_by_id(id).map(|node| implicit_hydrogens_for_node(self, id, node))
     }
 }

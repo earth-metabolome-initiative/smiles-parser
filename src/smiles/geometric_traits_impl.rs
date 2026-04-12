@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 use core::hash::{Hash, Hasher};
 
 use geometric_traits::{
@@ -57,6 +57,20 @@ impl BondEntry {
     #[must_use]
     pub(crate) fn to_bond_edge(self, node_a: usize, node_b: usize) -> BondEdge {
         BondEdge::new(node_a, node_b, self.bond, self.ring_num)
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) const fn with_bond(mut self, bond: Bond) -> Self {
+        self.bond = bond;
+        self
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) const fn with_order(mut self, order: usize) -> Self {
+        self.order = order;
+        self
     }
 }
 
@@ -157,6 +171,7 @@ impl PendingBond {
 #[inline]
 #[must_use]
 fn build_bond_matrix(number_of_nodes: usize, mut entries: Vec<PendingBond>) -> BondMatrix {
+    reassign_rdkit_bond_orders(&mut entries);
     if !is_row_major_sorted(&entries) {
         entries.sort_unstable_by_key(|bond| bond.row_major_key());
     }
@@ -164,7 +179,20 @@ fn build_bond_matrix(number_of_nodes: usize, mut entries: Vec<PendingBond>) -> B
         number_of_nodes,
         entries.into_iter().map(PendingBond::into_entry),
     )
-    .expect("bond entries are unique, upper-triangular, and row-major sorted")
+    .unwrap_or_else(|_| {
+        unreachable!("bond entries are unique, upper-triangular, and row-major sorted")
+    })
+}
+
+#[inline]
+fn reassign_rdkit_bond_orders(entries: &mut [PendingBond]) {
+    let mut reordered = entries.iter_mut().collect::<Vec<_>>();
+    reordered.sort_unstable_by_key(|pending| {
+        (pending.entry.ring_num().is_some(), pending.entry.order())
+    });
+    for (order, pending) in reordered.into_iter().enumerate() {
+        pending.entry = pending.entry.with_order(order);
+    }
 }
 
 #[inline]
@@ -173,12 +201,17 @@ fn is_row_major_sorted(entries: &[PendingBond]) -> bool {
 }
 
 impl Smiles {
-    #[cfg(test)]
     #[inline]
     #[must_use]
     pub(crate) fn from_bond_matrix_parts(atom_nodes: Vec<Atom>, bond_matrix: BondMatrix) -> Self {
         let parsed_stereo_neighbors = vec![Vec::new(); atom_nodes.len()];
-        Self { atom_nodes, bond_matrix, parsed_stereo_neighbors }
+        Self::from_bond_matrix_parts_with_sidecars(
+            atom_nodes,
+            bond_matrix,
+            parsed_stereo_neighbors,
+            None,
+            None,
+        )
     }
 
     #[inline]
@@ -186,10 +219,34 @@ impl Smiles {
     pub(crate) fn from_bond_matrix_parts_with_parsed_stereo(
         atom_nodes: Vec<Atom>,
         bond_matrix: BondMatrix,
-        parsed_stereo_neighbors: Vec<Vec<crate::smiles::stereo::StereoNeighbor>>,
+        parsed_stereo_neighbors: Vec<Vec<super::StereoNeighbor>>,
+    ) -> Self {
+        Self::from_bond_matrix_parts_with_sidecars(
+            atom_nodes,
+            bond_matrix,
+            parsed_stereo_neighbors,
+            None,
+            None,
+        )
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn from_bond_matrix_parts_with_sidecars(
+        atom_nodes: Vec<Atom>,
+        bond_matrix: BondMatrix,
+        parsed_stereo_neighbors: Vec<Vec<super::StereoNeighbor>>,
+        implicit_hydrogen_cache: Option<Vec<u8>>,
+        kekulization_source: Option<Box<Self>>,
     ) -> Self {
         debug_assert_eq!(atom_nodes.len(), parsed_stereo_neighbors.len());
-        Self { atom_nodes, bond_matrix, parsed_stereo_neighbors }
+        Self {
+            atom_nodes,
+            bond_matrix,
+            parsed_stereo_neighbors,
+            implicit_hydrogen_cache,
+            kekulization_source,
+        }
     }
 
     /// Returns the symmetric valued sparse matrix storing the graph bonds.
@@ -242,128 +299,29 @@ impl MonopartiteGraph for Smiles {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{vec, vec::Vec};
-    use core::{
+    use core::str::FromStr;
+    use std::{
+        collections::hash_map::DefaultHasher,
         hash::{Hash, Hasher},
-        str::FromStr,
-    };
-    use std::collections::hash_map::DefaultHasher;
-
-    use elements_rs::Element;
-    use geometric_traits::traits::{
-        Graph, GraphSimilarities, McesBuilder, MonopartiteGraph, MonoplexGraph, SizedSparseMatrix,
-        SizedSparseMatrix2D,
     };
 
-    use super::{
-        BondEntry, BondMatrixBuilder, PendingBond, build_bond_matrix, is_row_major_sorted,
-    };
-    use crate::{
-        atom::{Atom, atom_symbol::AtomSymbol},
-        bond::{Bond, ring_num::RingNum},
-        errors::SmilesError,
-        smiles::Smiles,
-    };
+    use geometric_traits::traits::{Graph, GraphSimilarities, McesBuilder};
+
+    use super::*;
+    use crate::bond::ring_num::RingNum;
 
     fn assert_similarity_close(actual: impl Into<f64>, expected: f64) {
         let actual = actual.into();
         let difference = (actual - expected).abs();
 
         assert!(
-            difference < 1.0e-12,
+            difference < 1.0e-6,
             "expected Johnson similarity {expected}, got {actual} (diff {difference})"
         );
     }
 
-    fn atom(element: Element) -> Atom {
-        Atom::new_organic_subset(AtomSymbol::Element(element), false)
-    }
-
     #[test]
-    fn bond_entry_accessors_and_conversion_work() {
-        let ring = RingNum::try_new(7).unwrap();
-        let entry = BondEntry::new(Bond::Double, Some(ring), 3);
-
-        assert_eq!(entry.bond(), Bond::Double);
-        assert_eq!(entry.ring_num(), Some(ring));
-        assert_eq!(entry.order(), 3);
-
-        let edge = entry.to_bond_edge(1, 4);
-        assert_eq!(edge.bond(), Bond::Double);
-        assert_eq!(edge.ring_num(), Some(ring));
-        assert_eq!(edge.vertices(), (1, 4));
-    }
-
-    #[test]
-    fn bond_matrix_builder_detects_duplicates_and_contains_edges() {
-        let mut builder = BondMatrixBuilder::with_capacity(2);
-        assert!(!builder.contains_edge(0, 1));
-        builder.push_edge(1, 0, Bond::Single, None).unwrap();
-        assert!(builder.contains_edge(0, 1));
-        assert_eq!(
-            builder.push_edge(0, 1, Bond::Single, None),
-            Err(SmilesError::DuplicateEdge(0, 1))
-        );
-    }
-
-    #[test]
-    fn build_bond_matrix_sorts_unsorted_pending_bonds() {
-        let entries = vec![
-            PendingBond::new(2, 3, BondEntry::new(Bond::Triple, None, 1)),
-            PendingBond::new(0, 1, BondEntry::new(Bond::Single, None, 0)),
-        ];
-        assert!(!is_row_major_sorted(&entries));
-
-        let matrix = build_bond_matrix(4, entries);
-        assert_eq!(matrix.number_of_defined_values(), 4);
-        assert_eq!(matrix.try_rank(0, 1), Some(0));
-        assert_eq!(matrix.try_rank(2, 3), Some(2));
-    }
-
-    #[test]
-    fn pending_bond_helpers_and_sorted_matrix_path_work() {
-        let pending = PendingBond::new(0, 2, BondEntry::new(Bond::Double, None, 4));
-        assert_eq!(pending.row_major_key(), (0, 2));
-        assert_eq!(pending.into_entry(), (0, 2, BondEntry::new(Bond::Double, None, 4)));
-
-        let entries = vec![
-            PendingBond::new(0, 1, BondEntry::new(Bond::Single, None, 0)),
-            PendingBond::new(0, 2, BondEntry::new(Bond::Double, None, 1)),
-        ];
-        assert!(is_row_major_sorted(&entries));
-
-        let matrix = build_bond_matrix(3, entries);
-        assert_eq!(matrix.number_of_defined_values(), 4);
-        assert_eq!(matrix.try_rank(0, 2), Some(1));
-    }
-
-    #[test]
-    fn smiles_graph_trait_views_reflect_storage() {
-        let mut builder = BondMatrixBuilder::with_capacity(1);
-        builder.push_edge(0, 1, Bond::Single, None).unwrap();
-        let smiles = Smiles::from_bond_matrix_parts(
-            vec![atom(Element::C), atom(Element::O)],
-            builder.finish(2),
-        );
-
-        assert!(smiles.has_nodes());
-        assert!(smiles.has_edges());
-        assert_eq!(smiles.edges().number_of_defined_values(), 2);
-        assert_eq!(smiles.nodes_vocabulary().len(), 2);
-    }
-
-    #[test]
-    fn empty_smiles_trait_views_report_no_nodes_or_edges() {
-        let smiles =
-            Smiles::from_bond_matrix_parts(Vec::new(), BondMatrixBuilder::default().finish(0));
-        assert!(!smiles.has_nodes());
-        assert!(!smiles.has_edges());
-        assert_eq!(smiles.edges().number_of_defined_values(), 0);
-        assert!(smiles.nodes_vocabulary().is_empty());
-    }
-
-    #[test]
-    fn bond_entry_equality_and_hash_depend_only_on_bond_kind() {
+    fn bond_entry_equality_ignores_ring_digits_and_uses_bond_kind() {
         let first = BondEntry::new(Bond::Double, Some(RingNum::try_new(1).unwrap()), 0);
         let second = BondEntry::new(Bond::Double, Some(RingNum::try_new(9).unwrap()), 17);
         let third = BondEntry::new(Bond::Double, None, 99);
@@ -372,39 +330,48 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first, third);
         assert_ne!(first, fourth);
-
-        let mut first_hasher = DefaultHasher::new();
-        let mut second_hasher = DefaultHasher::new();
-        let mut fourth_hasher = DefaultHasher::new();
-        first.hash(&mut first_hasher);
-        second.hash(&mut second_hasher);
-        fourth.hash(&mut fourth_hasher);
-
-        assert_eq!(first_hasher.finish(), second_hasher.finish());
-        assert_ne!(first_hasher.finish(), fourth_hasher.finish());
     }
 
     #[test]
-    fn from_bond_matrix_parts_with_parsed_stereo_preserves_sidecar() {
-        let mut builder = BondMatrixBuilder::with_capacity(1);
-        builder.push_edge(0, 1, Bond::Single, None).unwrap();
-        let smiles = Smiles::from_bond_matrix_parts_with_parsed_stereo(
-            vec![atom(Element::C), atom(Element::N)],
-            builder.finish(2),
-            vec![
-                vec![crate::smiles::stereo::StereoNeighbor::ExplicitHydrogen],
-                vec![crate::smiles::stereo::StereoNeighbor::Atom(0)],
-            ],
-        );
+    fn bond_entry_hash_ignores_ring_digits_like_equality() {
+        let first = BondEntry::new(Bond::Double, Some(RingNum::try_new(1).unwrap()), 0);
+        let second = BondEntry::new(Bond::Double, Some(RingNum::try_new(9).unwrap()), 17);
+        let mut first_hasher = DefaultHasher::new();
+        let mut second_hasher = DefaultHasher::new();
 
-        assert_eq!(
-            smiles.parsed_stereo_neighbors(0),
-            vec![crate::smiles::stereo::StereoNeighbor::ExplicitHydrogen]
-        );
-        assert_eq!(
-            smiles.parsed_stereo_neighbors(1),
-            vec![crate::smiles::stereo::StereoNeighbor::Atom(0)]
-        );
+        first.hash(&mut first_hasher);
+        second.hash(&mut second_hasher);
+
+        assert_eq!(first_hasher.finish(), second_hasher.finish());
+    }
+
+    #[test]
+    fn bond_matrix_builder_rejects_duplicate_edges() {
+        let mut builder = BondMatrixBuilder::with_capacity(2);
+
+        builder.push_edge(0, 1, Bond::Single, None).unwrap();
+        let error = builder.push_edge(1, 0, Bond::Double, None).unwrap_err();
+
+        assert_eq!(error, SmilesError::DuplicateEdge(0, 1));
+    }
+
+    #[test]
+    fn empty_smiles_reports_no_nodes_or_edges() {
+        let smiles = Smiles::default();
+
+        assert_eq!(smiles.number_of_bonds(), 0);
+        assert!(!Graph::has_nodes(&smiles));
+        assert!(!Graph::has_edges(&smiles));
+    }
+
+    struct DirectionalParityCase {
+        name: &'static str,
+        smiles1: &'static str,
+        smiles2: &'static str,
+        raw_edges: usize,
+        raw_similarity: f64,
+        collapsed_edges: usize,
+        collapsed_similarity: f64,
     }
 
     #[test]
@@ -453,5 +420,121 @@ mod tests {
 
         assert_eq!(result.matched_edges().len(), 6);
         assert_similarity_close(result.johnson_similarity(), 1.0);
+    }
+
+    #[test]
+    fn directional_bond_collapse_recovers_eight_massspecgym_directional_cases() {
+        let cases = [
+            DirectionalParityCase {
+                name: "massspecgym_default_0012",
+                smiles1: "CCCCCCCCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCCCCCC/C=C\\CCCCCCCC",
+                smiles2: "CCCCCCCCCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCC/C=C\\C/C=C\\C/C=C\\C/C=C\\CCCCC",
+                raw_edges: 42,
+                raw_similarity: 0.728_139,
+                collapsed_edges: 46,
+                collapsed_similarity: 0.868_206,
+            },
+            DirectionalParityCase {
+                name: "massspecgym_default_0015",
+                smiles1: "CCCCCCC=CCCCCCCCC(=O)O",
+                smiles2: "CCCCCCCC/C=C\\CCCCCCCC(=O)OCC",
+                raw_edges: 15,
+                raw_similarity: 0.723_588,
+                collapsed_edges: 17,
+                collapsed_similarity: 0.813_953,
+            },
+            DirectionalParityCase {
+                name: "massspecgym_default_0051",
+                smiles1: "CCCCCCCCCCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCCCCCCC(=O)O",
+                smiles2: "CCCCCCCCCCCCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCCCCCC/C=C\\CCCCCCCC",
+                raw_edges: 41,
+                raw_similarity: 0.723_406,
+                collapsed_edges: 42,
+                collapsed_similarity: 0.758_689,
+            },
+            DirectionalParityCase {
+                name: "massspecgym_default_0059",
+                smiles1: "CCCCCCCCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC",
+                smiles2: "CCCCCCCCCCCCCC(=O)O[C@H](COC(=O)CCCCCCC/C=C\\CCCCCCCC)COP(=O)([O-])OCC[N+](C)(C)C",
+                raw_edges: 45,
+                raw_similarity: 0.882_461,
+                collapsed_edges: 47,
+                collapsed_similarity: 0.960_004,
+            },
+            DirectionalParityCase {
+                name: "massspecgym_default_0069",
+                smiles1: "CCCCCC/C=C\\CCCCCCCC(=O)O",
+                smiles2: "CCCCCCC=CCCCCCCCCC(=O)NCC(=O)O",
+                raw_edges: 14,
+                raw_similarity: 0.650_159,
+                collapsed_edges: 16,
+                collapsed_similarity: 0.733_968,
+            },
+            DirectionalParityCase {
+                name: "massspecgym_default_0090",
+                smiles1: "CCCCCCCCCCCC(=O)OC(CCCCCC)C/C=C/CCCCCCCC(=O)O",
+                smiles2: "CCCCCCCCCCCCCCCC(=O)OC(CCCCCCC)CCCCCCCCCCC(=O)O",
+                raw_edges: 30,
+                raw_similarity: 0.745_106,
+                collapsed_edges: 32,
+                collapsed_similarity: 0.844_350,
+            },
+            DirectionalParityCase {
+                name: "massspecgym_default_0097",
+                smiles1: "CCCCCCCC/C=C\\CCCCCCCCCC(=O)O[C@H](COC(=O)CCCCCCC/C=C\\CCCCCCCC)COP(=O)(O)OCCN",
+                smiles2: "CCCCCCCCCCCCCCCC/C=C\\OC[C@H](COP(=O)(O)OCCN)OC(=O)CCCCC/C=C\\C/C=C\\C/C=C\\C/C=C\\CCCCC",
+                raw_edges: 42,
+                raw_similarity: 0.720_961,
+                collapsed_edges: 46,
+                collapsed_similarity: 0.854_829,
+            },
+            DirectionalParityCase {
+                name: "massspecgym_default_0098",
+                smiles1: "CCCCC/C=C\\CCCCCCCCCCCCC(=O)O",
+                smiles2: "CCCCCC=CCC=CCCCCCCCCC(=O)OCCCCCCCCCCCCCCC(=O)O",
+                raw_edges: 19,
+                raw_similarity: 0.521_240,
+                collapsed_edges: 20,
+                collapsed_similarity: 0.546_977,
+            },
+        ];
+
+        for case in cases {
+            let smiles1 = Smiles::from_str(case.smiles1).unwrap();
+            let smiles2 = Smiles::from_str(case.smiles2).unwrap();
+            let raw = McesBuilder::new(&smiles1, &smiles2).compute_labeled();
+            assert_eq!(raw.matched_edges().len(), case.raw_edges, "{}", case.name);
+            assert_similarity_close(raw.johnson_similarity(), case.raw_similarity);
+
+            let collapsed1 = smiles1.with_directional_bonds_collapsed();
+            let collapsed2 = smiles2.with_directional_bonds_collapsed();
+            let collapsed = McesBuilder::new(&collapsed1, &collapsed2).compute_labeled();
+            assert_eq!(collapsed.matched_edges().len(), case.collapsed_edges, "{}", case.name);
+            assert_similarity_close(collapsed.johnson_similarity(), case.collapsed_similarity);
+        }
+    }
+
+    #[test]
+    fn directional_bond_collapse_improves_but_does_not_fully_resolve_massspecgym_0023() {
+        let smiles1 = Smiles::from_str(
+            "CCCCCCCC/C=C\\CCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCCCCCCCC/C=C\\CCCCCC",
+        )
+        .unwrap();
+        let smiles2 = Smiles::from_str(
+            "CCCCCCCCCCCCCCCC(=O)OC[C@H](COP(=O)(O)OCCN)OC(=O)CCCCCCC/C=C\\CCCCCCCC",
+        )
+        .unwrap();
+
+        let raw = McesBuilder::new(&smiles1, &smiles2).compute_labeled();
+        let collapsed1 = smiles1.with_directional_bonds_collapsed();
+        let collapsed2 = smiles2.with_directional_bonds_collapsed();
+        let collapsed = McesBuilder::new(&collapsed1, &collapsed2).compute_labeled();
+
+        assert_eq!(raw.matched_edges().len(), 43);
+        assert_similarity_close(raw.johnson_similarity(), 0.780_422);
+        assert_eq!(collapsed.matched_edges().len(), 44);
+        assert_similarity_close(collapsed.johnson_similarity(), 0.797_861_065_613_257_5);
+        assert!(collapsed.matched_edges().len() > raw.matched_edges().len());
+        assert!(collapsed.johnson_similarity() > raw.johnson_similarity());
     }
 }

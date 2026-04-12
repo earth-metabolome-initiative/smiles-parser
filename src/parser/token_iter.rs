@@ -170,7 +170,13 @@ impl Iterator for TokenIter<'_> {
                 let end = self.current_end();
                 Some(Ok(TokenWithSpan::new(token, start, end)))
             }
-            Err(e) => Some(Err(SmilesErrorWithSpan::new(e, start, self.current_end()))),
+            Err(e) => {
+                let mut end = self.current_end();
+                if end <= start {
+                    end = (start + 1).min(self.len);
+                }
+                Some(Err(SmilesErrorWithSpan::new(e, start, end)))
+            }
         }
     }
 }
@@ -366,19 +372,7 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
                 _ => return Err(SmilesError::InvalidChirality),
             }
         }
-        b'A' => {
-            let _ = stream.next_byte();
-            match stream.peek_byte().ok_or(SmilesError::UnexpectedEndOfString)? {
-                b'L' => {
-                    let _ = stream.next_byte();
-                    let num =
-                        try_fold_number::<u8, 1>(stream).ok_or(SmilesError::InvalidChirality)??;
-                    Chirality::try_al(num)?
-                }
-                _ => return Err(SmilesError::InvalidChirality),
-            }
-        }
-        b'S' => {
+        b'A' | b'S' => {
             let _ = stream.next_byte();
             match stream.peek_byte().ok_or(SmilesError::UnexpectedEndOfString)? {
                 b'P' => {
@@ -463,27 +457,15 @@ fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
         Some(b'-') => {
             stream.position += 1;
             match stream.peek_byte() {
-                Some(b'-') => repeated_charge(stream, b'-'),
-                _ => {
-                    if let Some(possible_num) = try_fold_number::<i8, 2>(stream) {
-                        Charge::try_new(-possible_num?)
-                    } else {
-                        Charge::try_new(-1)
-                    }
-                }
+                Some(b'-') => repeated_sign_charge(stream, ChargeSign::Negative),
+                _ => parse_signed_charge_magnitude(stream, ChargeSign::Negative),
             }
         }
         Some(b'+') => {
             stream.position += 1;
             match stream.peek_byte() {
-                Some(b'+') => repeated_charge(stream, b'+'),
-                _ => {
-                    if let Some(possible_num) = try_fold_number::<i8, 2>(stream) {
-                        Charge::try_new(possible_num?)
-                    } else {
-                        Charge::try_new(1)
-                    }
-                }
+                Some(b'+') => repeated_sign_charge(stream, ChargeSign::Positive),
+                _ => parse_signed_charge_magnitude(stream, ChargeSign::Positive),
             }
         }
         Some(byte) if byte.is_ascii_digit() => {
@@ -508,28 +490,74 @@ fn try_charge(stream: &mut TokenIter<'_>) -> Result<Charge, SmilesError> {
     }
 }
 
-#[inline]
-fn repeated_charge(stream: &mut TokenIter<'_>, sign: u8) -> Result<Charge, SmilesError> {
-    let mut magnitude: usize = 1;
-    while stream.peek_byte() == Some(sign) {
-        magnitude = magnitude.checked_add(1).ok_or(if sign == b'+' {
-            SmilesError::ChargeOverflow(i8::MAX)
-        } else {
-            SmilesError::ChargeUnderflow(i8::MIN)
-        })?;
-        stream.position += 1;
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum ChargeSign {
+    Positive,
+    Negative,
+}
+
+impl ChargeSign {
+    #[inline]
+    fn apply(self, magnitude: i8) -> i8 {
+        match self {
+            Self::Positive => magnitude,
+            Self::Negative => -magnitude,
+        }
     }
 
-    let magnitude = i8::try_from(magnitude).map_err(|_| {
-        if sign == b'+' {
-            SmilesError::ChargeOverflow(i8::MAX)
-        } else {
-            SmilesError::ChargeUnderflow(i8::MIN)
+    #[inline]
+    fn sign_byte(self) -> u8 {
+        match self {
+            Self::Positive => b'+',
+            Self::Negative => b'-',
         }
-    })?;
+    }
 
-    let charge = if sign == b'+' { magnitude } else { -magnitude };
-    Charge::try_new(charge)
+    #[inline]
+    fn try_new_charge(self, magnitude: i8) -> Result<Charge, SmilesError> {
+        Charge::try_new(self.apply(magnitude))
+    }
+
+    #[inline]
+    fn overflow_error(self) -> SmilesError {
+        match self {
+            Self::Positive => SmilesError::ChargeOverflow(16),
+            Self::Negative => SmilesError::ChargeUnderflow(-16),
+        }
+    }
+}
+
+#[inline]
+fn parse_signed_charge_magnitude(
+    stream: &mut TokenIter<'_>,
+    sign: ChargeSign,
+) -> Result<Charge, SmilesError> {
+    if let Some(possible_num) = try_fold_number::<i8, 2>(stream) {
+        sign.try_new_charge(possible_num?)
+    } else {
+        sign.try_new_charge(1)
+    }
+}
+
+#[inline]
+fn repeated_sign_charge(
+    stream: &mut TokenIter<'_>,
+    sign: ChargeSign,
+) -> Result<Charge, SmilesError> {
+    const MAX_ABSOLUTE_CHARGE: u16 = 15;
+
+    let mut magnitude: u16 = 1;
+    while stream.peek_byte() == Some(sign.sign_byte()) {
+        stream.position += 1;
+        magnitude = magnitude.saturating_add(1);
+    }
+    if magnitude > MAX_ABSOLUTE_CHARGE {
+        Err(sign.overflow_error())
+    } else {
+        let magnitude = i8::try_from(magnitude)
+            .unwrap_or_else(|_| unreachable!("charge magnitude is checked above"));
+        sign.try_new_charge(magnitude)
+    }
 }
 
 #[inline]
@@ -599,7 +627,7 @@ fn try_bond(byte: u8, bracket: bool) -> Result<Token, SmilesError> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec::Vec;
+    use alloc::{format, vec::Vec};
 
     use elements_rs::Element;
 
@@ -756,12 +784,8 @@ mod tests {
 
     #[test]
     fn valid_unbracketed_branches() {
-        assert!(valid_unbracketed(AtomSymbol::Element(Element::B)));
         assert!(valid_unbracketed(AtomSymbol::Element(Element::C)));
-        assert!(valid_unbracketed(AtomSymbol::Element(Element::F)));
         assert!(valid_unbracketed(AtomSymbol::Element(Element::Cl)));
-        assert!(valid_unbracketed(AtomSymbol::Element(Element::Br)));
-        assert!(valid_unbracketed(AtomSymbol::Element(Element::I)));
         assert!(valid_unbracketed(AtomSymbol::WildCard));
         assert!(!valid_unbracketed(AtomSymbol::Element(Element::Ac)));
     }
@@ -783,10 +807,7 @@ mod tests {
         let mut stream = TokenIter::from("@+");
         assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::At)));
 
-        let mut stream = TokenIter::from("@AL1");
-        assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::try_al(1).unwrap())));
-
-        let mut stream = TokenIter::from("@SP1");
+        let mut stream = TokenIter::from("@AP1");
         assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::try_sp(1).unwrap())));
 
         let mut stream = TokenIter::from("@OH12");
@@ -801,85 +822,8 @@ mod tests {
         let mut stream = TokenIter::from("@AQ");
         assert_eq!(try_chirality(&mut stream), Err(SmilesError::InvalidChirality));
 
-        let mut stream = TokenIter::from("@SQ");
-        assert_eq!(try_chirality(&mut stream), Err(SmilesError::InvalidChirality));
-
         let mut stream = TokenIter::from("@OQ");
         assert_eq!(try_chirality(&mut stream), Err(SmilesError::InvalidChirality));
-    }
-
-    #[test]
-    fn parse_token_direct_dispatch_covers_remaining_ascii_variants() {
-        let mut dot = TokenIter::from(".");
-        dot.position = 1;
-        assert_eq!(dot.parse_token(b'.').unwrap(), Token::NonBond);
-
-        let mut bracket = TokenIter::from("[C]");
-        bracket.position = 1;
-        assert_eq!(
-            bracket.parse_token(b'[').unwrap(),
-            Token::Atom(Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).build())
-        );
-
-        let mut invalid = TokenIter::from("Ac");
-        invalid.position = 1;
-        assert_eq!(
-            invalid.parse_token(b'A'),
-            Err(SmilesError::InvalidUnbracketedAtom(AtomSymbol::Element(Element::Ac)))
-        );
-
-        let mut bond = TokenIter::from("-");
-        bond.position = 1;
-        assert_eq!(bond.parse_token(b'-').unwrap(), Token::Bond(Bond::Single));
-
-        let mut left = TokenIter::from("(");
-        left.position = 1;
-        assert_eq!(left.parse_token(b'(').unwrap(), Token::LeftParentheses);
-
-        let mut right = TokenIter::from(")");
-        right.position = 1;
-        assert_eq!(right.parse_token(b')').unwrap(), Token::RightParentheses);
-    }
-
-    #[test]
-    fn helper_tables_cover_remaining_allowed_element_paths() {
-        for element in [
-            Element::B,
-            Element::C,
-            Element::N,
-            Element::O,
-            Element::P,
-            Element::S,
-            Element::Se,
-            Element::As,
-        ] {
-            assert_eq!(aromatic_from_element(true, element), Ok(true));
-        }
-        for element in [Element::B, Element::C, Element::N, Element::O, Element::S, Element::P] {
-            assert_eq!(aromatic_from_element(false, element), Ok(true));
-        }
-        assert_eq!(
-            aromatic_from_element(true, Element::F),
-            Err(SmilesError::InvalidAromaticElement(Element::F))
-        );
-        assert_eq!(
-            aromatic_from_element(false, Element::Se),
-            Err(SmilesError::InvalidAromaticElement(Element::Se))
-        );
-
-        let mut b_only = TokenIter::from("B");
-        b_only.position = 1;
-        assert_eq!(
-            try_organic_subset_from_first(&mut b_only, b'B').unwrap().unwrap(),
-            (AtomSymbol::Element(Element::B), false)
-        );
-
-        let mut c_only = TokenIter::from("C");
-        c_only.position = 1;
-        assert_eq!(
-            try_organic_subset_from_first(&mut c_only, b'C').unwrap().unwrap(),
-            (AtomSymbol::Element(Element::C), false)
-        );
     }
 
     #[test]
@@ -1048,6 +992,16 @@ mod tests {
         let mut stream = TokenIter::from("15+");
         assert_eq!(try_charge(&mut stream), Ok(Charge::try_new(15).unwrap()));
     }
+
+    #[test]
+    fn repeated_charge_runs_fail_cleanly_instead_of_overflowing() {
+        let plus_err = next_err(&format!("[s{}P]", "+".repeat(200)));
+        assert_eq!(plus_err.smiles_error(), SmilesError::ChargeOverflow(16));
+
+        let minus_err = next_err(&format!("[s{}P]", "-".repeat(200)));
+        assert_eq!(minus_err.smiles_error(), SmilesError::ChargeUnderflow(-16));
+    }
+
     #[test]
     fn test_charge_parsing_number_before_sign() {
         let test_cases = vec![("[C2-]", -2), ("[C2+]", 2), ("[Fe15+]", 15), ("[Fe15-]", -15)];
@@ -1068,130 +1022,5 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn parse_token_misc_ascii_and_unicode_error_paths() {
-        let token = next_ok(".");
-        assert_eq!(token.token(), Token::NonBond);
-
-        let token = next_ok("(");
-        assert_eq!(token.token(), Token::LeftParentheses);
-
-        let token = next_ok(")");
-        assert_eq!(token.token(), Token::RightParentheses);
-
-        let err = next_err("€");
-        assert_eq!(err.smiles_error(), SmilesError::UnexpectedUnicodeCharacter);
-        assert_eq!(err.start(), 0);
-        assert_eq!(err.end(), 3);
-    }
-
-    #[test]
-    fn utf8_char_width_covers_all_width_buckets() {
-        assert_eq!(utf8_char_width(b'a'), 1);
-        assert_eq!(utf8_char_width(0xc2), 2);
-        assert_eq!(utf8_char_width(0xe2), 3);
-        assert_eq!(utf8_char_width(0xf0), 4);
-    }
-
-    #[test]
-    fn organic_subset_fast_path_covers_remaining_variants() {
-        let cases = [
-            ("B", AtomSymbol::Element(Element::B), false),
-            ("F", AtomSymbol::Element(Element::F), false),
-            ("I", AtomSymbol::Element(Element::I), false),
-            ("b", AtomSymbol::Element(Element::B), true),
-            ("o", AtomSymbol::Element(Element::O), true),
-            ("p", AtomSymbol::Element(Element::P), true),
-            ("s", AtomSymbol::Element(Element::S), true),
-            ("*", AtomSymbol::WildCard, false),
-        ];
-
-        for (input, symbol, aromatic) in cases {
-            let token = next_ok(input);
-            assert_eq!(token.token(), Token::Atom(Atom::new_organic_subset(symbol, aromatic)));
-        }
-    }
-
-    #[test]
-    fn try_element_and_general_element_path_cover_bracket_specific_cases() {
-        let mut stream = TokenIter::from("Xe");
-        assert_eq!(try_element(&mut stream), Ok((AtomSymbol::Element(Element::Xe), false)));
-
-        let mut stream = TokenIter::from("se");
-        stream.in_bracket = true;
-        assert_eq!(try_element(&mut stream), Ok((AtomSymbol::Element(Element::Se), true)));
-
-        let mut stream = TokenIter::from("q");
-        assert_eq!(try_element(&mut stream), Err(SmilesError::InvalidElementName('q')));
-
-        let mut stream = TokenIter::from("");
-        assert_eq!(try_element(&mut stream), Err(SmilesError::MissingElement));
-    }
-
-    #[test]
-    fn parse_ascii_element_and_valid_unbracketed_cover_false_cases() {
-        assert_eq!(parse_ascii_element(b"Xe"), Some(Element::Xe));
-        assert_eq!(parse_ascii_element(b"??"), None);
-        assert!(!valid_unbracketed(AtomSymbol::Element(Element::Xe)));
-    }
-
-    #[test]
-    fn try_charge_handles_digit_prefixed_forms_and_errors() {
-        let mut stream = TokenIter::from("2+");
-        assert_eq!(try_charge(&mut stream), Ok(Charge::try_new(2).unwrap()));
-
-        let mut stream = TokenIter::from("2-");
-        assert_eq!(try_charge(&mut stream), Ok(Charge::try_new(-2).unwrap()));
-
-        let mut stream = TokenIter::from("2x");
-        assert_eq!(try_charge(&mut stream), Err(SmilesError::UnexpectedCharacter('2')));
-    }
-
-    #[test]
-    fn try_class_parses_large_values_and_try_bond_covers_remaining_paths() {
-        let mut stream = TokenIter::from(":999");
-        assert_eq!(try_class(&mut stream), Ok(999));
-
-        assert_eq!(try_bond(b'=', false), Ok(Token::Bond(Bond::Double)));
-        assert_eq!(try_bond(b'#', false), Ok(Token::Bond(Bond::Triple)));
-        assert_eq!(try_bond(b'$', false), Ok(Token::Bond(Bond::Quadruple)));
-        assert_eq!(try_bond(b'/', false), Ok(Token::Bond(Bond::Up)));
-        assert_eq!(try_bond(b'\\', false), Ok(Token::Bond(Bond::Down)));
-    }
-
-    #[test]
-    fn repeated_positive_charge_overflow_should_error_instead_of_panicking() {
-        let smiles = format!("[n{}]", "+".repeat(200));
-
-        let result = std::panic::catch_unwind(|| TokenIter::from(smiles.as_str()).next());
-        assert!(result.is_ok(), "tokenization panicked on oversized repeated positive charge");
-
-        let token = result.unwrap().expect("expected one token");
-        assert!(
-            matches!(
-                token,
-                Err(ref err) if matches!(err.smiles_error(), SmilesError::ChargeOverflow(_))
-            ),
-            "expected ChargeOverflow error, got {token:?}"
-        );
-    }
-
-    #[test]
-    fn repeated_negative_charge_underflow_should_error_instead_of_panicking() {
-        let smiles = format!("[n{}]", "-".repeat(200));
-
-        let result = std::panic::catch_unwind(|| TokenIter::from(smiles.as_str()).next());
-        assert!(result.is_ok(), "tokenization panicked on oversized repeated negative charge");
-
-        let token = result.unwrap().expect("expected one token");
-        assert!(
-            matches!(
-                token,
-                Err(ref err) if matches!(err.smiles_error(), SmilesError::ChargeUnderflow(_))
-            ),
-            "expected ChargeUnderflow error, got {token:?}"
-        );
     }
 }

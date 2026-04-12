@@ -81,6 +81,12 @@ impl Smiles {
     /// This is infallible for [`usize`] component markers, because a graph
     /// cannot contain more components than nodes, and node ids are already
     /// stored as `usize`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the underlying geometric-traits connected-components routine
+    /// ever reports marker overflow for `usize` component identifiers. That
+    /// would indicate a bug in the graph library or an invalid graph size.
     #[inline]
     #[must_use]
     pub fn connected_components(&self) -> SmilesComponents<'_> {

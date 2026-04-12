@@ -1,4 +1,4 @@
-//! Connected-components parity checks against documented RDKit fragment
+//! Connected-components parity checks against documented `RDKit` fragment
 //! behavior.
 
 use std::str::FromStr;
