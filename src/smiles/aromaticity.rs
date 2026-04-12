@@ -334,11 +334,23 @@ impl AromaticityAssignment {
 /// graph it produces.
 #[derive(Debug, PartialEq)]
 pub struct AromaticityPerception {
+    /// Named policy used to build this perception when one was requested
+    /// through the public preset entrypoints.
+    policy: Option<AromaticityPolicy>,
     assignment: AromaticityAssignment,
     aromaticized: Smiles,
 }
 
 impl AromaticityPerception {
+    #[inline]
+    fn new(
+        policy: Option<AromaticityPolicy>,
+        assignment: AromaticityAssignment,
+        aromaticized: Smiles,
+    ) -> Self {
+        Self { policy, assignment, aromaticized }
+    }
+
     /// Returns the aromaticity assignment.
     #[inline]
     #[must_use]
@@ -379,6 +391,27 @@ impl AromaticityPerception {
     #[must_use]
     pub fn into_aromaticized(self) -> Smiles {
         self.aromaticized
+    }
+
+    #[inline]
+    fn validate_named_policy_standalone_roundtrip(
+        &self,
+        kekulized: Smiles,
+    ) -> Result<Smiles, KekulizationError> {
+        let Some(policy) = self.policy else {
+            return Ok(kekulized);
+        };
+
+        let reperceived = kekulized
+            .perceive_aromaticity_for(policy)
+            .map_err(|_| KekulizationError::StandaloneRoundtripMismatch)?;
+        if reperceived.assignment().atom_ids() != self.assignment.atom_ids()
+            || reperceived.assignment().bond_edges() != self.assignment.bond_edges()
+        {
+            return Err(KekulizationError::StandaloneRoundtripMismatch);
+        }
+
+        Ok(kekulized)
     }
 
     /// Returns a Kekule form of the aromaticized graph while preserving the
@@ -431,8 +464,17 @@ impl AromaticityPerception {
     /// # Errors
     /// Returns a [`KekulizationError`] if no valid localized form exists for
     /// the aromaticized graph.
+    ///
+    /// When `mode` is [`KekulizationMode::Standalone`], named-policy
+    /// perceptions also reject localized forms that would re-perceive to a
+    /// different aromatic assignment.
     pub fn kekulize_with(&self, mode: KekulizationMode) -> Result<Smiles, KekulizationError> {
-        self.aromaticized.kekulize_with(mode)
+        let kekulized = self.aromaticized.kekulize_with(mode)?;
+        if mode == KekulizationMode::Standalone {
+            self.validate_named_policy_standalone_roundtrip(kekulized)
+        } else {
+            Ok(kekulized)
+        }
     }
 
     /// Returns a Kekule form of the aromaticized graph by solving from the
@@ -457,8 +499,12 @@ impl AromaticityPerception {
     /// # Errors
     /// Returns a [`KekulizationError`] if no valid localized form exists for
     /// the aromaticized graph.
+    ///
+    /// For named-policy perceptions, this also rejects standalone localized
+    /// forms that do not roundtrip back to the same aromatic assignment under
+    /// the original policy.
     pub fn kekulize_standalone(&self) -> Result<Smiles, KekulizationError> {
-        self.aromaticized.kekulize_standalone()
+        self.kekulize_with(KekulizationMode::Standalone)
     }
 }
 
@@ -507,7 +553,7 @@ impl Smiles {
     pub fn perceive_aromaticity(
         &self,
     ) -> Result<AromaticityPerception, AromaticityAssignmentApplicationError> {
-        self.perceive_aromaticity_with(&RdkitDefaultAromaticity)
+        self.perceive_aromaticity_for(AromaticityPolicy::RdkitDefault)
     }
 
     /// Returns the aromaticity perception result for the provided named policy
@@ -521,7 +567,8 @@ impl Smiles {
         &self,
         policy: AromaticityPolicy,
     ) -> Result<AromaticityPerception, AromaticityAssignmentApplicationError> {
-        self.perceive_aromaticity_with(&policy)
+        let assignment = self.aromaticity_assignment_with(&policy);
+        self.finish_perception(Some(policy), assignment)
     }
 
     /// Returns the aromaticity perception result for the provided model.
@@ -535,8 +582,17 @@ impl Smiles {
         model: &M,
     ) -> Result<AromaticityPerception, AromaticityAssignmentApplicationError> {
         let assignment = self.aromaticity_assignment_with(model);
+        self.finish_perception(None, assignment)
+    }
+
+    #[inline]
+    fn finish_perception(
+        &self,
+        policy: Option<AromaticityPolicy>,
+        assignment: AromaticityAssignment,
+    ) -> Result<AromaticityPerception, AromaticityAssignmentApplicationError> {
         let aromaticized = self.try_with_aromaticity_assignment(&assignment)?;
-        Ok(AromaticityPerception { assignment, aromaticized })
+        Ok(AromaticityPerception::new(policy, assignment, aromaticized))
     }
 
     /// Returns a new graph with the provided aromaticity assignment applied to

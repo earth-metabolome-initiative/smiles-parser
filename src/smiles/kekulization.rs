@@ -23,6 +23,12 @@ pub enum KekulizationError {
         /// Number of candidate atoms that required localization.
         candidate_atom_count: usize,
     },
+    /// Standalone localization succeeded structurally, but re-perceiving the
+    /// result under the original named policy changed the aromatic assignment.
+    #[error(
+        "standalone kekulization did not preserve the original named-policy aromatic assignment"
+    )]
+    StandaloneRoundtripMismatch,
 }
 
 /// How kekulization should treat any preserved pre-aromatic source graph.
@@ -96,6 +102,11 @@ impl Smiles {
     /// # Errors
     /// Returns [`KekulizationError::NoPerfectMatching`] if no valid localized
     /// assignment exists for the aromatic candidate graph.
+    ///
+    /// This method only performs structural localization. If the caller needs
+    /// policy-stable standalone roundtrips, use
+    /// [`AromaticityPerception::kekulize_with`](super::AromaticityPerception::kekulize_with)
+    /// or [`AromaticityPerception::kekulize_standalone`](super::AromaticityPerception::kekulize_standalone).
     pub fn kekulize_with(&self, mode: KekulizationMode) -> Result<Self, KekulizationError> {
         let aromatic_bonds = self
             .bond_matrix()
@@ -393,6 +404,12 @@ fn needs_localized_double_bond(
 #[cfg(test)]
 mod tests {
     use alloc::{string::ToString, vec::Vec};
+
+    const TEST_POLICIES: [crate::smiles::AromaticityPolicy; 3] = [
+        crate::smiles::AromaticityPolicy::RdkitDefault,
+        crate::smiles::AromaticityPolicy::RdkitSimple,
+        crate::smiles::AromaticityPolicy::RdkitMdl,
+    ];
     use std::str::FromStr;
 
     use elements_rs::Element;
@@ -736,14 +753,18 @@ mod tests {
         assert_eq!(reperceived.assignment().bond_edges(), expected_bond_edges);
     }
 
+    fn is_expected_fuzz_standalone_error(error: &KekulizationError) -> bool {
+        matches!(
+            error,
+            KekulizationError::NoPerfectMatching { candidate_atom_count: 0 }
+                | KekulizationError::StandaloneRoundtripMismatch
+        )
+    }
+
     fn assert_fuzz_roundtrip_regression_for_all_policies(input: &str) {
         let smiles = Smiles::from_str(input).expect("fuzz input should parse");
 
-        for policy in [
-            crate::smiles::AromaticityPolicy::RdkitDefault,
-            crate::smiles::AromaticityPolicy::RdkitSimple,
-            crate::smiles::AromaticityPolicy::RdkitMdl,
-        ] {
+        for policy in TEST_POLICIES {
             let Ok(perception) = smiles.perceive_aromaticity_for(policy) else {
                 continue;
             };
@@ -789,10 +810,9 @@ mod tests {
                         );
                     }
                     Err(error) => {
-                        assert_eq!(
-                            error,
-                            KekulizationError::NoPerfectMatching { candidate_atom_count: 0 },
-                            "policy={policy:?}; input={smiles}; aromaticized={}",
+                        assert!(
+                            is_expected_fuzz_standalone_error(&error),
+                            "unexpected standalone error {error:?}; policy={policy:?}; input={smiles}; aromaticized={}",
                             perception.aromaticized()
                         );
                     }
@@ -881,6 +901,13 @@ mod tests {
     fn fuzz_regression_large_mixed_wildcard_case() {
         assert_fuzz_roundtrip_regression_for_all_policies(
             "N5NNN*NNNNNNFNN*=N*N5NN5NBBBBBBBBBBBBBBBBBBBBBBSSSSSSSSSSSSNPPPPPPPPPPPPPPPPPPPPPPPPPPPPPSSSSSSSSSSSSSSSSSSSSSSSSPSSSP5NNNNNN4N*NNNNNNN5NNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNNN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNN#NNNN*5NNN*FNN*FN5#NNNN*5N*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*NNNNNNNFNN*NN*FNN2NN5*FNN2NN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*FN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5N*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNN#NNNN*5NNN*FNN*FN5#NNNN*5N*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*NNNNNNNFNN*NN*FNN2NN5*FNN2NN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*FN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNN#NNNN*5NNN*FNN*FN5#NNNN*5N*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN2NN5*NN2FNN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNN#NNNN*5NNN*FNN*FN5#NNNN4*NSPNO$OPPPPPPPPPPPSSSSPPPPPPPPPPPPPPPPBrPPPPPPPPPPPPPPNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNNN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNNN5NN5NFNNNNNNNN5NNN*NNNNNNFNN*FN*N5NN5NFNNNNNNNNNNNNNNNNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*5NNN*FNN*FNNNNNNNNNNN5NNNNN5NNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNN*NNNNNNFNN*NN*FNN2NN5*FNN2NN5FNN*FNN2N**2N5*N5FN*N5NN5NFNNNNNNNNNNNNNNNNN5NNNN5#NNNN*5NNN*FNN*FN5#NNNN*5NNN*FNN*FNNNPSSPPPPPPPPPPPPPPPPPPPP$PPPPPPSSSSSSSSSSSSSSSSSSSSSSSSPSSSP5NNNNNN4N*NNNNNNN5N=NNNNNNNN4*NSPNO$OPPPPPPPPPPPSSNN*5SSPPPPPPPNNN*FNBBBBBBBBBBBBBBBBBBBBBFNNNNNNN*FN*5NNNNNN",
+        );
+    }
+
+    #[test]
+    fn fuzz_regression_phosphorus_default_standalone_mismatch_case() {
+        assert_fuzz_roundtrip_regression_for_all_policies(
+            "*2*CPPPPO$OPPPPPPPPPPPPO$3PPPPPPPPPPPPPPPPPO$3PPPPP**31$*2PPPPP=PPPPPP2*1*=13-**12*",
         );
     }
 }
