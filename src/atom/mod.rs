@@ -2,7 +2,7 @@
 pub mod atom_symbol;
 pub mod bracketed;
 
-use alloc::{borrow::Cow, string::String};
+use alloc::string::String;
 use core::fmt;
 
 use elements_rs::{Element, Isotope};
@@ -245,35 +245,23 @@ impl Atom {
         self.chirality
     }
 
-    #[inline]
-    #[must_use]
-    pub(crate) fn rendered_string(&self) -> String {
-        let mut rendered = String::with_capacity(self.rendered_len_hint());
-        self.write_smiles(&mut rendered)
-            .unwrap_or_else(|_| unreachable!("writing to String cannot fail"));
-        rendered
-    }
-
-    #[inline]
-    #[must_use]
-    pub(crate) fn rendered_cow(&self) -> Cow<'static, str> {
-        if let Some(rendered) = self.rendered_static() {
-            Cow::Borrowed(rendered)
-        } else {
-            Cow::Owned(self.rendered_string())
-        }
-    }
-
+    #[cfg(test)]
     #[inline]
     #[must_use]
     pub(crate) fn rendered_len_hint(&self) -> usize {
+        self.rendered_len_hint_with_chirality(self.chirality)
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn rendered_len_hint_with_chirality(&self, chirality: Option<Chirality>) -> usize {
         let mut len = rendered_symbol_len(self.symbol, self.aromatic);
         if self.syntax == AtomSyntax::Bracket {
             len += 2;
             if let Some(isotope) = self.isotope_mass_number {
                 len += decimal_len_u16(isotope);
             }
-            if let Some(chirality) = self.chirality {
+            if let Some(chirality) = chirality {
                 len += chirality.display_len();
             }
             if self.hydrogens != 0 {
@@ -291,6 +279,49 @@ impl Atom {
     }
 
     pub(crate) fn write_smiles<W: fmt::Write>(&self, target: &mut W) -> fmt::Result {
+        self.write_smiles_with_chirality(target, self.chirality)
+    }
+
+    #[inline]
+    pub(crate) fn write_smiles_with_chirality_to_string(
+        &self,
+        target: &mut String,
+        chirality: Option<Chirality>,
+    ) {
+        match self.syntax {
+            AtomSyntax::OrganicSubset => write_symbol_to_string(target, self.symbol, self.aromatic),
+            AtomSyntax::Bracket => {
+                target.push('[');
+                if let Some(isotope) = self.isotope_mass_number {
+                    push_u16_decimal(target, isotope);
+                }
+                write_symbol_to_string(target, self.symbol, self.aromatic);
+                if let Some(chirality) = chirality {
+                    write_chirality_to_string(target, chirality);
+                }
+                match self.hydrogens {
+                    0 => {}
+                    1 => target.push('H'),
+                    count => {
+                        target.push('H');
+                        push_u8_decimal(target, count);
+                    }
+                }
+                write_charge_to_string(target, self.charge);
+                if self.class != 0 {
+                    target.push(':');
+                    push_u16_decimal(target, self.class);
+                }
+                target.push(']');
+            }
+        }
+    }
+
+    pub(crate) fn write_smiles_with_chirality<W: fmt::Write>(
+        &self,
+        target: &mut W,
+        chirality: Option<Chirality>,
+    ) -> fmt::Result {
         match self.syntax {
             AtomSyntax::OrganicSubset => write_symbol(target, self.symbol, self.aromatic),
             AtomSyntax::Bracket => {
@@ -299,7 +330,7 @@ impl Atom {
                     write!(target, "{isotope}")?;
                 }
                 write_symbol(target, self.symbol, self.aromatic)?;
-                if let Some(chirality) = self.chirality {
+                if let Some(chirality) = chirality {
                     write!(target, "{chirality}")?;
                 }
                 match self.hydrogens {
@@ -313,14 +344,6 @@ impl Atom {
                 }
                 target.write_str("]")
             }
-        }
-    }
-
-    #[inline]
-    fn rendered_static(&self) -> Option<&'static str> {
-        match self.syntax {
-            AtomSyntax::OrganicSubset => rendered_symbol_static(self.symbol, self.aromatic),
-            AtomSyntax::Bracket => None,
         }
     }
 }
@@ -439,12 +462,25 @@ fn write_symbol<W: fmt::Write>(target: &mut W, symbol: AtomSymbol, aromatic: boo
 }
 
 #[inline]
+fn write_symbol_to_string(target: &mut String, symbol: AtomSymbol, aromatic: bool) {
+    match rendered_symbol_static(symbol, aromatic) {
+        Some(rendered) => target.push_str(rendered),
+        None => {
+            match symbol {
+                AtomSymbol::WildCard => unreachable!("wildcards always render statically"),
+                AtomSymbol::Element(element) => target.push_str(element.symbol()),
+            }
+        }
+    }
+}
+
+#[inline]
 fn rendered_symbol_len(symbol: AtomSymbol, aromatic: bool) -> usize {
     match rendered_symbol_static(symbol, aromatic) {
         Some(rendered) => rendered.len(),
         None => {
             match symbol {
-                AtomSymbol::WildCard => 1,
+                AtomSymbol::WildCard => unreachable!("wildcards always render statically"),
                 AtomSymbol::Element(element) => element.symbol_len(),
             }
         }
@@ -484,9 +520,104 @@ const fn decimal_len_u16(value: u16) -> usize {
     }
 }
 
+#[inline]
+fn push_u8_decimal(target: &mut String, value: u8) {
+    let mut buf = [0u8; 5];
+    let len = write_decimal_u16_into(&mut buf, u16::from(value));
+    target.push_str(core::str::from_utf8(&buf[..len]).unwrap_or_else(|_| unreachable!()));
+}
+
+#[inline]
+fn push_u16_decimal(target: &mut String, value: u16) {
+    let mut buf = [0u8; 5];
+    let len = write_decimal_u16_into(&mut buf, value);
+    target.push_str(core::str::from_utf8(&buf[..len]).unwrap_or_else(|_| unreachable!()));
+}
+
+#[inline]
+fn write_decimal_u16_into(buf: &mut [u8; 5], value: u16) -> usize {
+    if value >= 10_000 {
+        buf[0] = ascii_digit_u16(value / 10_000);
+        buf[1] = ascii_digit_u16((value / 1_000) % 10);
+        buf[2] = ascii_digit_u16((value / 100) % 10);
+        buf[3] = ascii_digit_u16((value / 10) % 10);
+        buf[4] = ascii_digit_u16(value % 10);
+        5
+    } else if value >= 1_000 {
+        buf[0] = ascii_digit_u16(value / 1_000);
+        buf[1] = ascii_digit_u16((value / 100) % 10);
+        buf[2] = ascii_digit_u16((value / 10) % 10);
+        buf[3] = ascii_digit_u16(value % 10);
+        4
+    } else if value >= 100 {
+        buf[0] = ascii_digit_u16(value / 100);
+        buf[1] = ascii_digit_u16((value / 10) % 10);
+        buf[2] = ascii_digit_u16(value % 10);
+        3
+    } else if value >= 10 {
+        buf[0] = ascii_digit_u16(value / 10);
+        buf[1] = ascii_digit_u16(value % 10);
+        2
+    } else {
+        buf[0] = ascii_digit_u16(value);
+        1
+    }
+}
+
+#[inline]
+fn ascii_digit_u16(value: u16) -> u8 {
+    b'0' + u8::try_from(value).unwrap_or_else(|_| unreachable!())
+}
+
+#[inline]
+fn write_charge_to_string(target: &mut String, charge: Charge) {
+    match charge.get() {
+        0 => {}
+        1 => target.push('+'),
+        n @ 2..=15 => {
+            target.push('+');
+            push_u8_decimal(target, n.cast_unsigned());
+        }
+        -1 => target.push('-'),
+        n @ -15..=-2 => {
+            target.push('-');
+            push_u8_decimal(target, n.unsigned_abs());
+        }
+        _ => unreachable!("state not reachable, charges can only be between -15 & 15"),
+    }
+}
+
+#[inline]
+fn write_chirality_to_string(target: &mut String, chirality: Chirality) {
+    match chirality {
+        Chirality::At => target.push('@'),
+        Chirality::AtAt => target.push_str("@@"),
+        Chirality::TH(n) => {
+            target.push_str("@TH");
+            push_u8_decimal(target, n);
+        }
+        Chirality::AL(n) => {
+            target.push_str("@AL");
+            push_u8_decimal(target, n);
+        }
+        Chirality::SP(n) => {
+            target.push_str("@SP");
+            push_u8_decimal(target, n);
+        }
+        Chirality::TB(n) => {
+            target.push_str("@TB");
+            push_u8_decimal(target, n);
+        }
+        Chirality::OH(n) => {
+            target.push_str("@OH");
+            push_u8_decimal(target, n);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use alloc::string::ToString;
+    use alloc::string::{String, ToString};
 
     use elements_rs::Element;
     use geometric_traits::traits::TypedNode;
@@ -619,6 +750,22 @@ mod tests {
     }
 
     #[test]
+    fn mces_atom_type_accessors_return_stored_fields() {
+        let atom = Atom::builder()
+            .with_symbol(AtomSymbol::Element(Element::N))
+            .with_aromatic(true)
+            .with_isotope(15)
+            .with_charge(Charge::try_new(-2).unwrap())
+            .build();
+        let node_type = atom.node_type();
+
+        assert_eq!(node_type.symbol(), AtomSymbol::Element(Element::N));
+        assert!(node_type.aromatic());
+        assert_eq!(node_type.isotope_mass_number(), Some(15));
+        assert_eq!(node_type.formal_charge(), -2);
+    }
+
+    #[test]
     fn test_atom_fmt_all_arms() {
         let cases = [
             (Atom::new_organic_subset(AtomSymbol::Element(Element::C), false), "C"),
@@ -674,5 +821,150 @@ mod tests {
         for (atom, expected) in cases {
             assert_eq!(atom.to_string(), expected);
         }
+    }
+
+    #[test]
+    fn rendered_len_hint_matches_rendered_output_for_complex_bracket_atom() {
+        let atom = Atom::builder()
+            .with_symbol(AtomSymbol::Element(Element::Ac))
+            .with_isotope(227)
+            .with_chirality(Chirality::AtAt)
+            .with_hydrogens(12)
+            .with_charge(Charge::try_new(-1).unwrap())
+            .with_class(321)
+            .build();
+
+        let rendered = atom.to_string();
+        assert_eq!(atom.rendered_len_hint(), rendered.len());
+    }
+
+    #[test]
+    fn rendered_len_hint_matches_symbol_paths_for_static_and_dynamic_symbols() {
+        let aromatic_se = Atom::builder()
+            .with_symbol(AtomSymbol::Element(Element::Se))
+            .with_aromatic(true)
+            .build();
+        let heavy_element = Atom::builder().with_symbol(ac_symbol()).build();
+
+        assert_eq!(aromatic_se.rendered_len_hint(), aromatic_se.to_string().len());
+        assert_eq!(heavy_element.rendered_len_hint(), heavy_element.to_string().len());
+    }
+
+    #[test]
+    fn rendered_len_hint_covers_large_counts_and_fallback_symbols() {
+        let aromatic_f = Atom::builder()
+            .with_symbol(AtomSymbol::Element(Element::F))
+            .with_aromatic(true)
+            .build();
+        let mut aromatic_f_rendered = String::new();
+        aromatic_f.write_smiles(&mut aromatic_f_rendered).unwrap();
+        assert_eq!(aromatic_f_rendered, "[F]");
+        assert_eq!(aromatic_f.rendered_len_hint(), aromatic_f_rendered.len());
+
+        let many_h = Atom::builder()
+            .with_symbol(AtomSymbol::Element(Element::C))
+            .with_hydrogens(100)
+            .build();
+        assert_eq!(many_h.rendered_len_hint(), many_h.to_string().len());
+
+        let class_1000 =
+            Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).with_class(1000).build();
+        assert_eq!(class_1000.rendered_len_hint(), class_1000.to_string().len());
+
+        let class_10000 =
+            Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).with_class(10_000).build();
+        assert_eq!(class_10000.rendered_len_hint(), class_10000.to_string().len());
+    }
+
+    #[test]
+    fn write_smiles_covers_bracket_zero_and_multi_hydrogen_arms() {
+        let zero_h = Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).build();
+        let mut rendered = String::new();
+        zero_h.write_smiles(&mut rendered).unwrap();
+        assert_eq!(rendered, "[C]");
+
+        let two_h =
+            Atom::builder().with_symbol(AtomSymbol::Element(Element::N)).with_hydrogens(2).build();
+        let mut rendered = String::new();
+        two_h.write_smiles(&mut rendered).unwrap();
+        assert_eq!(rendered, "[NH2]");
+    }
+
+    #[test]
+    fn write_smiles_with_chirality_helpers_cover_override_and_string_fast_path() {
+        let bracket = Atom::builder()
+            .with_symbol(AtomSymbol::Element(Element::C))
+            .with_isotope(1234)
+            .with_hydrogens(12)
+            .with_charge(Charge::try_new(-12).unwrap())
+            .with_class(1234)
+            .build();
+        let mut rendered = String::new();
+        bracket.write_smiles_with_chirality_to_string(&mut rendered, Some(Chirality::TB(12)));
+        assert_eq!(rendered, "[1234C@TB12H12-12:1234]");
+
+        rendered.clear();
+        bracket.write_smiles_with_chirality(&mut rendered, Some(Chirality::OH(30))).unwrap();
+        assert_eq!(rendered, "[1234C@OH30H12-12:1234]");
+
+        let organic = Atom::new_organic_subset(AtomSymbol::Element(Element::C), false);
+        rendered.clear();
+        organic.write_smiles_with_chirality_to_string(&mut rendered, Some(Chirality::AtAt));
+        assert_eq!(rendered, "C");
+    }
+
+    #[test]
+    fn symbol_and_decimal_helpers_cover_dynamic_paths() {
+        let mut rendered = String::new();
+        write_symbol_to_string(&mut rendered, AtomSymbol::Element(Element::F), true);
+        assert_eq!(rendered, "F");
+
+        assert_eq!(rendered_symbol_len(AtomSymbol::Element(Element::F), true), 1);
+        assert_eq!(decimal_len_u8(7), 1);
+        assert_eq!(decimal_len_u8(42), 2);
+        assert_eq!(decimal_len_u8(100), 3);
+        assert_eq!(decimal_len_u16(9), 1);
+        assert_eq!(decimal_len_u16(999), 3);
+        assert_eq!(decimal_len_u16(1234), 4);
+        assert_eq!(decimal_len_u16(10_000), 5);
+
+        let mut buf = [0u8; 5];
+        assert_eq!(write_decimal_u16_into(&mut buf, 10_000), 5);
+        assert_eq!(&buf, b"10000");
+        assert_eq!(ascii_digit_u16(9), b'9');
+    }
+
+    #[test]
+    fn charge_and_chirality_string_helpers_cover_negative_and_extended_variants() {
+        let mut rendered = String::new();
+        write_charge_to_string(&mut rendered, Charge::try_new(0).unwrap());
+        assert_eq!(rendered, "");
+
+        write_charge_to_string(&mut rendered, Charge::try_new(1).unwrap());
+        assert_eq!(rendered, "+");
+
+        rendered.clear();
+        write_charge_to_string(&mut rendered, Charge::try_new(-12).unwrap());
+        assert_eq!(rendered, "-12");
+
+        rendered.clear();
+        for chirality in [
+            Chirality::TH(2),
+            Chirality::AL(2),
+            Chirality::SP(3),
+            Chirality::TB(12),
+            Chirality::OH(30),
+        ] {
+            write_chirality_to_string(&mut rendered, chirality);
+        }
+        assert_eq!(rendered, "@TH2@AL2@SP3@TB12@OH30");
+    }
+
+    #[test]
+    fn rendered_symbol_len_matches_static_and_dynamic_symbol_paths() {
+        assert_eq!(rendered_symbol_len(AtomSymbol::WildCard, false), 1);
+        assert_eq!(rendered_symbol_len(AtomSymbol::Element(Element::Cl), false), 2);
+        assert_eq!(rendered_symbol_len(AtomSymbol::Element(Element::Se), true), 2);
+        assert_eq!(rendered_symbol_len(AtomSymbol::Element(Element::F), true), 1);
     }
 }

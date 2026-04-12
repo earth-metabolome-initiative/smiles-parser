@@ -14,14 +14,13 @@ pub mod errors;
 pub(crate) mod parser;
 pub mod smiles;
 pub mod token;
-pub(crate) mod traversal;
 
 pub use crate::{
     errors::{SmilesError, SmilesErrorWithSpan},
-    smiles::Smiles,
+    smiles::{Smiles, SmilesComponents},
 };
 
 /// Common imports for working with this crate.
 pub mod prelude {
-    pub use crate::{Smiles, SmilesError, SmilesErrorWithSpan};
+    pub use crate::{Smiles, SmilesComponents, SmilesError, SmilesErrorWithSpan};
 }

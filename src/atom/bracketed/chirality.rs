@@ -105,7 +105,7 @@ const fn decimal_len_u8(value: u8) -> usize {
 mod tests {
     use alloc::string::ToString;
 
-    use super::Chirality;
+    use super::{Chirality, decimal_len_u8};
     use crate::errors::SmilesError;
 
     #[test]
@@ -218,5 +218,20 @@ mod tests {
         for (chiral, expected) in chirals.into_iter().zip(expected) {
             assert_eq!(expected, chiral.to_string());
         }
+    }
+
+    #[test]
+    fn display_len_covers_all_number_width_paths() {
+        assert_eq!(Chirality::At.display_len(), 1);
+        assert_eq!(Chirality::AtAt.display_len(), 2);
+        assert_eq!(Chirality::TH(2).display_len(), 4);
+        assert_eq!(Chirality::AL(2).display_len(), 4);
+        assert_eq!(Chirality::SP(3).display_len(), 4);
+        assert_eq!(Chirality::TB(20).display_len(), 5);
+        assert_eq!(Chirality::OH(30).display_len(), 5);
+
+        assert_eq!(decimal_len_u8(1), 1);
+        assert_eq!(decimal_len_u8(10), 2);
+        assert_eq!(decimal_len_u8(100), 3);
     }
 }

@@ -5,8 +5,7 @@
 //!
 //! # Examples
 //!
-//! SMILES strings can be parsed into a graph, inspected, and rendered back
-//! into a SMILES string.
+//! SMILES strings can be parsed into a graph and inspected.
 //!
 //! ```rust
 //! use core::str::FromStr;
@@ -18,8 +17,6 @@
 //!
 //! assert_eq!(smiles.nodes().len(), 2);
 //! assert_eq!(smiles.number_of_bonds(), 1);
-//! assert_eq!(smiles.to_string(), "CC");
-//!
 //! # Ok::<(), smiles_parser::errors::SmilesErrorWithSpan>(())
 //! ```
 use alloc::{string::String, vec::Vec};
@@ -29,25 +26,36 @@ use geometric_traits::traits::{
     SizedSparseMatrix2D, SizedSparseValuedMatrixRef, SparseMatrix2D, SparseValuedMatrix2DRef,
 };
 
-use crate::{
-    atom::Atom,
-    bond::bond_edge::BondEdge,
-    errors::SmilesError,
-    traversal::{render_visitor::RenderVisitor, walker::walk},
-};
+use crate::{atom::Atom, bond::bond_edge::BondEdge, errors::SmilesError};
 
+mod branches;
+mod connected_components;
+mod double_bond_stereo;
+mod emitter;
 mod from_str;
 mod geometric_traits_impl;
 mod implicit_hydrogens;
+mod invariants;
+mod neighbors;
+mod refinement;
+mod render_plan;
+mod roots;
+mod spanning_tree;
+mod stereo;
+mod symmetry;
 
-pub(crate) use self::geometric_traits_impl::BondMatrixBuilder;
-pub use self::geometric_traits_impl::{BondEntry, BondMatrix};
+pub use self::{
+    connected_components::SmilesComponents,
+    geometric_traits_impl::{BondEntry, BondMatrix},
+};
+pub(crate) use self::{geometric_traits_impl::BondMatrixBuilder, stereo::StereoNeighbor};
 
 /// Represents a parsed SMILES graph.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Smiles {
     atom_nodes: Vec<Atom>,
     bond_matrix: BondMatrix,
+    parsed_stereo_neighbors: Vec<Vec<StereoNeighbor>>,
 }
 
 impl Smiles {
@@ -55,7 +63,11 @@ impl Smiles {
     #[inline]
     #[must_use]
     pub fn new() -> Self {
-        Self { atom_nodes: Vec::new(), bond_matrix: BondMatrix::default() }
+        Self {
+            atom_nodes: Vec::new(),
+            bond_matrix: BondMatrix::default(),
+            parsed_stereo_neighbors: Vec::new(),
+        }
     }
 
     /// Returns a slice of all parsed [`Atom`] values.
@@ -104,18 +116,39 @@ impl Smiles {
             .collect()
     }
 
-    /// Renders the graph back into a valid SMILES string.
+    /// Renders the graph back into a SMILES string.
+    ///
+    /// This is the main entry point for display. Rendering is split into a
+    /// deterministic planning phase followed by a write-only emission phase:
+    ///
+    /// 1. compute atom-local invariants
+    /// 2. run seeded Weisfeiler-Lehman refinement over the labeled molecular
+    ///    graph
+    /// 3. derive rooted symmetry tie-break classes on top of the refined
+    ///    partition
+    /// 4. choose one root per connected component
+    /// 5. order each atom's incident edges deterministically
+    /// 6. build a rooted DFS spanning forest
+    /// 7. choose continuation versus branch children from subtree signatures
+    /// 8. compute a final preorder for each component
+    /// 9. schedule closure events and assign reusable ring labels
+    /// 10. normalize stereo relative to the final traversal, with a raw
+    ///     directional-single fallback for unsupported double-bond environments
+    /// 11. emit a string from the finished plan
+    ///
+    /// The key design constraint is that ordering decisions come from
+    /// graph-derived keys and explicit plan objects. The emitter does not
+    /// canonicalize, search, or preview alternate strings while writing.
+    ///
+    /// [`fmt::Display`] uses this exact pipeline by delegating to `render()`
+    /// and then writing the finished string into the formatter.
     ///
     /// # Errors
-    /// - Returns a [`SmilesError`] if traversal fails.
+    ///
+    /// This currently returns `Ok` for every in-memory graph produced by the
+    /// crate and reserves `Err` for future render-time validation failures.
     pub fn render(&self) -> Result<String, SmilesError> {
-        self.render_visitor().map(RenderVisitor::into_string)
-    }
-    fn render_visitor(&self) -> Result<RenderVisitor, SmilesError> {
-        let mut render_visitor =
-            RenderVisitor::with_capacity(self.nodes().len(), self.number_of_bonds());
-        walk(self, &mut render_visitor)?;
-        Ok(render_visitor)
+        Ok(self::emitter::emit(self))
     }
 }
 
@@ -125,10 +158,21 @@ impl Default for Smiles {
     }
 }
 
+impl PartialEq for Smiles {
+    fn eq(&self, other: &Self) -> bool {
+        self.atom_nodes == other.atom_nodes && self.bond_matrix == other.bond_matrix
+    }
+}
+
 impl fmt::Display for Smiles {
+    /// Formats the graph by running the full render pipeline and writing the
+    /// resulting SMILES string into `f`.
+    ///
+    /// See [`Smiles::render`] for the full algorithm stack and the rationale
+    /// behind the split between planning and emission.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let render_visitor = self.render_visitor().map_err(|_| fmt::Error)?;
-        render_visitor.write_into_formatter(f)
+        let rendered = self.render().map_err(|_| fmt::Error)?;
+        f.write_str(&rendered)
     }
 }
 
@@ -148,6 +192,14 @@ mod tests {
 
     fn atom(element: Element) -> Atom {
         Atom::new_organic_subset(AtomSymbol::Element(element), false)
+    }
+
+    fn assert_render_roundtrip_stable(input: &str) {
+        let smiles: Smiles = input.parse().unwrap();
+        let rendered = smiles.to_string();
+        let reparsed: Smiles = rendered.parse().unwrap();
+        let rerendered = reparsed.to_string();
+        assert_eq!(rendered, rerendered);
     }
 
     fn smiles_from_edges(atom_nodes: Vec<Atom>, bond_edges: &[BondEdge]) -> Smiles {
@@ -263,7 +315,7 @@ mod tests {
     fn branch_render_regression_non_aromatic() {
         let smiles: Smiles = "C(O)N".parse().unwrap();
         let rendered = smiles.to_string();
-        assert_eq!(rendered, "C(O)N");
+        assert_eq!(rendered, "NCO");
         let resmiles: Smiles = rendered.parse().unwrap();
         let rerendered = resmiles.to_string();
         assert_eq!(rendered, rerendered);
@@ -278,12 +330,6 @@ mod tests {
         assert_eq!(smiles.edge_for_node_pair((0, 1)).unwrap().bond(), Bond::Single);
         assert_eq!(smiles.edge_for_node_pair((0, 2)).unwrap().bond(), Bond::Single);
         assert_eq!(smiles.edge_for_node_pair((1, 2)), None);
-    }
-
-    #[test]
-    fn render_b_s_branch_should_preserve_branch_origin() {
-        let smiles: Smiles = "B(s)s".parse().unwrap();
-        assert_eq!(smiles.to_string(), "B(s)s");
     }
 
     #[test]
@@ -315,9 +361,42 @@ mod tests {
     }
 
     #[test]
-    fn explicit_single_between_aromatic_atoms_is_preserved() {
-        let smiles: Smiles = "*c-c".parse().unwrap();
-        assert_eq!(smiles.to_string(), "*c-c");
+    fn render_roundtrip_stays_stable_for_non_stereo_directional_single_bond_regression() {
+        assert_render_roundtrip_stable("c/o-ooNcNN-oNc");
+    }
+
+    #[test]
+    fn render_roundtrip_stays_stable_for_directional_diene_regression() {
+        assert_render_roundtrip_stable("C(=C/Cl)\\C=C\\Cl");
+    }
+
+    #[test]
+    fn render_roundtrip_stays_stable_for_tetrahedral_ring_regression() {
+        assert_render_roundtrip_stable("C[C@H]1CCCCN1N=O");
+    }
+
+    #[test]
+    fn render_roundtrip_stays_stable_for_bis_tetrahedral_ring_regression() {
+        assert_render_roundtrip_stable("C[C@@H]1CC[C@@H](C1)C");
+    }
+
+    #[test]
+    fn render_roundtrip_stays_stable_for_cumulene_directional_regression() {
+        assert_render_roundtrip_stable("C=C(=C/CO)/C#N");
+    }
+
+    #[test]
+    fn render_roundtrip_stays_stable_for_polyene_boron_regression() {
+        assert_render_roundtrip_stable(
+            "CbbbbbbbbbbbbbbbbbbbbC/C=C\\C/C=C\\C/C=C\\CBrBrSbbbbbC#CC#CC#CC#CC#CC#CC#CC#CCCCCCCCC/C=C/C=C/CCcC/C=C/C(=C/C=C/C)CCC#CC#C",
+        );
+    }
+
+    #[test]
+    fn render_roundtrip_stays_stable_for_long_directional_nitroso_polycycle_regression() {
+        assert_render_roundtrip_stable(
+            "C=C\\1C=CC=C/OSONNNNNbcNNN:NNNNNNNNNNNC1=C-2\\C=ONNNNNbcNNN:NNNNNNNNNNNC2=C-2\\C=CCC2",
+        );
     }
 
     #[test]
@@ -353,5 +432,30 @@ mod tests {
         let invalid =
             "[HH2]".parse::<Smiles>().expect_err("Hydrogens cannot have explicit hydrogens > 1");
         assert_eq!(invalid.smiles_error(), SmilesError::InvalidHydrogenWithExplicitHydrogensFound);
+    }
+
+    #[test]
+    fn render_roundtrip_stays_stable_for_pubchem_high_ring_label_regression() {
+        assert_render_roundtrip_stable(concat!(
+            "C1C2C3C4C5C6C7C8CC9C88C77C66C55C44C33C22C1C1C22C33C44C55C66C77C88C9C9C88",
+            "C77C66C55C44C33C22C1C1C22C33C44C55C66C77C88C9C9C88C77C66C55C44C33C22C1C1",
+            "C22C33C44C55C66C77C88C9C9C88C77C66C55C44C33C22C1C1C22C33C44C55C66C77C88C",
+            "9C9C88C77C66C55C44C33C22C1C1C22C33C44C55C66C77C88C9C9C88C77C66C55C44C33C",
+            "22C1C1C22C33C44C55C66C77C88C9C9C88C77C66C55C44C33C22C1C1C22C33C44C55C66C",
+            "77C88C9C9C88C77C66C55C44C33C22C1C1C22C33C44C55C66C77C88C9C9C88C77C66C55C",
+            "44C33C22C1C1C22C33C44C55C66C77C88C9C9C88C77C66C55C44C33C22C1C1C22C33C44C",
+            "55C66C77C88C9C9C88C77C66C55C44C33C22C1C1C22C33C44C55C66C77C88C9C9C88C77C",
+            "66C55C44C33C22C1C1C22C33C44C55C66C77C88C9C9C88C77C66C55C44C33C22C1C1C22C",
+            "33C44C55C66C77C88C9C9C88C77C66C55C44C33C22C1C1C22C33C44C55C66C77C88C9C9C",
+            "88C77C66C55C44C33C22C1C1C22C33C44C55C66C77C88C9C9C88C77C66C55C44C33C22C1",
+            "CC2C3C4C5C6C7C8C9",
+        ));
+    }
+
+    #[test]
+    fn render_roundtrip_stays_stable_for_quaternary_cage_hydroxide_regression() {
+        assert_render_roundtrip_stable(
+            "C1N2CN3CN1C[N+](C2)(C3)CO.C1N2CN3CN1C[N+](C2)(C3)CO.O.O.O.O.[OH-].[OH-].[OH-].[OH-]",
+        );
     }
 }

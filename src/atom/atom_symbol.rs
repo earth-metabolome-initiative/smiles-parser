@@ -118,8 +118,25 @@ mod tests {
     }
 
     #[test]
-    fn atom_symbols_have_a_stable_total_order() {
-        assert!(AtomSymbol::WildCard < AtomSymbol::Element(Element::C));
-        assert!(AtomSymbol::Element(Element::C) < AtomSymbol::Element(Element::O));
+    fn wildcard_accessors_return_none() {
+        let wildcard = AtomSymbol::WildCard;
+        assert_eq!(wildcard.element(), None);
+        assert_eq!(wildcard.into_element(), None);
+    }
+
+    #[test]
+    fn atom_symbol_order_places_wildcard_before_elements_and_sorts_by_symbol() {
+        let wildcard = AtomSymbol::WildCard;
+        let carbon = AtomSymbol::Element(Element::C);
+        let oxygen = AtomSymbol::Element(Element::O);
+
+        assert!(wildcard < carbon);
+        assert_eq!(wildcard.partial_cmp(&oxygen), Some(core::cmp::Ordering::Less));
+        assert_eq!(oxygen.cmp(&carbon), core::cmp::Ordering::Greater);
+        assert_eq!(carbon.cmp(&carbon), core::cmp::Ordering::Equal);
+
+        let mut symbols = [oxygen, wildcard, carbon];
+        symbols.sort_unstable();
+        assert_eq!(symbols, [wildcard, carbon, oxygen]);
     }
 }

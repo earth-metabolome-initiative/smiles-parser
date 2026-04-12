@@ -53,15 +53,6 @@ impl Bond {
             _ => self.smiles_symbol(),
         }
     }
-
-    #[inline]
-    #[must_use]
-    pub(crate) const fn ring_closure_symbol(self) -> &'static str {
-        match self {
-            Self::Single | Self::Aromatic => "",
-            _ => self.smiles_symbol(),
-        }
-    }
 }
 
 #[cfg(test)]
