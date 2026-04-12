@@ -1,4 +1,4 @@
-//! Aromaticity policy and assignment utilities for [`Smiles`](super::Smiles).
+//! Aromaticity policy and assignment utilities for [`Smiles`].
 
 use alloc::vec::Vec;
 
@@ -10,11 +10,11 @@ use crate::{atom::Atom, bond::Bond};
 
 mod rdkit_default;
 
-/// Aromaticity-model interface for [`Smiles`](super::Smiles).
+/// Aromaticity-model interface for [`Smiles`].
 ///
 /// Implementations take a parsed graph and produce a canonicalized aromaticity
 /// assignment. The assignment can then be inspected directly or applied back to
-/// a transformed [`Smiles`](super::Smiles) graph.
+/// a transformed [`Smiles`] graph.
 pub trait AromaticityModel {
     /// Perceives aromatic atoms and bonds for the provided graph.
     fn assignment(&self, smiles: &Smiles) -> AromaticityAssignment;
@@ -108,7 +108,7 @@ pub enum AromaticityDiagnostic {
 }
 
 /// Error raised while applying an aromaticity assignment back onto a
-/// [`Smiles`](super::Smiles) graph.
+/// [`Smiles`] graph.
 ///
 /// Applying an assignment is only lossless when the source graph does not
 /// require clearing pre-existing aromatic labels. Once a graph already contains
@@ -178,7 +178,7 @@ pub enum AromaticityAssignmentApplicationError {
 }
 
 /// Canonicalized aromatic atom and bond assignment for a
-/// [`Smiles`](super::Smiles) graph.
+/// [`Smiles`] graph.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AromaticityAssignment {
     status: AromaticityStatus,
