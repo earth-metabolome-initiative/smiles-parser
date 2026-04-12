@@ -2,7 +2,7 @@
 //! aromatic corpora.
 
 use std::{
-    env, fs,
+    env,
     fs::File,
     io::{self, BufRead, BufReader, BufWriter, Write},
     path::{Path, PathBuf},
@@ -19,7 +19,7 @@ use smiles_parser::{
 };
 
 const PUBCHEM_AROMATIC_CASES_PATH: &str =
-    "tests/fixtures/aromaticity/corpus/pubchem_aromaticity_cases.json";
+    "tests/fixtures/aromaticity/corpus/pubchem_aromaticity_cases.json.gz";
 const DEFAULT_CORPUS_PATH: &str =
     "target/pubchem_aromaticity/default/pubchem_aromaticity_default.jsonl.gz";
 const MDL_CORPUS_PATH: &str = "target/pubchem_aromaticity/mdl/pubchem_aromaticity_mdl.jsonl.gz";
@@ -52,9 +52,9 @@ struct PubChemAromaticRecord {
 #[test]
 fn kekulization_roundtrips_pubchem_aromatic_cases_under_default_perception() {
     let corpus_path = Path::new(PUBCHEM_AROMATIC_CASES_PATH);
-    let corpus = serde_json::from_str::<AromaticCorpus>(
-        &fs::read_to_string(corpus_path).expect("pubchem aromatic corpus should be readable"),
-    )
+    let corpus = serde_json::from_reader::<_, AromaticCorpus>(GzDecoder::new(
+        File::open(corpus_path).expect("pubchem aromatic corpus should be readable"),
+    ))
     .expect("pubchem aromatic corpus should parse");
 
     let mut failures = Vec::new();

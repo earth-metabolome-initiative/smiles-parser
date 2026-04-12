@@ -4,8 +4,8 @@
 //! This bench uses two corpora:
 //! - `tests/fixtures/benchmark_smiles_corpus.txt` for the legacy parse/display
 //!   and implicit-hydrogen groups
-//! - `tests/fixtures/aromaticity/corpus/pubchem_benchmark_cases.json` for the
-//!   PubChem parse/ring/SSSR/aromaticity groups
+//! - `tests/fixtures/aromaticity/corpus/pubchem_benchmark_cases.json.gz` for
+//!   the PubChem parse/ring/SSSR/aromaticity groups
 //!
 //! The benchmarked operations are kept separate:
 //! - parse-only: `Smiles::from_str(...)`
@@ -14,17 +14,18 @@
 //!   molecules
 //!
 //! The aromaticity-oriented groups use the frozen PubChem benchmark corpus in
-//! `tests/fixtures/aromaticity/corpus/pubchem_benchmark_cases.json`.
+//! `tests/fixtures/aromaticity/corpus/pubchem_benchmark_cases.json.gz`.
 
 use std::{hint::black_box, str::FromStr};
 
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
+use flate2::read::GzDecoder;
 use serde::Deserialize;
 use smiles_parser::smiles::Smiles;
 
 const CORPUS: &str = include_str!("../tests/fixtures/benchmark_smiles_corpus.txt");
-const PUBCHEM_CORPUS: &str =
-    include_str!("../tests/fixtures/aromaticity/corpus/pubchem_benchmark_cases.json");
+const PUBCHEM_CORPUS: &[u8] =
+    include_bytes!("../tests/fixtures/aromaticity/corpus/pubchem_benchmark_cases.json.gz");
 
 #[derive(Debug, Deserialize)]
 struct PubChemCorpus {
@@ -41,7 +42,7 @@ fn corpus_smiles() -> Vec<&'static str> {
 }
 
 fn pubchem_smiles() -> Vec<String> {
-    serde_json::from_str::<PubChemCorpus>(PUBCHEM_CORPUS)
+    serde_json::from_reader::<_, PubChemCorpus>(GzDecoder::new(PUBCHEM_CORPUS))
         .expect("PubChem benchmark corpus should deserialize")
         .cases
         .into_iter()
