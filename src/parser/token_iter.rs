@@ -372,7 +372,19 @@ fn try_chirality(stream: &mut TokenIter<'_>) -> Result<Option<Chirality>, Smiles
                 _ => return Err(SmilesError::InvalidChirality),
             }
         }
-        b'A' | b'S' => {
+        b'A' => {
+            let _ = stream.next_byte();
+            match stream.peek_byte().ok_or(SmilesError::UnexpectedEndOfString)? {
+                b'L' => {
+                    let _ = stream.next_byte();
+                    let num =
+                        try_fold_number::<u8, 1>(stream).ok_or(SmilesError::InvalidChirality)??;
+                    Chirality::try_al(num)?
+                }
+                _ => return Err(SmilesError::InvalidChirality),
+            }
+        }
+        b'S' => {
             let _ = stream.next_byte();
             match stream.peek_byte().ok_or(SmilesError::UnexpectedEndOfString)? {
                 b'P' => {
@@ -807,7 +819,10 @@ mod tests {
         let mut stream = TokenIter::from("@+");
         assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::At)));
 
-        let mut stream = TokenIter::from("@AP1");
+        let mut stream = TokenIter::from("@AL1");
+        assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::try_al(1).unwrap())));
+
+        let mut stream = TokenIter::from("@SP1");
         assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::try_sp(1).unwrap())));
 
         let mut stream = TokenIter::from("@OH12");
@@ -820,6 +835,9 @@ mod tests {
         assert_eq!(try_chirality(&mut stream), Err(SmilesError::InvalidChirality));
 
         let mut stream = TokenIter::from("@AQ");
+        assert_eq!(try_chirality(&mut stream), Err(SmilesError::InvalidChirality));
+
+        let mut stream = TokenIter::from("@AP1");
         assert_eq!(try_chirality(&mut stream), Err(SmilesError::InvalidChirality));
 
         let mut stream = TokenIter::from("@OQ");
@@ -939,6 +957,12 @@ mod tests {
     }
 
     #[test]
+    fn try_chirality_al_form_should_parse() {
+        let mut stream = TokenIter::from("@AL2");
+        assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::try_al(2).unwrap())));
+    }
+
+    #[test]
     fn try_chirality_tb_form_should_parse() {
         let mut stream = TokenIter::from("@TB10");
         assert_eq!(try_chirality(&mut stream), Ok(Some(Chirality::try_tb(10).unwrap())));
@@ -946,6 +970,12 @@ mod tests {
     #[test]
     fn token_iter_parses_bracket_atom_with_th_chirality() {
         let token = next_ok("[C@TH1]");
+        assert!(matches!(token.token(), Token::Atom(atom) if atom.is_bracket_atom()));
+    }
+
+    #[test]
+    fn token_iter_parses_bracket_atom_with_al_chirality() {
+        let token = next_ok("[C@AL1](F)=C=C");
         assert!(matches!(token.token(), Token::Atom(atom) if atom.is_bracket_atom()));
     }
     #[test]

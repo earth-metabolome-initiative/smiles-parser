@@ -45,7 +45,7 @@ pub(crate) fn parse_smiles(input: &str) -> Result<Smiles, SmilesErrorWithSpan> {
                 parser_state.validate_branch_open(start, end, next_kind)?;
             }
             Token::NonBond => {
-                parser_state.validate_all_closed()?;
+                parser_state.validate_component_boundary()?;
                 ParserState::validate_non_bond(previous, next_kind, start, end)?;
             }
             Token::RingClosure(ring_num) => {
@@ -310,6 +310,27 @@ impl ParserState {
         Ok(())
     }
 
+    /// Validates a component boundary introduced by `.`.
+    ///
+    /// Unlike [`Self::validate_all_closed`], this allows open ring labels to
+    /// remain pending so disconnected ring-closure notation such as
+    /// `C1.C1`-style forms can be resolved by later tokens.
+    fn validate_component_boundary(&mut self) -> Result<(), SmilesErrorWithSpan> {
+        let (start, end) = self.last_span;
+        let start = start.min(end.saturating_sub(1));
+        let end = end.max(start.saturating_add(1));
+
+        if let Some(bond) = self.pending_bond {
+            return Err(SmilesErrorWithSpan::new(SmilesError::IncompleteBond(bond), start, end));
+        }
+        if !self.stack_empty() {
+            return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedBranch, start, end));
+        }
+        self.update_last_atom(None);
+        self.update_pending_bond(None);
+        Ok(())
+    }
+
     /// This method validates and adds the ring number to the relevant bond in
     /// the graph.
     ///
@@ -483,10 +504,12 @@ fn default_bond(nodes: &[Atom], id_a: usize, id_b: usize) -> Bond {
 
 #[cfg(test)]
 mod tests {
+    use core::str::FromStr;
+
     use elements_rs::Element;
 
     use crate::{
-        SmilesError,
+        Smiles, SmilesError,
         atom::{Atom, atom_symbol::AtomSymbol},
         bond::{Bond, ring_num::RingNum},
         parser::smiles_parser::{ParserState, default_bond},
@@ -676,6 +699,46 @@ mod tests {
     }
 
     #[test]
+    fn parser_state_validate_component_boundary_allows_open_ring_labels() {
+        let mut state = ParserState::new(0);
+        state.update_last_span((2, 3));
+        state.insert_ring(RingNum::try_new(1).unwrap(), (0, None));
+        state.update_last_atom(Some(0));
+
+        state.validate_component_boundary().unwrap();
+
+        assert_eq!(state.last_atom(), None);
+        assert_eq!(state.pending_bond(), None);
+        assert!(!state.ring_open_empty());
+    }
+
+    #[test]
+    fn parser_state_validate_component_boundary_rejects_incomplete_bond() {
+        let mut state = ParserState::new(0);
+        state.update_last_span((2, 3));
+        state.update_pending_bond(Some(Bond::Double));
+
+        let err = state.validate_component_boundary().expect_err("expected incomplete bond");
+
+        assert_eq!(err.smiles_error(), SmilesError::IncompleteBond(Bond::Double));
+        assert_eq!(err.start(), 2);
+        assert_eq!(err.end(), 3);
+    }
+
+    #[test]
+    fn parser_state_validate_component_boundary_rejects_open_branch() {
+        let mut state = ParserState::new(0);
+        state.update_last_span((2, 3));
+        state.push_stack(0);
+
+        let err = state.validate_component_boundary().expect_err("expected unclosed branch");
+
+        assert_eq!(err.smiles_error(), SmilesError::UnclosedBranch);
+        assert_eq!(err.start(), 2);
+        assert_eq!(err.end(), 3);
+    }
+
+    #[test]
     fn parser_state_validate_branch_open_errors_without_anchor() {
         let mut state = ParserState::new(0);
 
@@ -832,6 +895,17 @@ mod tests {
         assert_eq!(err.smiles_error(), SmilesError::InvalidRingNumber);
         assert_eq!(err.start(), 4);
         assert_eq!(err.end(), 5);
+    }
+
+    #[test]
+    fn parse_smiles_allows_disconnected_ring_closure_stereo_forms() {
+        let left = Smiles::from_str("[C@@]1(Cl)(F)(I).Br1").unwrap();
+        let right = Smiles::from_str("[C@@](Cl)(F)(I)1.Br1").unwrap();
+
+        assert_eq!(left.nodes().len(), 5);
+        assert_eq!(right.nodes().len(), 5);
+        assert_eq!(left.number_of_bonds(), 4);
+        assert_eq!(right.number_of_bonds(), 4);
     }
 
     #[test]

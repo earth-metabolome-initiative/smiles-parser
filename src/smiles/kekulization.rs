@@ -112,11 +112,8 @@ impl Smiles {
             .bond_matrix()
             .sparse_entries()
             .filter_map(|((row, column), entry)| {
-                (row < column && entry.bond() == Bond::Aromatic).then_some(AromaticBond {
-                    node_a: row,
-                    node_b: column,
-                    order: entry.order(),
-                })
+                (row < column && entry.bond() == Bond::Aromatic)
+                    .then_some(AromaticBond { node_a: row, node_b: column })
             })
             .collect::<Vec<_>>();
 
@@ -144,11 +141,7 @@ impl Smiles {
         if candidate_graph.graph.number_of_rows() == 0 {
             return Err(KekulizationError::NoPerfectMatching { candidate_atom_count: 0 });
         }
-        let matched_orders = candidate_graph.matched_original_orders()?;
-        let mut matched_order_flags = vec![false; self.number_of_bonds()];
-        for matched_order in matched_orders {
-            matched_order_flags[matched_order] = true;
-        }
+        let matched_edges = candidate_graph.matched_original_edges()?;
 
         let atom_nodes = self
             .atom_nodes
@@ -164,7 +157,7 @@ impl Smiles {
                     row,
                     column,
                     if entry.bond() == Bond::Aromatic {
-                        if matched_order_flags[entry.order()] {
+                        if matched_edges.contains(&(row, column)) {
                             entry.with_bond(Bond::Double)
                         } else {
                             entry.with_bond(Bond::Single)
@@ -220,11 +213,11 @@ impl Smiles {
 struct AromaticBond {
     node_a: usize,
     node_b: usize,
-    order: usize,
 }
 
 struct KekulizationCandidateGraph {
     graph: BondMatrix,
+    original_edge_keys_by_order: Vec<(usize, usize)>,
 }
 
 impl KekulizationCandidateGraph {
@@ -237,29 +230,36 @@ impl KekulizationCandidateGraph {
         let mut local_edges = Vec::with_capacity(aromatic_bonds.len());
 
         for aromatic_bond in aromatic_bonds {
-            let AromaticBond { node_a, node_b, order } = *aromatic_bond;
+            let AromaticBond { node_a, node_b } = *aromatic_bond;
             let (Some(local_a), Some(local_b)) =
                 (original_to_local[node_a], original_to_local[node_b])
             else {
                 continue;
             };
-            local_edges.push((local_a, local_b, BondEntry::new(Bond::Single, None, order)));
+            local_edges.push((local_a, local_b, (node_a, node_b)));
         }
 
         if local_edges.len() > 1 {
-            local_edges.sort_unstable_by_key(|(row, column, _)| (*row, *column));
+            local_edges.sort_unstable_by_key(|(row, column, edge_key)| (*row, *column, *edge_key));
         }
 
-        let graph =
-            BondMatrix::from_sorted_upper_triangular_entries(local_atom_ids.len(), local_edges)
-                .unwrap_or_else(|_| {
-                    unreachable!("candidate graph only adds unique non-self upper-triangular edges")
-                });
+        let original_edge_keys_by_order =
+            local_edges.iter().map(|(_, _, edge_key)| *edge_key).collect::<Vec<_>>();
 
-        Self { graph }
+        let graph = BondMatrix::from_sorted_upper_triangular_entries(
+            local_atom_ids.len(),
+            local_edges.into_iter().enumerate().map(|(order, (row, column, _edge_key))| {
+                (row, column, BondEntry::new(Bond::Single, None, order))
+            }),
+        )
+        .unwrap_or_else(|_| {
+            unreachable!("candidate graph only adds unique non-self upper-triangular edges")
+        });
+
+        Self { graph, original_edge_keys_by_order }
     }
 
-    fn matched_original_orders(&self) -> Result<Vec<usize>, KekulizationError> {
+    fn matched_original_edges(&self) -> Result<Vec<(usize, usize)>, KekulizationError> {
         let candidate_atom_count = self.graph.number_of_rows();
         if candidate_atom_count == 0 {
             return Ok(Vec::new());
@@ -280,7 +280,8 @@ impl KekulizationCandidateGraph {
                     self.graph.try_rank(left.min(right), left.max(right)).unwrap_or_else(|| {
                         unreachable!("matching edges always come from the candidate graph")
                     });
-                self.graph.select_value_ref(rank).order()
+                let original_edge_order = self.graph.select_value_ref(rank).order();
+                self.original_edge_keys_by_order[original_edge_order]
             })
             .collect())
     }
@@ -659,11 +660,8 @@ mod tests {
             .bond_matrix()
             .sparse_entries()
             .filter_map(|((row, column), entry)| {
-                (row < column && entry.bond() == Bond::Aromatic).then_some(AromaticBond {
-                    node_a: row,
-                    node_b: column,
-                    order: entry.order(),
-                })
+                (row < column && entry.bond() == Bond::Aromatic)
+                    .then_some(AromaticBond { node_a: row, node_b: column })
             })
             .collect::<Vec<_>>();
         let candidate_atom_ids = candidate_atom_ids(&smiles);
@@ -671,7 +669,7 @@ mod tests {
             KekulizationCandidateGraph::new(&smiles, &aromatic_bonds, &candidate_atom_ids);
 
         assert_eq!(
-            candidate_graph.matched_original_orders(),
+            candidate_graph.matched_original_edges(),
             Err(KekulizationError::NoPerfectMatching { candidate_atom_count: 3 })
         );
     }

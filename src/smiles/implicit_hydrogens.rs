@@ -107,6 +107,25 @@ fn implicit_hydrogens_for_node(smiles: &Smiles, node_id: usize, node: &Atom) -> 
     }
 }
 
+#[inline]
+pub(super) fn implicit_hydrogens_if_written_unbracketed(
+    smiles: &Smiles,
+    node_id: usize,
+    node: &Atom,
+) -> u8 {
+    let explicit_valence = explicit_valence(smiles, node_id);
+    match node.symbol() {
+        AtomSymbol::WildCard => 0,
+        AtomSymbol::Element(element) => {
+            if node.aromatic() {
+                aromatic_implicit_hydrogens(element, explicit_valence)
+            } else {
+                aliphatic_implicit_hydrogens(element, explicit_valence)
+            }
+        }
+    }
+}
+
 /// Returns the raw explicit valence contribution from the parsed graph.
 ///
 /// Only bond orders are included here. Explicit bracket hydrogens are not added

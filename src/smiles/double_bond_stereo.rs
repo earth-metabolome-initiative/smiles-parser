@@ -1,25 +1,24 @@
-#[cfg(test)]
-use alloc::collections::BTreeMap;
-use alloc::{collections::VecDeque, vec::Vec};
+use alloc::{
+    collections::{BTreeMap, VecDeque},
+    vec::Vec,
+};
 use core::cmp::Ordering;
 
-#[cfg(test)]
-use geometric_traits::traits::WeisfeilerLehmanColoring;
-use geometric_traits::traits::{SparseMatrix2D, SparseValuedMatrix2DRef, SparseValuedMatrixRef};
+use geometric_traits::traits::{
+    SparseMatrix2D, SparseValuedMatrix2DRef, SparseValuedMatrixRef, WeisfeilerLehmanColoring,
+};
 
-use super::Smiles;
-#[cfg(test)]
-use super::invariants::AtomInvariant;
+use super::{Smiles, invariants::AtomInvariant};
 use crate::bond::{Bond, bond_edge::BondEdge};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum DoubleBondStereoConfig {
+pub(super) enum DoubleBondStereoConfig {
     E,
     Z,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct DoubleBondStereoSide {
+pub(super) struct DoubleBondStereoSide {
     endpoint: usize,
     reference_atom: usize,
     reference_bond_is_up: bool,
@@ -27,23 +26,23 @@ pub(crate) struct DoubleBondStereoSide {
 
 impl DoubleBondStereoSide {
     #[must_use]
-    pub(crate) fn endpoint(self) -> usize {
+    pub(super) fn endpoint(self) -> usize {
         self.endpoint
     }
 
     #[must_use]
-    pub(crate) fn reference_atom(self) -> usize {
+    pub(super) fn reference_atom(self) -> usize {
         self.reference_atom
     }
 
     #[must_use]
-    pub(crate) fn reference_bond_is_up(self) -> bool {
+    pub(super) fn reference_bond_is_up(self) -> bool {
         self.reference_bond_is_up
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct DoubleBondStereoRecord {
+pub(super) struct DoubleBondStereoRecord {
     double_bond: BondEdge,
     side_a: DoubleBondStereoSide,
     side_b: DoubleBondStereoSide,
@@ -52,17 +51,17 @@ pub(crate) struct DoubleBondStereoRecord {
 
 impl DoubleBondStereoRecord {
     #[must_use]
-    pub(crate) fn side_a(self) -> DoubleBondStereoSide {
+    pub(super) fn side_a(self) -> DoubleBondStereoSide {
         self.side_a
     }
 
     #[must_use]
-    pub(crate) fn side_b(self) -> DoubleBondStereoSide {
+    pub(super) fn side_b(self) -> DoubleBondStereoSide {
         self.side_b
     }
 
     #[must_use]
-    pub(crate) fn config(self) -> DoubleBondStereoConfig {
+    pub(super) fn config(self) -> DoubleBondStereoConfig {
         self.config
     }
 }
@@ -81,9 +80,9 @@ struct DoubleBondStereoCandidate {
 }
 
 impl Smiles {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "fuzzing"))]
     #[must_use]
-    pub(crate) fn double_bond_stereo_records(&self) -> Vec<DoubleBondStereoRecord> {
+    pub(super) fn double_bond_stereo_records(&self) -> Vec<DoubleBondStereoRecord> {
         let candidates = self.double_bond_stereo_candidates();
         if candidates.is_empty() {
             return Vec::new();
@@ -96,7 +95,7 @@ impl Smiles {
     }
 
     #[must_use]
-    pub(crate) fn double_bond_stereo_records_with_planning_classes(
+    pub(super) fn double_bond_stereo_records_with_planning_classes(
         &self,
         rooted_classes: &[usize],
         refined_classes: &[usize],
@@ -338,8 +337,7 @@ impl Smiles {
         unique_best.then_some(best)
     }
 
-    #[cfg(test)]
-    fn stereo_neutral_refined_classes(&self) -> Vec<usize> {
+    pub(super) fn stereo_neutral_refined_classes(&self) -> Vec<usize> {
         let seed_colors: Vec<StereoNeutralAtomInvariantKey> =
             self.atom_invariants().into_iter().map(StereoNeutralAtomInvariantKey::from).collect();
         self.wl_coloring_with_seed_and_edge_colors(&seed_colors, |node, neighbor| {
@@ -348,8 +346,7 @@ impl Smiles {
         })
     }
 
-    #[cfg(test)]
-    fn stereo_neutral_rooted_classes(&self, initial_classes: &[usize]) -> Vec<usize> {
+    pub(super) fn stereo_neutral_rooted_classes(&self, initial_classes: &[usize]) -> Vec<usize> {
         let node_count = initial_classes.len();
         if node_count == 0 {
             return Vec::new();
@@ -422,7 +419,6 @@ impl Smiles {
         dense_ranks(&rooted_keys)
     }
 
-    #[cfg(test)]
     fn stereo_neutral_directed_edges(
         &self,
     ) -> (Vec<DirectedEdge>, BTreeMap<(usize, usize), usize>) {
@@ -513,7 +509,6 @@ fn bond_priority(bond: Bond) -> u8 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg(test)]
 struct StereoNeutralAtomInvariantKey {
     syntax: u8,
     symbol_kind: u8,
@@ -529,7 +524,6 @@ struct StereoNeutralAtomInvariantKey {
     bond_kind_histogram: [usize; 5],
 }
 
-#[cfg(test)]
 impl From<AtomInvariant> for StereoNeutralAtomInvariantKey {
     fn from(value: AtomInvariant) -> Self {
         let (symbol_kind, element_symbol) = match value.symbol.element() {
@@ -576,27 +570,23 @@ impl From<AtomInvariant> for StereoNeutralAtomInvariantKey {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg(test)]
 struct DirectedEdge {
     from: usize,
     to: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg(test)]
 struct StereoNeutralDirectedEdgeKey {
     node_class: usize,
     neighborhood: Vec<(usize, usize)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg(test)]
 struct StereoNeutralRootedNodeKey {
     node_class: usize,
     neighborhood: Vec<(usize, usize)>,
 }
 
-#[cfg(test)]
 fn stereo_neutral_bond_kind_index(bond: Bond) -> usize {
     match bond {
         Bond::Single | Bond::Up | Bond::Down => 0,
@@ -607,7 +597,6 @@ fn stereo_neutral_bond_kind_index(bond: Bond) -> usize {
     }
 }
 
-#[cfg(test)]
 fn dense_ranks<K>(keys: &[K]) -> Vec<usize>
 where
     K: Ord + Clone,

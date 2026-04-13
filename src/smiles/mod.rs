@@ -35,6 +35,7 @@ use crate::{atom::Atom, bond::bond_edge::BondEdge, errors::SmilesError};
 
 mod aromaticity;
 mod branches;
+mod canonicalization;
 mod connected_components;
 mod double_bond_stereo;
 mod emitter;
@@ -58,6 +59,7 @@ pub use self::{
         AromaticityModel, AromaticityPerception, AromaticityPolicy, AromaticityRingFamilyKind,
         AromaticityStatus, RdkitDefaultAromaticity, RdkitMdlAromaticity, RdkitSimpleAromaticity,
     },
+    canonicalization::SmilesCanonicalLabeling,
     connected_components::SmilesComponents,
     geometric_traits_impl::{BondEntry, BondMatrix},
     kekulization::{KekulizationError, KekulizationMode},
