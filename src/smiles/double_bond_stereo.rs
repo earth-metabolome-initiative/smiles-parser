@@ -1,7 +1,4 @@
-use alloc::{
-    collections::{BTreeMap, VecDeque},
-    vec::Vec,
-};
+use alloc::{collections::BTreeMap, vec::Vec};
 use core::cmp::Ordering;
 
 use geometric_traits::traits::{
@@ -152,6 +149,9 @@ impl Smiles {
         if !self.has_directional_single_bonds() || !self.has_double_bonds() {
             return Vec::new();
         }
+        // Ring membership is cheaper and clearer than rerunning a bespoke
+        // reachability search per double bond candidate.
+        let ring_membership = self.ring_membership();
 
         self.bond_matrix()
             .sparse_entries()
@@ -168,7 +168,7 @@ impl Smiles {
                 }
                 self.has_directional_neighbor(a, b)?;
                 self.has_directional_neighbor(b, a)?;
-                if self.double_bond_is_in_cycle(a, b) {
+                if ring_membership.contains_edge(a, b) {
                     return None;
                 }
                 Some(DoubleBondStereoCandidate { endpoint_a: a, endpoint_b: b, double_bond })
@@ -198,31 +198,6 @@ impl Smiles {
             .sparse_row_values_ref(node_id)
             .filter(|entry| !matches!(entry.bond(), Bond::Single | Bond::Up | Bond::Down))
             .count()
-    }
-
-    fn double_bond_is_in_cycle(&self, node_a: usize, node_b: usize) -> bool {
-        let mut queue = VecDeque::from([node_a]);
-        let mut seen = vec![false; self.nodes().len()];
-        seen[node_a] = true;
-
-        while let Some(current) = queue.pop_front() {
-            for neighbor in self.bond_matrix().sparse_row(current) {
-                if (current == node_a && neighbor == node_b)
-                    || (current == node_b && neighbor == node_a)
-                {
-                    continue;
-                }
-                if neighbor == node_b {
-                    return true;
-                }
-                if !seen[neighbor] {
-                    seen[neighbor] = true;
-                    queue.push_back(neighbor);
-                }
-            }
-        }
-
-        false
     }
 
     fn double_bond_stereo_side(

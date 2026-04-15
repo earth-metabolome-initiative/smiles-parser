@@ -211,6 +211,14 @@ impl Smiles {
         Some(entry.to_bond_edge(row, column))
     }
 
+    #[inline]
+    #[must_use]
+    pub(crate) fn bond_for_node_pair(&self, nodes: (usize, usize)) -> Option<crate::bond::Bond> {
+        let (row, column) = Self::edge_key(nodes.0, nodes.1);
+        let rank = self.bond_matrix.try_rank(row, column)?;
+        Some(self.bond_matrix.select_value_ref(rank).bond())
+    }
+
     /// Returns the bonds incident to the provided node id.
     #[inline]
     #[must_use]

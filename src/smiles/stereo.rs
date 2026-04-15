@@ -15,6 +15,13 @@ pub(crate) struct DirectionalBondOverrides {
     semantic_endpoints: Vec<bool>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct DirectionalParityConstraint {
+    pub(super) left_edge_key: (usize, usize),
+    pub(super) right_edge_key: (usize, usize),
+    pub(super) same_parity: bool,
+}
+
 impl DirectionalBondOverrides {
     #[cfg(test)]
     #[must_use]
@@ -34,6 +41,7 @@ impl DirectionalBondOverrides {
         self.get(edge_key.0, edge_key.1).is_some()
     }
 
+    #[inline]
     #[must_use]
     pub(crate) fn get(&self, from: usize, to: usize) -> Option<Bond> {
         let (left, right) = Smiles::edge_key(from, to);
@@ -42,6 +50,7 @@ impl DirectionalBondOverrides {
         Some(row[index].1)
     }
 
+    #[inline]
     #[must_use]
     pub(crate) fn has_semantic_endpoint(&self, node_id: usize) -> bool {
         self.semantic_endpoints.get(node_id).copied().unwrap_or(false)
@@ -49,9 +58,15 @@ impl DirectionalBondOverrides {
 }
 
 impl Smiles {
+    #[inline]
+    #[must_use]
+    pub(super) fn parsed_stereo_neighbors_row(&self, node_id: usize) -> &[StereoNeighbor] {
+        self.parsed_stereo_neighbors.get(node_id).map_or(&[], Vec::as_slice)
+    }
+
     #[must_use]
     pub(crate) fn parsed_stereo_neighbors(&self, node_id: usize) -> Vec<StereoNeighbor> {
-        self.parsed_stereo_neighbors.get(node_id).cloned().unwrap_or_default()
+        self.parsed_stereo_neighbors_row(node_id).to_vec()
     }
 
     #[cfg(test)]
@@ -88,101 +103,122 @@ impl Smiles {
             semantic_endpoints[record.side_a().endpoint()] = true;
             semantic_endpoints[record.side_b().endpoint()] = true;
         }
-        let mut edge_keys = records
-            .iter()
-            .flat_map(|record| {
-                [
-                    Smiles::edge_key(record.side_a().endpoint(), record.side_a().reference_atom()),
-                    Smiles::edge_key(record.side_b().endpoint(), record.side_b().reference_atom()),
-                ]
+        let constraints = records
+            .into_iter()
+            .map(|record| {
+                DirectionalParityConstraint {
+                    left_edge_key: Smiles::edge_key(
+                        record.side_a().endpoint(),
+                        record.side_a().reference_atom(),
+                    ),
+                    right_edge_key: Smiles::edge_key(
+                        record.side_b().endpoint(),
+                        record.side_b().reference_atom(),
+                    ),
+                    same_parity: matches!(
+                        record.config(),
+                        crate::smiles::double_bond_stereo::DoubleBondStereoConfig::E
+                    ),
+                }
             })
             .collect::<Vec<_>>();
-        edge_keys.sort_unstable();
-        edge_keys.dedup();
-        let mut adjacency: Vec<Vec<(usize, bool)>> = vec![Vec::new(); edge_keys.len()];
 
-        for record in records {
-            let left_edge = edge_keys
-                .binary_search(&Smiles::edge_key(
-                    record.side_a().endpoint(),
-                    record.side_a().reference_atom(),
-                ))
-                .unwrap_or_else(|_| unreachable!());
-            let right_edge = edge_keys
-                .binary_search(&Smiles::edge_key(
-                    record.side_b().endpoint(),
-                    record.side_b().reference_atom(),
-                ))
-                .unwrap_or_else(|_| unreachable!());
-            let same_parity = matches!(
-                record.config(),
-                crate::smiles::double_bond_stereo::DoubleBondStereoConfig::E
-            );
-            adjacency[left_edge].push((right_edge, same_parity));
-            adjacency[right_edge].push((left_edge, same_parity));
+        DirectionalBondOverrides {
+            rows: directional_override_rows_from_parity_constraints(
+                node_count,
+                &constraints,
+                preorder_indices,
+            ),
+            semantic_endpoints,
+        }
+    }
+}
+
+pub(super) fn directional_override_rows_from_parity_constraints(
+    node_count: usize,
+    constraints: &[DirectionalParityConstraint],
+    preorder_indices: &[usize],
+) -> Vec<Vec<(usize, Bond)>> {
+    let mut rows = vec![Vec::new(); node_count];
+    if constraints.is_empty() {
+        return rows;
+    }
+
+    let mut edge_keys = constraints
+        .iter()
+        .flat_map(|constraint| [constraint.left_edge_key, constraint.right_edge_key])
+        .collect::<Vec<_>>();
+    edge_keys.sort_unstable();
+    edge_keys.dedup();
+
+    let mut adjacency: Vec<Vec<(usize, bool)>> = vec![Vec::new(); edge_keys.len()];
+    for constraint in constraints {
+        let left_edge =
+            edge_keys.binary_search(&constraint.left_edge_key).unwrap_or_else(|_| unreachable!());
+        let right_edge =
+            edge_keys.binary_search(&constraint.right_edge_key).unwrap_or_else(|_| unreachable!());
+        adjacency[left_edge].push((right_edge, constraint.same_parity));
+        adjacency[right_edge].push((left_edge, constraint.same_parity));
+    }
+
+    let mut bond_is_up: Vec<Option<bool>> = vec![None; edge_keys.len()];
+    let mut component_seen = vec![false; edge_keys.len()];
+    let mut stack = Vec::new();
+
+    for start in 0..edge_keys.len() {
+        if component_seen[start] {
+            continue;
         }
 
-        let mut bond_is_up: Vec<Option<bool>> = vec![None; edge_keys.len()];
-        let mut component_seen = vec![false; edge_keys.len()];
-        let mut stack = Vec::new();
+        let mut component = Vec::new();
+        stack.push(start);
 
-        for start in 0..edge_keys.len() {
-            if component_seen[start] {
+        while let Some(current) = stack.pop() {
+            if component_seen[current] {
                 continue;
             }
-
-            let mut component = Vec::new();
-            stack.push(start);
-
-            while let Some(current) = stack.pop() {
-                if component_seen[current] {
-                    continue;
-                }
-                component_seen[current] = true;
-                component.push(current);
-                for &(neighbor, _same_parity) in &adjacency[current] {
-                    if !component_seen[neighbor] {
-                        stack.push(neighbor);
-                    }
-                }
-            }
-
-            let seed = component
-                .iter()
-                .copied()
-                .min_by_key(|&edge_id| {
-                    canonical_directional_edge_key(edge_keys[edge_id], preorder_indices)
-                })
-                .unwrap_or_else(|| unreachable!());
-
-            bond_is_up[seed] = Some(true);
-            stack.push(seed);
-
-            while let Some(current) = stack.pop() {
-                let current_is_up = bond_is_up[current].unwrap_or_else(|| unreachable!());
-                for &(neighbor, same_parity) in &adjacency[current] {
-                    let expected = if same_parity { current_is_up } else { !current_is_up };
-                    if let Some(existing) = bond_is_up[neighbor] {
-                        debug_assert_eq!(existing, expected);
-                    } else {
-                        bond_is_up[neighbor] = Some(expected);
-                        stack.push(neighbor);
-                    }
+            component_seen[current] = true;
+            component.push(current);
+            for &(neighbor, _same_parity) in &adjacency[current] {
+                if !component_seen[neighbor] {
+                    stack.push(neighbor);
                 }
             }
         }
 
-        let mut rows = vec![Vec::new(); node_count];
-        for (edge_key, is_up) in edge_keys.into_iter().zip(bond_is_up) {
-            let bond = if is_up.unwrap_or(true) { Bond::Up } else { Bond::Down };
-            rows[edge_key.0].push((edge_key.1, bond));
-        }
-        for row in &mut rows {
-            row.sort_unstable_by_key(|&(neighbor, _)| neighbor);
-        }
+        let seed = component
+            .iter()
+            .copied()
+            .min_by_key(|&edge_id| {
+                canonical_directional_edge_key(edge_keys[edge_id], preorder_indices)
+            })
+            .unwrap_or_else(|| unreachable!());
 
-        DirectionalBondOverrides { rows, semantic_endpoints }
+        bond_is_up[seed] = Some(true);
+        stack.push(seed);
+
+        while let Some(current) = stack.pop() {
+            let current_is_up = bond_is_up[current].unwrap_or_else(|| unreachable!());
+            for &(neighbor, same_parity) in &adjacency[current] {
+                let expected = if same_parity { current_is_up } else { !current_is_up };
+                if let Some(existing) = bond_is_up[neighbor] {
+                    debug_assert_eq!(existing, expected);
+                } else {
+                    bond_is_up[neighbor] = Some(expected);
+                    stack.push(neighbor);
+                }
+            }
+        }
     }
+
+    for (edge_key, is_up) in edge_keys.into_iter().zip(bond_is_up) {
+        let bond = if is_up.unwrap_or(true) { Bond::Up } else { Bond::Down };
+        rows[edge_key.0].push((edge_key.1, bond));
+    }
+    for row in &mut rows {
+        row.sort_unstable_by_key(|&(neighbor, _)| neighbor);
+    }
+    rows
 }
 
 fn canonical_directional_edge_key(

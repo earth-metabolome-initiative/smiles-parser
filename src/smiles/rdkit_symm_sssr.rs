@@ -248,10 +248,33 @@ struct RingSearchResult {
     extras: Vec<Vec<usize>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+struct SmallestRingsBfsScratch {
+    done: Vec<u8>,
+    parents: Vec<Option<usize>>,
+    depths: Vec<usize>,
+    queue: VecDeque<usize>,
+}
+
+impl SmallestRingsBfsScratch {
+    fn new(atom_count: usize) -> Self {
+        Self {
+            done: vec![WHITE; atom_count],
+            parents: vec![None; atom_count],
+            depths: vec![0; atom_count],
+            queue: VecDeque::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 struct RingSearchState<'a> {
     smiles: &'a Smiles,
     fragments: Vec<Vec<usize>>,
+    ordered_incident_bonds: Vec<Vec<BondEdge>>,
+    bfs_scratch: SmallestRingsBfsScratch,
+    d2_pick_marks: Vec<u32>,
+    d2_pick_generation: u32,
     active_edges: HashSet<[usize; 2]>,
     rdkit_bridge_scan_order: RdkitBridgeScanOrder,
     bfs_budget: RdkitBfsBudget,
@@ -275,11 +298,14 @@ impl<'a> RingSearchState<'a> {
 
     fn with_bfs_budget(smiles: &'a Smiles, bfs_budget: RdkitBfsBudget) -> Self {
         let atom_count = smiles.nodes().len();
+        let ordered_incident_bonds = (0..atom_count)
+            .map(|atom_id| RdkitIncidentBondOrdering::for_node(smiles, atom_id))
+            .collect::<Vec<_>>();
         let mut active_edges = HashSet::<[usize; 2]>::with_capacity(smiles.number_of_bonds());
         let mut atom_degrees = vec![0_usize; atom_count];
 
-        for atom_id in 0..atom_count {
-            for edge in RdkitIncidentBondOrdering::for_node(smiles, atom_id) {
+        for incident_bonds in ordered_incident_bonds.iter().take(atom_count) {
+            for edge in incident_bonds {
                 let key = edge_key(edge.node_a(), edge.node_b());
                 if active_edges.insert(key) {
                     atom_degrees[edge.node_a()] += 1;
@@ -291,6 +317,13 @@ impl<'a> RingSearchState<'a> {
         Self {
             smiles,
             fragments: connected_fragments(smiles),
+            ordered_incident_bonds,
+            // The search revisits the same graph many times, so keep the BFS
+            // buffers and the degree-2 mark array on the state instead of
+            // rebuilding them for each probe.
+            bfs_scratch: SmallestRingsBfsScratch::new(atom_count),
+            d2_pick_marks: vec![0; atom_count],
+            d2_pick_generation: 1,
             active_edges,
             rdkit_bridge_scan_order: RdkitBridgeScanOrder::new(smiles),
             bfs_budget,
@@ -402,7 +435,7 @@ impl<'a> RingSearchState<'a> {
         let ring_count = fragment_rings.len();
         let bond_count = fragment
             .iter()
-            .flat_map(|&atom_id| RdkitIncidentBondOrdering::for_node(self.smiles, atom_id))
+            .flat_map(|&atom_id| self.ordered_incident_bonds[atom_id].iter())
             .map(|edge| edge_key(edge.node_a(), edge.node_b()))
             .collect::<HashSet<_>>()
             .len();
@@ -449,7 +482,7 @@ impl<'a> RingSearchState<'a> {
         None
     }
     fn trim_bonds(&mut self, cand: usize, changed: &mut VecDeque<usize>) {
-        for edge in RdkitIncidentBondOrdering::for_node(self.smiles, cand) {
+        for edge in &self.ordered_incident_bonds[cand] {
             let key = edge_key(edge.node_a(), edge.node_b());
             if !self.active_edges.remove(&key) {
                 continue;
@@ -464,8 +497,25 @@ impl<'a> RingSearchState<'a> {
         }
     }
 
-    fn mark_useless_d2s(&self, root: usize, forb: &mut [bool], active_edges: &HashSet<[usize; 2]>) {
-        for edge in RdkitIncidentBondOrdering::for_node(self.smiles, root) {
+    fn next_d2_pick_generation(&mut self) -> u32 {
+        if self.d2_pick_generation == u32::MAX {
+            self.d2_pick_marks.fill(0);
+            self.d2_pick_generation = 1;
+        } else {
+            self.d2_pick_generation += 1;
+        }
+        self.d2_pick_generation
+    }
+
+    fn mark_useless_d2s(
+        ordered_incident_bonds: &[Vec<BondEdge>],
+        atom_degrees: &[usize],
+        root: usize,
+        forb: &mut [u32],
+        generation: u32,
+        active_edges: &HashSet<[usize; 2]>,
+    ) {
+        for edge in &ordered_incident_bonds[root] {
             let key = edge_key(edge.node_a(), edge.node_b());
             if !active_edges.contains(&key) {
                 continue;
@@ -473,31 +523,45 @@ impl<'a> RingSearchState<'a> {
             let Some(other) = edge.other(root) else {
                 continue;
             };
-            if !forb[other] && self.atom_degrees[other] == 2 {
-                forb[other] = true;
-                self.mark_useless_d2s(other, forb, active_edges);
+            if forb[other] != generation && atom_degrees[other] == 2 {
+                forb[other] = generation;
+                Self::mark_useless_d2s(
+                    ordered_incident_bonds,
+                    atom_degrees,
+                    other,
+                    forb,
+                    generation,
+                    active_edges,
+                );
             }
         }
     }
 
-    fn pick_d2_nodes(&self, fragment: &[usize], d2nodes: &mut Vec<usize>) {
+    fn pick_d2_nodes(&mut self, fragment: &[usize], d2nodes: &mut Vec<usize>) {
         d2nodes.clear();
 
-        let mut forb = vec![false; self.smiles.nodes().len()];
+        let generation = self.next_d2_pick_generation();
         loop {
             let mut root = None;
             for &atom_id in fragment {
-                if self.atom_degrees[atom_id] == 2 && !forb[atom_id] {
+                if self.atom_degrees[atom_id] == 2 && self.d2_pick_marks[atom_id] != generation {
                     root = Some(atom_id);
                     d2nodes.push(atom_id);
-                    forb[atom_id] = true;
+                    self.d2_pick_marks[atom_id] = generation;
                     break;
                 }
             }
             let Some(root) = root else {
                 break;
             };
-            self.mark_useless_d2s(root, &mut forb, &self.active_edges);
+            Self::mark_useless_d2s(
+                &self.ordered_incident_bonds,
+                &self.atom_degrees,
+                root,
+                &mut self.d2_pick_marks,
+                generation,
+                &self.active_edges,
+            );
         }
     }
 
@@ -587,7 +651,7 @@ impl<'a> RingSearchState<'a> {
         atom_degrees: &mut [usize],
         active_edges: &mut HashSet<[usize; 2]>,
     ) {
-        for edge in RdkitIncidentBondOrdering::for_node(self.smiles, cand) {
+        for edge in &self.ordered_incident_bonds[cand] {
             let key = edge_key(edge.node_a(), edge.node_b());
             if !active_edges.remove(&key) {
                 continue;
@@ -662,8 +726,9 @@ impl<'a> RingSearchState<'a> {
     }
 
     fn active_neighbors(&self, atom_id: usize) -> Vec<usize> {
-        RdkitIncidentBondOrdering::for_node(self.smiles, atom_id)
-            .into_iter()
+        self.ordered_incident_bonds[atom_id]
+            .iter()
+            .copied()
             .filter_map(|edge| {
                 let key = edge_key(edge.node_a(), edge.node_b());
                 self.active_edges.contains(&key).then(|| edge.other(atom_id)).flatten()
@@ -697,7 +762,7 @@ impl<'a> RingSearchState<'a> {
                 return false;
             }
             let curr = *path.last().unwrap_or(&start);
-            for edge in RdkitIncidentBondOrdering::for_node(self.smiles, curr) {
+            for edge in &self.ordered_incident_bonds[curr] {
                 let Some(nbr) = edge.other(curr) else {
                     continue;
                 };
@@ -722,33 +787,68 @@ impl<'a> RingSearchState<'a> {
         false
     }
 
-    fn smallest_rings_bfs(&self, root: usize, forbidden: Option<&[usize]>) -> Vec<Vec<usize>> {
-        self.smallest_rings_bfs_with_state(root, forbidden, &self.active_edges)
+    fn smallest_rings_bfs(&mut self, root: usize, forbidden: Option<&[usize]>) -> Vec<Vec<usize>> {
+        Self::smallest_rings_bfs_with_scratch(
+            &self.ordered_incident_bonds,
+            &self.hit_queue_cutoff,
+            self.bfs_budget,
+            &mut self.bfs_scratch,
+            root,
+            forbidden,
+            &self.active_edges,
+        )
     }
 
     fn smallest_rings_bfs_with_state(
-        &self,
+        &mut self,
         root: usize,
         forbidden: Option<&[usize]>,
         active_edges: &HashSet<[usize; 2]>,
     ) -> Vec<Vec<usize>> {
-        let mut done = vec![WHITE; self.smiles.nodes().len()];
+        Self::smallest_rings_bfs_with_scratch(
+            &self.ordered_incident_bonds,
+            &self.hit_queue_cutoff,
+            self.bfs_budget,
+            &mut self.bfs_scratch,
+            root,
+            forbidden,
+            active_edges,
+        )
+    }
+
+    fn smallest_rings_bfs_with_scratch(
+        ordered_incident_bonds: &[Vec<BondEdge>],
+        hit_queue_cutoff: &Cell<bool>,
+        bfs_budget: RdkitBfsBudget,
+        scratch: &mut SmallestRingsBfsScratch,
+        root: usize,
+        forbidden: Option<&[usize]>,
+        active_edges: &HashSet<[usize; 2]>,
+    ) -> Vec<Vec<usize>> {
+        let done = &mut scratch.done;
+        let parents = &mut scratch.parents;
+        let depths = &mut scratch.depths;
+        let bfsq = &mut scratch.queue;
+
+        // Reuse the scratch storage across BFS calls; this path is hot during
+        // exact SSSR search on larger ring systems.
+        done.fill(WHITE);
+        parents.fill(None);
+        depths.fill(0);
         if let Some(forbidden) = forbidden {
             for &idx in forbidden {
                 done[idx] = BLACK;
             }
         }
 
-        let mut parents = vec![None; self.smiles.nodes().len()];
-        let mut depths = vec![0_usize; self.smiles.nodes().len()];
-        let mut bfsq = VecDeque::<usize>::new();
+        bfsq.clear();
         bfsq.push_back(root);
         let mut rings = Vec::<Vec<usize>>::new();
         let mut cur_size = usize::MAX;
 
         while let Some(curr) = bfsq.pop_front() {
-            if bfsq.len() >= self.bfs_budget.max_queue_size {
-                self.hit_queue_cutoff.set(true);
+            if bfsq.len() >= bfs_budget.max_queue_size {
+                hit_queue_cutoff.set(true);
                 break;
             }
             done[curr] = BLACK;
@@ -757,7 +857,7 @@ impl<'a> RingSearchState<'a> {
                 break;
             }
 
-            for edge in RdkitIncidentBondOrdering::for_node(self.smiles, curr) {
+            for edge in &ordered_incident_bonds[curr] {
                 let key = edge_key(edge.node_a(), edge.node_b());
                 if !active_edges.contains(&key) {
                     continue;

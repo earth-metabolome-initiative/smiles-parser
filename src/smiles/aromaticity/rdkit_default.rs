@@ -1137,18 +1137,9 @@ impl Default for RdkitFusedSubsystemBudget {
 
 impl RdkitPreparedFusedFamily {
     fn new(family: &RdkitDefaultRingFamily) -> Self {
-        let mut ring_neighbors = vec![Vec::<usize>::new(); family.member_cycles.len()];
-        for left_index in 0..family.member_cycle_bond_edges.len() {
-            for right_index in left_index + 1..family.member_cycle_bond_edges.len() {
-                if RdkitFusedNeighborRule::are_neighbors(
-                    &family.member_cycle_bond_edges[left_index],
-                    &family.member_cycle_bond_edges[right_index],
-                ) {
-                    ring_neighbors[left_index].push(right_index);
-                    ring_neighbors[right_index].push(left_index);
-                }
-            }
-        }
+        let eligible_cycle_indices = vec![true; family.member_cycles.len()];
+        let ring_neighbors =
+            rdkit_fused_cycle_neighbors(&family.member_cycle_bond_edges, &eligible_cycle_indices);
         let member_cycle_bond_indices = family
             .member_cycle_bond_edges
             .iter()
@@ -1600,15 +1591,48 @@ fn element_is_se_or_te(element: Option<Element>) -> bool {
     matches!(element, Some(Element::Se | Element::Te))
 }
 
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
-struct RdkitFusedNeighborRule;
+fn rdkit_fused_cycle_neighbors(
+    member_cycle_bond_edges: &[Vec<[usize; 2]>],
+    eligible_cycle_indices: &[bool],
+) -> Vec<Vec<usize>> {
+    // The original pairwise cycle comparison was quadratic in the family size.
+    // Build the same "share exactly one bond" relation by inverting the
+    // bond-to-cycle incidence once, then counting shared edges per cycle pair.
+    let mut bond_to_cycle_indices =
+        HashMap::<[usize; 2], Vec<usize>>::with_capacity(member_cycle_bond_edges.len() * 6);
 
-impl RdkitFusedNeighborRule {
-    fn are_neighbors(left: &[[usize; 2]], right: &[[usize; 2]]) -> bool {
-        let shared_edge_count =
-            left.iter().filter(|edge| right.iter().any(|other| other == *edge)).count();
-        shared_edge_count == 1
+    for (cycle_index, cycle_edges) in member_cycle_bond_edges.iter().enumerate() {
+        if !eligible_cycle_indices[cycle_index] {
+            continue;
+        }
+        for &edge in cycle_edges {
+            bond_to_cycle_indices.entry(edge).or_default().push(cycle_index);
+        }
     }
+
+    let mut shared_edge_counts =
+        HashMap::<[usize; 2], u8>::with_capacity(member_cycle_bond_edges.len() * 2);
+    for cycle_indices in bond_to_cycle_indices.values() {
+        for left_position in 0..cycle_indices.len() {
+            for right_position in left_position + 1..cycle_indices.len() {
+                let pair = [cycle_indices[left_position], cycle_indices[right_position]];
+                *shared_edge_counts.entry(pair).or_insert(0) += 1;
+            }
+        }
+    }
+
+    let mut ring_neighbors = vec![Vec::<usize>::new(); member_cycle_bond_edges.len()];
+    for ([left_index, right_index], shared_edge_count) in shared_edge_counts {
+        if shared_edge_count == 1 {
+            ring_neighbors[left_index].push(right_index);
+            ring_neighbors[right_index].push(left_index);
+        }
+    }
+    for neighbors in &mut ring_neighbors {
+        neighbors.sort_unstable();
+    }
+
+    ring_neighbors
 }
 
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
@@ -1869,6 +1893,12 @@ impl Smiles {
         max_fused_ring_size: usize,
     ) -> Vec<RdkitCycleFamilySeed> {
         let cycle_bond_edges = cycles.iter().map(|cycle| cycle_edges(cycle)).collect::<Vec<_>>();
+        let eligible_cycle_indices = cycle_bond_edges
+            .iter()
+            .map(|cycle_edges| cycle_edges.len() <= max_fused_ring_size)
+            .collect::<Vec<_>>();
+        let ring_neighbors =
+            rdkit_fused_cycle_neighbors(&cycle_bond_edges, &eligible_cycle_indices);
         let mut families = Vec::<RdkitCycleFamilySeed>::new();
         let mut seen_cycles = vec![false; cycles.len()];
 
@@ -1887,18 +1917,8 @@ impl Smiles {
                 seen_cycles[current_cycle_index] = true;
                 family_cycle_indices.push(current_cycle_index);
 
-                for next_cycle_index in 0..cycles.len() {
-                    if seen_cycles[next_cycle_index] || next_cycle_index == current_cycle_index {
-                        continue;
-                    }
-
-                    if cycle_bond_edges[current_cycle_index].len() <= max_fused_ring_size
-                        && cycle_bond_edges[next_cycle_index].len() <= max_fused_ring_size
-                        && RdkitFusedNeighborRule::are_neighbors(
-                            &cycle_bond_edges[current_cycle_index],
-                            &cycle_bond_edges[next_cycle_index],
-                        )
-                    {
+                for &next_cycle_index in &ring_neighbors[current_cycle_index] {
+                    if !seen_cycles[next_cycle_index] {
                         pending_cycle_indices.push(next_cycle_index);
                     }
                 }
