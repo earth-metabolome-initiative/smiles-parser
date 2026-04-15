@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{string::ToString, vec::Vec};
 use core::str::FromStr;
 
 use geometric_traits::traits::SparseValuedMatrixRef;
@@ -108,6 +108,20 @@ fn canonicalize_remaps_implicit_hydrogen_cache_and_clears_provenance() {
             .all(|((row, column), entry)| row >= column || entry.ring_num().is_none())
     );
     assert_canonicalization_invariants(&aromaticized);
+}
+
+#[test]
+fn canonicalization_spelling_normal_form_keeps_aromatic_wildcards_bracketed() {
+    let aromaticized = Smiles::from_str("******#8OOO*c8")
+        .unwrap()
+        .perceive_aromaticity()
+        .unwrap()
+        .into_aromaticized();
+
+    let rewritten = aromaticized.canonicalization_spelling_normal_form();
+
+    assert_eq!(rewritten.aromaticity_assignment(), aromaticized.aromaticity_assignment());
+    assert!(rewritten.to_string().contains("[*]"));
 }
 
 #[test]

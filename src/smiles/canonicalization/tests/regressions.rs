@@ -98,6 +98,13 @@ fn canonicalize_handles_fuzz_crash_db6568a7_regression() {
 }
 
 #[test]
+fn canonicalize_handles_fuzz_crash_hex_wildcard_oxygen_regression() {
+    let smiles = Smiles::from_str("******#8OOO*c8").unwrap();
+
+    assert_canonicalization_invariants(&smiles);
+}
+
+#[test]
 fn canonicalize_reaches_fixed_point_for_pubchem_cid_10888631_regression() {
     let smiles =
         Smiles::from_str("C1C2[C@@H]3[C@H]4[C@H]5[C@H]6C5CC4[C@@H]6[C@H]2[C@@H]7[C@@H]3C71")

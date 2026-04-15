@@ -197,15 +197,25 @@ impl Smiles {
             .copied()
             .enumerate()
             .map(|(node_id, atom)| canonicalization_atom_spelling_normal_form(self, node_id, atom))
-            .collect();
-        // Spelling rewrites can move atoms between bracket and organic-subset
-        // forms, which changes implicit-hydrogen semantics. Recompute the cache
-        // lazily instead of preserving stale counts.
+            .collect::<Vec<_>>();
+        // Preserve the current interpreted implicit-hydrogen counts for atoms
+        // whose spelling did not change. Aromaticized graphs can carry
+        // sidecar counts that are not recoverable from raw aromatic token
+        // syntax alone. Recompute only the atoms whose spelling normalization
+        // actually changed their syntax-level hydrogen semantics.
+        let implicit_hydrogen_cache = atom_nodes
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(node_id, rewritten_atom)| {
+                canonicalization_implicit_hydrogen_count(self, node_id, rewritten_atom)
+            })
+            .collect::<Vec<_>>();
         Self::from_bond_matrix_parts_with_sidecars(
             atom_nodes,
             self.bond_matrix.clone(),
             self.parsed_stereo_neighbors.clone(),
-            None,
+            Some(implicit_hydrogen_cache),
             None,
         )
     }
@@ -450,6 +460,8 @@ fn maybe_collapse_atom_to_organic_subset(smiles: &Smiles, node_id: usize, atom: 
         || atom.charge_value() != 0
         || atom.class() != 0
         || atom.chirality().is_some()
+        || (atom.aromatic()
+            && atom.element().is_none_or(|element| element.aromatic_smiles_symbol().is_none()))
         || !canonicalization_valid_unbracketed(atom.symbol())
         || implicit_hydrogens_if_written_unbracketed(smiles, node_id, &atom)
             != atom.hydrogen_count()
@@ -484,6 +496,24 @@ fn canonicalization_atom_spelling_normal_form(smiles: &Smiles, node_id: usize, a
         maybe_collapse_atom_to_organic_subset(smiles, node_id, atom)
     } else {
         atom
+    }
+}
+
+fn canonicalization_implicit_hydrogen_count(
+    smiles: &Smiles,
+    node_id: usize,
+    rewritten_atom: Atom,
+) -> u8 {
+    if rewritten_atom == smiles.nodes()[node_id] {
+        return smiles
+            .implicit_hydrogen_count(node_id)
+            .unwrap_or_else(|| unreachable!("canonicalization only rewrites existing atoms"));
+    }
+    match rewritten_atom.syntax() {
+        AtomSyntax::Bracket => 0,
+        AtomSyntax::OrganicSubset => {
+            implicit_hydrogens_if_written_unbracketed(smiles, node_id, &rewritten_atom)
+        }
     }
 }
 
