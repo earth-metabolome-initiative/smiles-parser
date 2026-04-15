@@ -111,7 +111,7 @@ impl Token {
 mod tests {
     use elements_rs::Element;
 
-    use super::{Token, TokenWithSpan};
+    use super::{Token, TokenKind, TokenWithSpan};
     use crate::{
         atom::{Atom, atom_symbol::AtomSymbol},
         bond::{Bond, ring_num::RingNum},
@@ -181,5 +181,30 @@ mod tests {
         assert_eq!(original, cloned);
         assert_eq!(original.token(), Token::LeftParentheses);
         assert_eq!(cloned.span(), 2..3);
+    }
+
+    #[test]
+    fn token_kind_and_is_bond_helpers_cover_all_paths() {
+        let bond = TokenWithSpan::new(Token::Bond(Bond::Triple), 1, 2);
+        assert_eq!(bond.token_kind(), TokenKind::Bond);
+        assert!(bond.is_bond());
+
+        let atom = TokenWithSpan::new(
+            Token::Atom(Atom::new_organic_subset(AtomSymbol::Element(Element::C), false)),
+            0,
+            1,
+        );
+        assert_eq!(atom.token_kind(), TokenKind::Atom);
+        assert!(!atom.is_bond());
+
+        assert_eq!(Token::NonBond.kind(), TokenKind::NonBond);
+        assert_eq!(
+            Token::Atom(Atom::new_organic_subset(AtomSymbol::Element(Element::N), false)).kind(),
+            TokenKind::Atom
+        );
+        assert_eq!(Token::Bond(Bond::Double).kind(), TokenKind::Bond);
+        assert_eq!(Token::LeftParentheses.kind(), TokenKind::LeftParentheses);
+        assert_eq!(Token::RightParentheses.kind(), TokenKind::RightParentheses);
+        assert_eq!(Token::RingClosure(RingNum::try_new(1).unwrap()).kind(), TokenKind::RingClosure);
     }
 }

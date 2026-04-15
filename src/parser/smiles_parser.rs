@@ -9,7 +9,7 @@ use crate::{
     bond::{Bond, ring_num::RingNum},
     errors::{SmilesError, SmilesErrorWithSpan},
     parser::token_iter::TokenIter,
-    smiles::{BondMatrixBuilder, Smiles},
+    smiles::{BondMatrixBuilder, Smiles, StereoNeighbor},
     token::{Token, TokenKind, TokenWithSpan},
 };
 
@@ -45,7 +45,7 @@ pub(crate) fn parse_smiles(input: &str) -> Result<Smiles, SmilesErrorWithSpan> {
                 parser_state.validate_branch_open(start, end, next_kind)?;
             }
             Token::NonBond => {
-                parser_state.validate_all_closed()?;
+                parser_state.validate_component_boundary()?;
                 ParserState::validate_non_bond(previous, next_kind, start, end)?;
             }
             Token::RingClosure(ring_num) => {
@@ -79,9 +79,20 @@ struct ParserState {
     branch_stack: Vec<usize>,
     /// Open ring closures indexed by ring label.
     ring_open: [Option<(usize, Option<Bond>)>; 100],
+    /// Parsed lexical stereo neighbor order per atom, preserving ring-digit
+    /// position.
+    parsed_stereo_neighbors: Vec<Vec<PendingStereoNeighbor>>,
     /// The last used span
     last_span: (usize, usize),
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PendingStereoNeighbor {
+    Atom(usize),
+    ExplicitHydrogen,
+    RingLabel(RingNum),
+}
+
 impl ParserState {
     /// Creates a new initial state for the parser.
     #[must_use]
@@ -93,6 +104,7 @@ impl ParserState {
             pending_bond: None,
             branch_stack: Vec::with_capacity(input_len.min(16)),
             ring_open: [None; 100],
+            parsed_stereo_neighbors: Vec::with_capacity(input_len),
             last_span: (0, 0),
         }
     }
@@ -152,7 +164,33 @@ impl ParserState {
     #[must_use]
     fn into_smiles(self) -> Smiles {
         let number_of_nodes = self.atom_nodes.len();
-        Smiles::from_bond_matrix_parts(self.atom_nodes, self.bond_matrix.finish(number_of_nodes))
+        let parsed_stereo_neighbors = self
+            .parsed_stereo_neighbors
+            .into_iter()
+            .map(|neighbors| {
+                neighbors
+                    .into_iter()
+                    .map(|neighbor| {
+                        match neighbor {
+                            PendingStereoNeighbor::Atom(atom) => StereoNeighbor::Atom(atom),
+                            PendingStereoNeighbor::ExplicitHydrogen => {
+                                StereoNeighbor::ExplicitHydrogen
+                            }
+                            PendingStereoNeighbor::RingLabel(_) => {
+                                unreachable!(
+                                    "all ring labels must be resolved before parse completion"
+                                )
+                            }
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
+        Smiles::from_bond_matrix_parts_with_parsed_stereo(
+            self.atom_nodes,
+            self.bond_matrix.finish(number_of_nodes),
+            parsed_stereo_neighbors,
+        )
     }
     /// Returns whether there is an edge for the given pair of nodes.
     #[must_use]
@@ -162,6 +200,30 @@ impl ParserState {
     /// Pushes an [`Atom`] into the parsed [`Smiles`] graph.
     fn push_node(&mut self, node: Atom) {
         self.atom_nodes.push(node);
+        self.parsed_stereo_neighbors.push(Vec::new());
+    }
+
+    #[inline]
+    #[must_use]
+    fn node_has_chirality(&self, node_id: usize) -> bool {
+        self.atom_nodes.get(node_id).and_then(Atom::chirality).is_some()
+    }
+
+    fn append_stereo_neighbor(&mut self, node_id: usize, neighbor: PendingStereoNeighbor) {
+        if self.node_has_chirality(node_id) {
+            self.parsed_stereo_neighbors[node_id].push(neighbor);
+        }
+    }
+
+    fn resolve_ring_label_neighbor(&mut self, node_id: usize, ring_num: RingNum, neighbor: usize) {
+        if !self.node_has_chirality(node_id) {
+            return;
+        }
+        let slot = self.parsed_stereo_neighbors[node_id]
+            .iter_mut()
+            .find(|entry| **entry == PendingStereoNeighbor::RingLabel(ring_num))
+            .unwrap_or_else(|| unreachable!("ring opening placeholder must exist"));
+        *slot = PendingStereoNeighbor::Atom(neighbor);
     }
     #[inline]
     fn push_edge_verified(
@@ -189,6 +251,7 @@ impl ParserState {
         end: usize,
     ) -> Result<(), SmilesErrorWithSpan> {
         let id = self.atom_nodes.len();
+        let previous_atom = self.last_atom();
         if matches!(atom.element(), Some(Element::H)) && atom.hydrogen_count() > 1 {
             return Err(SmilesErrorWithSpan::new(
                 SmilesError::InvalidHydrogenWithExplicitHydrogensFound,
@@ -196,11 +259,23 @@ impl ParserState {
                 end,
             ));
         }
+        let mut stereo_neighbors = Vec::new();
+        if atom.chirality().is_some() {
+            if let Some(previous) = previous_atom {
+                stereo_neighbors.push(PendingStereoNeighbor::Atom(previous));
+            }
+            if atom.hydrogen_count() == 1 {
+                stereo_neighbors.push(PendingStereoNeighbor::ExplicitHydrogen);
+            }
+        }
         self.push_node(atom);
-        if let Some(prev) = self.last_atom() {
+        *self.parsed_stereo_neighbors.last_mut().unwrap_or_else(|| unreachable!()) =
+            stereo_neighbors;
+        if let Some(prev) = previous_atom {
             let bond = self.pending_bond().unwrap_or_else(|| default_bond(self.nodes(), prev, id));
             self.push_edge_verified(prev, id, bond, None)
                 .map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
+            self.append_stereo_neighbor(prev, PendingStereoNeighbor::Atom(id));
         }
         self.update_last_atom(Some(id));
         self.update_pending_bond(None);
@@ -229,6 +304,27 @@ impl ParserState {
         }
         if !self.ring_open_empty() {
             return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedRing, start, end));
+        }
+        self.update_last_atom(None);
+        self.update_pending_bond(None);
+        Ok(())
+    }
+
+    /// Validates a component boundary introduced by `.`.
+    ///
+    /// Unlike [`Self::validate_all_closed`], this allows open ring labels to
+    /// remain pending so disconnected ring-closure notation such as
+    /// `C1.C1`-style forms can be resolved by later tokens.
+    fn validate_component_boundary(&mut self) -> Result<(), SmilesErrorWithSpan> {
+        let (start, end) = self.last_span;
+        let start = start.min(end.saturating_sub(1));
+        let end = end.max(start.saturating_add(1));
+
+        if let Some(bond) = self.pending_bond {
+            return Err(SmilesErrorWithSpan::new(SmilesError::IncompleteBond(bond), start, end));
+        }
+        if !self.stack_empty() {
+            return Err(SmilesErrorWithSpan::new(SmilesError::UnclosedBranch, start, end));
         }
         self.update_last_atom(None);
         self.update_pending_bond(None);
@@ -267,9 +363,12 @@ impl ParserState {
 
             self.push_edge_verified(current, other, bond, Some(ring_num))
                 .map_err(|e| SmilesErrorWithSpan::new(e, start, end))?;
+            self.append_stereo_neighbor(current, PendingStereoNeighbor::Atom(other));
+            self.resolve_ring_label_neighbor(other, ring_num, current);
 
             self.update_pending_bond(None);
         } else {
+            self.append_stereo_neighbor(current, PendingStereoNeighbor::RingLabel(ring_num));
             self.insert_ring(ring_num, (current, self.pending_bond()));
             self.update_pending_bond(None);
         }
@@ -405,13 +504,16 @@ fn default_bond(nodes: &[Atom], id_a: usize, id_b: usize) -> Bond {
 
 #[cfg(test)]
 mod tests {
+    use core::str::FromStr;
+
     use elements_rs::Element;
 
     use crate::{
-        SmilesError,
+        Smiles, SmilesError,
         atom::{Atom, atom_symbol::AtomSymbol},
         bond::{Bond, ring_num::RingNum},
         parser::smiles_parser::{ParserState, default_bond},
+        token::TokenKind,
     };
 
     fn atom(element: Element, aromatic: bool) -> Atom {
@@ -460,7 +562,7 @@ mod tests {
         let mut state = ParserState::new(0);
 
         assert!(state.stack_empty());
-        assert_eq!(state.branch_stack, []);
+        assert!(state.branch_stack.is_empty());
 
         state.push_stack(1);
         state.push_stack(3);
@@ -597,6 +699,46 @@ mod tests {
     }
 
     #[test]
+    fn parser_state_validate_component_boundary_allows_open_ring_labels() {
+        let mut state = ParserState::new(0);
+        state.update_last_span((2, 3));
+        state.insert_ring(RingNum::try_new(1).unwrap(), (0, None));
+        state.update_last_atom(Some(0));
+
+        state.validate_component_boundary().unwrap();
+
+        assert_eq!(state.last_atom(), None);
+        assert_eq!(state.pending_bond(), None);
+        assert!(!state.ring_open_empty());
+    }
+
+    #[test]
+    fn parser_state_validate_component_boundary_rejects_incomplete_bond() {
+        let mut state = ParserState::new(0);
+        state.update_last_span((2, 3));
+        state.update_pending_bond(Some(Bond::Double));
+
+        let err = state.validate_component_boundary().expect_err("expected incomplete bond");
+
+        assert_eq!(err.smiles_error(), SmilesError::IncompleteBond(Bond::Double));
+        assert_eq!(err.start(), 2);
+        assert_eq!(err.end(), 3);
+    }
+
+    #[test]
+    fn parser_state_validate_component_boundary_rejects_open_branch() {
+        let mut state = ParserState::new(0);
+        state.update_last_span((2, 3));
+        state.push_stack(0);
+
+        let err = state.validate_component_boundary().expect_err("expected unclosed branch");
+
+        assert_eq!(err.smiles_error(), SmilesError::UnclosedBranch);
+        assert_eq!(err.start(), 2);
+        assert_eq!(err.end(), 3);
+    }
+
+    #[test]
     fn parser_state_validate_branch_open_errors_without_anchor() {
         let mut state = ParserState::new(0);
 
@@ -614,6 +756,16 @@ mod tests {
         let err = state.validate_branch_close(4, 5).expect_err("expected missing branch anchor");
 
         assert_eq!(err.smiles_error(), SmilesError::UnexpectedRightParentheses);
+        assert_eq!(err.start(), 4);
+        assert_eq!(err.end(), 5);
+    }
+
+    #[test]
+    fn validate_non_bond_rejects_invalid_left_context() {
+        let err =
+            ParserState::validate_non_bond(Some(TokenKind::Bond), Some(TokenKind::Atom), 4, 5)
+                .expect_err("expected invalid non-bond token");
+        assert_eq!(err.smiles_error(), SmilesError::InvalidNonBondToken);
         assert_eq!(err.start(), 4);
         assert_eq!(err.end(), 5);
     }
@@ -743,6 +895,17 @@ mod tests {
         assert_eq!(err.smiles_error(), SmilesError::InvalidRingNumber);
         assert_eq!(err.start(), 4);
         assert_eq!(err.end(), 5);
+    }
+
+    #[test]
+    fn parse_smiles_allows_disconnected_ring_closure_stereo_forms() {
+        let left = Smiles::from_str("[C@@]1(Cl)(F)(I).Br1").unwrap();
+        let right = Smiles::from_str("[C@@](Cl)(F)(I)1.Br1").unwrap();
+
+        assert_eq!(left.nodes().len(), 5);
+        assert_eq!(right.nodes().len(), 5);
+        assert_eq!(left.number_of_bonds(), 4);
+        assert_eq!(right.number_of_bonds(), 4);
     }
 
     #[test]

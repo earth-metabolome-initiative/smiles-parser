@@ -12,10 +12,25 @@ libfuzzer-sys = "0.4"
 
 [dependencies.smiles-parser]
 path = ".."
+features = ["fuzzing"]
 
 [[bin]]
-name = "fuzz_target_1"
-path = "fuzz_targets/fuzz_target_1.rs"
+name = "roundtrip"
+path = "fuzz_targets/roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "aromaticity_kekulization_roundtrip"
+path = "fuzz_targets/aromaticity_kekulization_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "canonicalization"
+path = "fuzz_targets/canonicalization.rs"
 test = false
 doc = false
 bench = false

@@ -58,6 +58,9 @@ impl Smiles {
     #[inline]
     #[must_use]
     pub fn implicit_hydrogen_counts(&self) -> Vec<u8> {
+        if let Some(cached) = &self.implicit_hydrogen_cache {
+            return cached.clone();
+        }
         self.nodes()
             .iter()
             .enumerate()
@@ -72,6 +75,9 @@ impl Smiles {
     #[inline]
     #[must_use]
     pub fn implicit_hydrogen_count(&self, id: usize) -> Option<u8> {
+        if let Some(cached) = &self.implicit_hydrogen_cache {
+            return cached.get(id).copied();
+        }
         self.node_by_id(id).map(|node| implicit_hydrogens_for_node(self, id, node))
     }
 }
@@ -96,6 +102,25 @@ fn implicit_hydrogens_for_node(smiles: &Smiles, node_id: usize, node: &Atom) -> 
                         aliphatic_implicit_hydrogens(element, explicit_valence)
                     }
                 }
+            }
+        }
+    }
+}
+
+#[inline]
+pub(super) fn implicit_hydrogens_if_written_unbracketed(
+    smiles: &Smiles,
+    node_id: usize,
+    node: &Atom,
+) -> u8 {
+    let explicit_valence = explicit_valence(smiles, node_id);
+    match node.symbol() {
+        AtomSymbol::WildCard => 0,
+        AtomSymbol::Element(element) => {
+            if node.aromatic() {
+                aromatic_implicit_hydrogens(element, explicit_valence)
+            } else {
+                aliphatic_implicit_hydrogens(element, explicit_valence)
             }
         }
     }
@@ -188,7 +213,8 @@ mod tests {
     use elements_rs::{AllowedValences, ChargedValences, Element};
 
     use super::{
-        Smiles, aromatic_implicit_hydrogens, bond_order, explicit_valence, target_valence,
+        Smiles, aromatic_implicit_hydrogens, bond_order, explicit_valence,
+        implicit_hydrogens_for_node, target_valence,
     };
     use crate::bond::Bond;
 
@@ -208,6 +234,13 @@ mod tests {
     fn wildcard_atoms_never_gain_implicit_hydrogens() {
         let smiles = Smiles::from_str("*").unwrap();
         assert_eq!(smiles.implicit_hydrogen_counts(), vec![0]);
+    }
+
+    #[test]
+    fn implicit_hydrogens_for_node_covers_direct_organic_subset_path() {
+        let smiles = Smiles::from_str("C").unwrap();
+        let node = smiles.node_by_id(0).unwrap();
+        assert_eq!(implicit_hydrogens_for_node(&smiles, 0, node), 4);
     }
 
     #[test]

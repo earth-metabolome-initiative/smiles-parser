@@ -8,10 +8,15 @@ repository = "https://github.com/earth-metabolome-initiative/smiles-parser"
 description = "A SMILES parser in Rust"
 readme = "README.md"
 
+[features]
+default = []
+fuzzing = []
+
 [dependencies]
 elements_rs = "0.2.1"
-geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", rev = "b509d25854aac0ecf368a2e8f97d2530e970a106", default-features = false, features = ["alloc"] }
+geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", branch = "main", default-features = false, features = ["alloc"] }
 hashbrown = { version = "0.16.1", default-features = false, features = ["alloc", "default-hasher", "inline-more"] }
+smallvec = { version = "1.15.1", default-features = false, features = ["union"] }
 thiserror = { version = "2.0.18", default-features = false }
 
 
@@ -38,7 +43,6 @@ invalid_rust_codeblocks = "forbid"
 unreadable_literal = "allow"
 missing_panics_doc = "allow"
 new_ret_no_self = "allow"
-struct_excessive_bools = "allow"
 should_panic_without_expect = "allow"
 doc_markdown = "allow"
 clone_on_copy = "forbid"
@@ -49,18 +53,9 @@ pedantic = { level = "deny", priority = -1 }
 lto = "thin"
 codegen-units = 1
 
-[profile.bench]
-inherits = "release"
-
 [dev-dependencies]
-criterion = "0.8.2"
-csv = "1.4.0"
 flate2 = "1.1.9"
 indicatif = "0.18.4"
 rayon = "1.11.0"
-reqwest = { version = "0.12.24", default-features = false, features = ["blocking", "rustls-tls"] }
-serde = "1.0.228"
-
-[[bench]]
-name = "smiles_bench"
-harness = false
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
