@@ -198,6 +198,9 @@ impl Smiles {
             .enumerate()
             .map(|(node_id, atom)| canonicalization_atom_spelling_normal_form(self, node_id, atom))
             .collect::<Vec<_>>();
+        if atom_nodes.is_empty() {
+            return self.clone_without_kekulization_source();
+        }
         // Preserve the current interpreted implicit-hydrogen counts for atoms
         // whose spelling did not change. Aromaticized graphs can carry
         // sidecar counts that are not recoverable from raw aromatic token

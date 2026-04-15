@@ -105,6 +105,13 @@ fn canonicalize_handles_fuzz_crash_hex_wildcard_oxygen_regression() {
 }
 
 #[test]
+fn canonicalize_handles_fuzz_crash_aromatic_boron_hydrogen_regression() {
+    let smiles = Smiles::from_str("[H]bbbbbbbbbb").unwrap();
+
+    assert_canonicalization_invariants(&smiles);
+}
+
+#[test]
 fn canonicalize_reaches_fixed_point_for_pubchem_cid_10888631_regression() {
     let smiles =
         Smiles::from_str("C1C2[C@@H]3[C@H]4[C@H]5[C@H]6C5CC4[C@@H]6[C@H]2[C@@H]7[C@@H]3C71")
@@ -128,15 +135,17 @@ fn canonicalize_reaches_fixed_point_for_pubchem_cid_101510359_regression() {
 }
 
 #[test]
-fn canonicalization_spelling_normal_form_clears_implicit_hydrogen_cache() {
+fn canonicalization_spelling_normal_form_preserves_semantic_implicit_hydrogens() {
     let aromaticized = Smiles::from_str("C1=CC=CC=C1")
         .unwrap()
         .perceive_aromaticity()
         .unwrap()
         .into_aromaticized();
+    let rewritten = aromaticized.canonicalization_spelling_normal_form();
 
     assert!(aromaticized.implicit_hydrogen_cache.is_some());
-    assert!(aromaticized.canonicalization_spelling_normal_form().implicit_hydrogen_cache.is_none());
+    assert_eq!(rewritten.implicit_hydrogen_counts(), aromaticized.implicit_hydrogen_counts());
+    assert_eq!(rewritten.implicit_hydrogen_cache, Some(aromaticized.implicit_hydrogen_counts()));
 }
 
 #[test]

@@ -170,13 +170,15 @@ impl Smiles {
         )
         .unwrap_or_else(|_| unreachable!("existing bond matrix entries are already valid"));
 
-        Ok(Self::from_bond_matrix_parts_with_sidecars(
+        let mut kekulized = Self::from_bond_matrix_parts_with_sidecars(
             atom_nodes,
             bond_matrix,
             self.parsed_stereo_neighbors.clone(),
-            Some(self.implicit_hydrogen_counts()),
             None,
-        ))
+            None,
+        );
+        kekulized.implicit_hydrogen_cache = Some(kekulized.implicit_hydrogen_counts());
+        Ok(kekulized)
     }
 
     /// Returns a localized Kekule form by solving from the current aromatic
