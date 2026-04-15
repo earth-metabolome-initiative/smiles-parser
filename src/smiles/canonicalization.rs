@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 
 use elements_rs::Element;
 use geometric_traits::{
-    prelude::canonical_label_labeled_simple_graph,
+    prelude::CanonicalLabeling,
     traits::{SparseMatrix2D, SparseValuedMatrixRef},
 };
 
@@ -82,7 +82,7 @@ impl Smiles {
         atom_label: impl Fn(Atom) -> CanonicalAtomLabel,
         bond_label: impl Fn(Bond) -> CanonicalBondLabel,
     ) -> SmilesCanonicalLabeling {
-        let result = canonical_label_labeled_simple_graph(
+        let result = CanonicalLabeling::canonical_labeling(
             self,
             |node_id| atom_label(self.nodes()[node_id]),
             |node_a, node_b| {

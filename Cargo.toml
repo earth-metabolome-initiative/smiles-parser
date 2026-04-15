@@ -14,7 +14,7 @@ fuzzing = []
 
 [dependencies]
 elements_rs = "0.2.1"
-geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", rev = "fc6365da81938f394778236a36c9cb70f1ec2bcd", default-features = false, features = ["alloc"] }
+geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", branch = "main", default-features = false, features = ["alloc"] }
 hashbrown = { version = "0.16.1", default-features = false, features = ["alloc", "default-hasher", "inline-more"] }
 smallvec = { version = "1.15.1", default-features = false, features = ["union"] }
 thiserror = { version = "2.0.18", default-features = false }
