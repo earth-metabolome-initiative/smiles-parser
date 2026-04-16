@@ -13,7 +13,7 @@ default = []
 fuzzing = []
 
 [dependencies]
-elements_rs = "0.2.1"
+elements_rs = "0.2.2"
 geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", branch = "main", default-features = false, features = ["alloc"] }
 hashbrown = { version = "0.16.1", default-features = false, features = ["alloc", "default-hasher", "inline-more"] }
 smallvec = { version = "1.15.1", default-features = false, features = ["union"] }
