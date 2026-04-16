@@ -14,12 +14,11 @@
 //! - aromatic token cases that are still local, but not purely periodic-table
 //!   lookups
 
-#[path = "common/implicit_hydrogen_cases.rs"]
-mod implicit_hydrogen_cases;
+mod implicit_hydrogen_common;
 
 use std::str::FromStr;
 
-use implicit_hydrogen_cases::{
+use implicit_hydrogen_common::{
     AROMATIC_CASES, ImplicitHydrogenCase, ORGANIC_SUBSET_CASES, RAW_RDKIT_COMPAT_CASES, all_cases,
 };
 use smiles_parser::smiles::Smiles;

@@ -159,6 +159,8 @@ pub(crate) fn canonical_stereo_neighbors_row(
     chirality: Option<Chirality>,
     parsed_neighbors: &[StereoNeighbor],
     new_index_of_old_node: &[usize],
+    rooted_classes: &[usize],
+    refined_classes: &[usize],
 ) -> Vec<StereoNeighbor> {
     let chirality = stereo_chirality_normal_form(smiles, node_id, chirality, parsed_neighbors);
     if !supports_stereo_neighbor_normalization(chirality) {
@@ -182,7 +184,16 @@ pub(crate) fn canonical_stereo_neighbors_row(
         Some(Chirality::SP(kind)) => {
             square_assignment_from_shape(Chirality::SP(kind), &expanded_neighbors).map_or_else(
                 || parsed_neighbors.to_vec(),
-                |assignment| canonical_square_planar_neighbors(&assignment, new_index_of_old_node),
+                |assignment| {
+                    canonical_square_planar_neighbors(
+                        smiles,
+                        node_id,
+                        &assignment,
+                        new_index_of_old_node,
+                        rooted_classes,
+                        refined_classes,
+                    )
+                },
             )
         }
         Some(Chirality::TB(_)) => {
@@ -290,6 +301,102 @@ fn stereo_neighbor_sequence_key(
         .collect()
 }
 
+fn square_planar_identity_sequence_key(
+    smiles: &Smiles,
+    node_id: usize,
+    neighbors: &[StereoNeighbor],
+    rooted_classes: &[usize],
+    refined_classes: &[usize],
+) -> Vec<StereoSubstituentIdentityKey> {
+    neighbors
+        .iter()
+        .copied()
+        .map(|neighbor| {
+            stereo_substituent_identity_key(
+                smiles,
+                node_id,
+                neighbor,
+                rooted_classes,
+                refined_classes,
+            )
+        })
+        .collect()
+}
+
+fn canonicalize_equivalent_square_planar_neighbors(
+    smiles: &Smiles,
+    node_id: usize,
+    neighbors: &[StereoNeighbor],
+    new_index_of_old_node: &[usize],
+    rooted_classes: &[usize],
+    refined_classes: &[usize],
+) -> Vec<StereoNeighbor> {
+    let mut canonicalized = neighbors.to_vec();
+    let mut keyed_positions = neighbors
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(index, neighbor)| {
+            (
+                index,
+                stereo_substituent_identity_key(
+                    smiles,
+                    node_id,
+                    neighbor,
+                    rooted_classes,
+                    refined_classes,
+                ),
+            )
+        })
+        .collect::<Vec<_>>();
+    keyed_positions.sort_unstable_by_key(|&(index, key)| (key, index));
+
+    let mut start = 0;
+    while start < keyed_positions.len() {
+        let key = keyed_positions[start].1;
+        let mut end = start + 1;
+        while end < keyed_positions.len() && keyed_positions[end].1 == key {
+            end += 1;
+        }
+
+        let mut positions =
+            keyed_positions[start..end].iter().map(|(index, _key)| *index).collect::<Vec<_>>();
+        positions.sort_unstable();
+        let mut group_neighbors =
+            positions.iter().map(|&index| neighbors[index]).collect::<Vec<_>>();
+        group_neighbors.sort_unstable_by_key(|neighbor| {
+            canonical_stereo_neighbor_sort_key(*neighbor, new_index_of_old_node)
+        });
+        for (position, neighbor) in positions.into_iter().zip(group_neighbors) {
+            canonicalized[position] = neighbor;
+        }
+
+        start = end;
+    }
+
+    canonicalized
+}
+
+fn canonical_square_planar_candidate_key(
+    smiles: &Smiles,
+    node_id: usize,
+    neighbors: &[StereoNeighbor],
+    new_index_of_old_node: &[usize],
+    rooted_classes: &[usize],
+    refined_classes: &[usize],
+) -> (Vec<StereoSubstituentIdentityKey>, Vec<(u8, usize)>) {
+    (
+        square_planar_identity_sequence_key(
+            smiles,
+            node_id,
+            neighbors,
+            rooted_classes,
+            refined_classes,
+        ),
+        stereo_neighbor_sequence_key(neighbors, new_index_of_old_node),
+    )
+}
+
 const fn square_shape_path(shape: SquareShape) -> [usize; 4] {
     match shape {
         SquareShape::U => [0, 1, 2, 3],
@@ -308,13 +415,31 @@ fn square_shape_for_chirality(chirality: Chirality) -> Option<SquareShape> {
 }
 
 fn canonical_square_planar_neighbors(
+    smiles: &Smiles,
+    node_id: usize,
     parsed_neighbors: &[StereoNeighbor],
     new_index_of_old_node: &[usize],
+    rooted_classes: &[usize],
+    refined_classes: &[usize],
 ) -> Vec<StereoNeighbor> {
     let assignment =
         [parsed_neighbors[0], parsed_neighbors[1], parsed_neighbors[2], parsed_neighbors[3]];
-    let mut best = assignment;
-    let mut best_key = stereo_neighbor_sequence_key(&best, new_index_of_old_node);
+    let mut best = canonicalize_equivalent_square_planar_neighbors(
+        smiles,
+        node_id,
+        &assignment,
+        new_index_of_old_node,
+        rooted_classes,
+        refined_classes,
+    );
+    let mut best_key = canonical_square_planar_candidate_key(
+        smiles,
+        node_id,
+        &best,
+        new_index_of_old_node,
+        rooted_classes,
+        refined_classes,
+    );
     for rotation in 0..4 {
         let rotated = [
             assignment[rotation % 4],
@@ -322,7 +447,22 @@ fn canonical_square_planar_neighbors(
             assignment[(rotation + 2) % 4],
             assignment[(rotation + 3) % 4],
         ];
-        let rotated_key = stereo_neighbor_sequence_key(&rotated, new_index_of_old_node);
+        let rotated = canonicalize_equivalent_square_planar_neighbors(
+            smiles,
+            node_id,
+            &rotated,
+            new_index_of_old_node,
+            rooted_classes,
+            refined_classes,
+        );
+        let rotated_key = canonical_square_planar_candidate_key(
+            smiles,
+            node_id,
+            &rotated,
+            new_index_of_old_node,
+            rooted_classes,
+            refined_classes,
+        );
         if rotated_key < best_key {
             best = rotated;
             best_key = rotated_key;
@@ -334,13 +474,28 @@ fn canonical_square_planar_neighbors(
             assignment[(rotation + 2) % 4],
             assignment[(rotation + 1) % 4],
         ];
-        let mirrored_key = stereo_neighbor_sequence_key(&mirrored, new_index_of_old_node);
+        let mirrored = canonicalize_equivalent_square_planar_neighbors(
+            smiles,
+            node_id,
+            &mirrored,
+            new_index_of_old_node,
+            rooted_classes,
+            refined_classes,
+        );
+        let mirrored_key = canonical_square_planar_candidate_key(
+            smiles,
+            node_id,
+            &mirrored,
+            new_index_of_old_node,
+            rooted_classes,
+            refined_classes,
+        );
         if mirrored_key < best_key {
             best = mirrored;
             best_key = mirrored_key;
         }
     }
-    best.to_vec()
+    best
 }
 
 fn square_assignment_from_shape(

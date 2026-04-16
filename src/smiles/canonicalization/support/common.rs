@@ -15,6 +15,8 @@ fn canonicalized_parsed_stereo_neighbor_rows(
     smiles: &Smiles,
 ) -> Vec<Vec<CanonicalStereoNeighborKey>> {
     let labeling = smiles.stereo_neutral_canonical_labeling();
+    let refined_classes = smiles.stereo_neutral_refined_classes();
+    let rooted_classes = smiles.stereo_neutral_rooted_classes(&refined_classes);
     smiles
         .nodes()
         .iter()
@@ -27,6 +29,8 @@ fn canonicalized_parsed_stereo_neighbor_rows(
                 atom.chirality(),
                 &smiles.parsed_stereo_neighbors(node_id),
                 labeling.new_index_of_old_node(),
+                &rooted_classes,
+                &refined_classes,
             )
             .into_iter()
             .map(canonical_stereo_neighbor_key)

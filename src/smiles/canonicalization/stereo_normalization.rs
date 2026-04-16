@@ -134,6 +134,8 @@ impl Smiles {
                     chirality,
                     parsed_neighbors,
                     new_index_of_old_node,
+                    rooted_classes,
+                    refined_classes,
                 );
                 let normalized_chirality = normalized_stereo_chirality(
                     self,

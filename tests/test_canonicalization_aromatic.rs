@@ -1,6 +1,5 @@
 //! Public canonicalization behavior tests for aromatic cases.
 
-#[path = "common/canonicalization.rs"]
 mod canonicalization_common;
 
 use canonicalization_common::{assert_same_canonical_group, canonical_string};
