@@ -112,6 +112,13 @@ fn canonicalize_handles_fuzz_crash_aromatic_boron_hydrogen_regression() {
 }
 
 #[test]
+fn canonicalize_handles_fuzz_crash_square_planar_platinum_regression() {
+    let smiles = Smiles::from_str("[NH3][Pt@SP1]([NH3])(Cl)Cl").unwrap();
+
+    assert_canonicalization_invariants(&smiles);
+}
+
+#[test]
 fn canonicalize_reaches_fixed_point_for_pubchem_cid_10888631_regression() {
     let smiles =
         Smiles::from_str("C1C2[C@@H]3[C@H]4[C@H]5[C@H]6C5CC4[C@@H]6[C@H]2[C@@H]7[C@@H]3C71")

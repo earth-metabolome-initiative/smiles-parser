@@ -249,6 +249,8 @@ fn tetrahedral_stereo_signature(smiles: &Smiles) -> Vec<TetrahedralStereoSignatu
                 atom.chirality(),
                 &parsed_neighbors,
                 labeling.new_index_of_old_node(),
+                &rooted_classes,
+                &refined_classes,
             );
             // Do not anchor tetrahedral invariants on a particular canonical
             // node index. Stereo normalization may change disconnected

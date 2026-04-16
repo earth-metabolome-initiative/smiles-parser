@@ -1,6 +1,5 @@
 //! Public canonicalization behavior tests for non-stereo cases.
 
-#[path = "common/canonicalization.rs"]
 mod canonicalization_common;
 
 use core::str::FromStr;
