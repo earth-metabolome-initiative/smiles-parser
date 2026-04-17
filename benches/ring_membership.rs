@@ -1,4 +1,5 @@
-//! Benchmarks for [`Smiles::ring_membership`].
+//! Benchmarks for [`Smiles::ring_membership`] and
+//! [`Smiles::ring_atom_membership`].
 //!
 //! The benchmark keeps a few single-molecule control cases and
 //! opportunistically adds broader corpus-backed datasets when local fixtures
@@ -15,7 +16,7 @@ use std::{
 
 use flate2::read::GzDecoder;
 use serde::Deserialize;
-use smiles_parser::Smiles;
+use smiles_parser::{RingAtomMembership, RingAtomMembershipScratch, Smiles};
 
 const SAMPLE_COUNT: usize = 9;
 const MIN_BATCH_TIME: Duration = Duration::from_millis(100);
@@ -40,6 +41,28 @@ struct BenchmarkCase {
     bond_count: usize,
     ring_atom_count: usize,
     ring_bond_count: usize,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum BenchmarkMode {
+    Full,
+    AtomOnly,
+    AtomOnlySeed,
+    AtomOnlyReuseSeed,
+}
+
+impl BenchmarkMode {
+    const ALL: [Self; 4] =
+        [Self::Full, Self::AtomOnly, Self::AtomOnlySeed, Self::AtomOnlyReuseSeed];
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Full => "full",
+            Self::AtomOnly => "atom_only",
+            Self::AtomOnlySeed => "atom_only_seed",
+            Self::AtomOnlyReuseSeed => "atom_only_reuse_seed",
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -79,18 +102,29 @@ fn main() {
     let mut matched_case_count = 0_usize;
 
     println!(
-        "{:<32} {:>8} {:>10} {:>10} {:>10} {:>10} {:>16} {:>16}",
-        "case", "mols", "atoms", "bonds", "ring_a", "ring_b", "median ns/mol", "best ns/mol",
+        "{:<12} {:<32} {:>8} {:>10} {:>10} {:>10} {:>10} {:>16} {:>16}",
+        "mode",
+        "case",
+        "mols",
+        "atoms",
+        "bonds",
+        "ring_a",
+        "ring_b",
+        "median ns/mol",
+        "best ns/mol",
     );
 
-    for case in &cases {
-        if let Some(filter) = &filter
-            && !case.name.contains(filter)
-        {
-            continue;
+    for mode in BenchmarkMode::ALL {
+        for case in &cases {
+            if let Some(filter) = &filter
+                && !case.name.contains(filter)
+                && !mode.label().contains(filter)
+            {
+                continue;
+            }
+            matched_case_count += 1;
+            print_case_result(case, mode);
         }
-        matched_case_count += 1;
-        print_case_result(case);
     }
 
     if matched_case_count == 0 {
@@ -279,9 +313,9 @@ fn parse_smiles_or_panic(name: &str, source: &str) -> Smiles {
     })
 }
 
-fn print_case_result(case: &BenchmarkCase) {
-    let batch_iterations = calibrate_iterations(case);
-    let sample_ns = sample_batch_ns(case, batch_iterations);
+fn print_case_result(case: &BenchmarkCase, mode: BenchmarkMode) {
+    let batch_iterations = calibrate_iterations(case, mode);
+    let sample_ns = sample_batch_ns(case, mode, batch_iterations);
     let per_molecule_divisor = u128::from(batch_iterations)
         * u128::try_from(case.molecule_count)
             .unwrap_or_else(|_| unreachable!("usize always fits into u128"));
@@ -289,7 +323,8 @@ fn print_case_result(case: &BenchmarkCase) {
     let best_ns = sample_ns[0] / per_molecule_divisor;
 
     println!(
-        "{:<32} {:>8} {:>10} {:>10} {:>10} {:>10} {:>16} {:>16}",
+        "{:<12} {:<32} {:>8} {:>10} {:>10} {:>10} {:>10} {:>16} {:>16}",
+        mode.label(),
         case.name,
         case.molecule_count,
         case.atom_count,
@@ -301,10 +336,10 @@ fn print_case_result(case: &BenchmarkCase) {
     );
 }
 
-fn calibrate_iterations(case: &BenchmarkCase) -> u64 {
+fn calibrate_iterations(case: &BenchmarkCase, mode: BenchmarkMode) -> u64 {
     let mut iterations = 1_u64;
     loop {
-        if measure_batch(case, iterations) >= MIN_BATCH_TIME {
+        if measure_batch(case, mode, iterations) >= MIN_BATCH_TIME {
             return iterations;
         }
         if iterations >= u64::MAX / 2 {
@@ -314,27 +349,56 @@ fn calibrate_iterations(case: &BenchmarkCase) -> u64 {
     }
 }
 
-fn sample_batch_ns(case: &BenchmarkCase, iterations: u64) -> [u128; SAMPLE_COUNT] {
+fn sample_batch_ns(
+    case: &BenchmarkCase,
+    mode: BenchmarkMode,
+    iterations: u64,
+) -> [u128; SAMPLE_COUNT] {
     let mut sample_ns = [0_u128; SAMPLE_COUNT];
     for slot in &mut sample_ns {
-        *slot = measure_batch(case, iterations).as_nanos();
+        *slot = measure_batch(case, mode, iterations).as_nanos();
     }
     sample_ns.sort_unstable();
     sample_ns
 }
 
-fn measure_batch(case: &BenchmarkCase, iterations: u64) -> Duration {
+fn measure_batch(case: &BenchmarkCase, mode: BenchmarkMode, iterations: u64) -> Duration {
     let started_at = Instant::now();
-    let mut checksum = 0_usize;
+    let mut reusable_ring_atom_membership = RingAtomMembership::default();
+    let mut reusable_scratch = RingAtomMembershipScratch::default();
 
     for _ in 0..iterations {
         for smiles in &case.smiles_set {
-            let ring_membership = smiles.ring_membership();
-            checksum = checksum.wrapping_add(ring_membership.atom_ids().len());
-            checksum = checksum.wrapping_add(ring_membership.bond_edges().len());
+            match mode {
+                BenchmarkMode::Full => {
+                    black_box(smiles.ring_membership());
+                }
+                BenchmarkMode::AtomOnly => {
+                    black_box(smiles.ring_atom_membership());
+                }
+                BenchmarkMode::AtomOnlySeed => {
+                    let ring_atom_membership = smiles.ring_atom_membership();
+                    let mut ring_atom_count = 0_usize;
+                    for atom_id in 0..smiles.nodes().len() {
+                        ring_atom_count += usize::from(ring_atom_membership.contains_atom(atom_id));
+                    }
+                    black_box(ring_atom_count);
+                }
+                BenchmarkMode::AtomOnlyReuseSeed => {
+                    smiles.write_ring_atom_membership(
+                        &mut reusable_ring_atom_membership,
+                        &mut reusable_scratch,
+                    );
+                    let mut ring_atom_count = 0_usize;
+                    for atom_id in 0..smiles.nodes().len() {
+                        ring_atom_count +=
+                            usize::from(reusable_ring_atom_membership.contains_atom(atom_id));
+                    }
+                    black_box(ring_atom_count);
+                }
+            }
         }
     }
 
-    black_box(checksum);
     started_at.elapsed()
 }
