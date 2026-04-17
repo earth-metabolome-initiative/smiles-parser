@@ -53,6 +53,10 @@ pedantic = { level = "deny", priority = -1 }
 lto = "thin"
 codegen-units = 1
 
+[[bench]]
+name = "ring_membership"
+harness = false
+
 [dev-dependencies]
 flate2 = "1.1.9"
 indicatif = "0.18.4"

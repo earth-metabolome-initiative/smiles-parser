@@ -29,7 +29,6 @@ use geometric_traits::traits::{
     SizedSparseMatrix2D, SizedSparseValuedMatrixRef, SparseMatrix2D, SparseValuedMatrix2DRef,
     SparseValuedMatrixRef,
 };
-use hashbrown::HashSet;
 
 use crate::{atom::Atom, bond::bond_edge::BondEdge};
 
@@ -256,49 +255,69 @@ impl Smiles {
     /// the graph, so chain attachments and bridges are excluded.
     #[must_use]
     pub fn ring_membership(&self) -> RingMembership {
-        if self.atom_nodes.is_empty() || self.number_of_bonds() == 0 {
+        let bond_count = self.number_of_bonds();
+        if self.atom_nodes.len() < 3 || bond_count < 3 {
             return RingMembership { atom_ids: Vec::new(), bond_edges: Vec::new() };
+        }
+        if u32::try_from(self.atom_nodes.len()).is_ok() {
+            return self.ring_membership_with_packed_bridge_keys(bond_count);
         }
 
         let mut discovery_order = vec![0_usize; self.atom_nodes.len()];
         let mut lowlink = vec![0_usize; self.atom_nodes.len()];
-        let mut parent = vec![None::<usize>; self.atom_nodes.len()];
         let mut time = 0_usize;
-        let mut bridge_edges = HashSet::<[usize; 2]>::new();
+        let mut bridge_edges = Vec::<[usize; 2]>::with_capacity(bond_count);
 
         for start_atom_id in 0..self.atom_nodes.len() {
             if discovery_order[start_atom_id] == 0 {
                 self.find_bridge_edges_depth_first(
                     start_atom_id,
+                    None,
                     &mut time,
                     &mut discovery_order,
                     &mut lowlink,
-                    &mut parent,
                     &mut bridge_edges,
                 );
             }
         }
+        if bridge_edges.len() == bond_count {
+            return RingMembership { atom_ids: Vec::new(), bond_edges: Vec::new() };
+        }
+        if bridge_edges.is_empty() {
+            lowlink.fill(0);
+            return self.ring_membership_from_all_unique_edges(bond_count, &mut lowlink);
+        }
+        bridge_edges.sort_unstable();
 
-        let mut ring_atom_flags = vec![false; self.atom_nodes.len()];
-        let mut bond_edges =
-            Vec::with_capacity(self.number_of_bonds().saturating_sub(bridge_edges.len()));
-        for ((row, column), _) in self.bond_matrix.sparse_entries() {
-            if row >= column {
-                continue;
+        lowlink.fill(0);
+        let mut bond_edges = Vec::with_capacity(bond_count.saturating_sub(bridge_edges.len()));
+        let mut next_bridge = 0_usize;
+        for row in 0..self.atom_nodes.len() {
+            for column in self.bond_matrix.sparse_row(row) {
+                if row >= column {
+                    continue;
+                }
+                let edge = [row, column];
+                while let Some(bridge) = bridge_edges.get(next_bridge) {
+                    if *bridge < edge {
+                        next_bridge += 1;
+                    } else {
+                        break;
+                    }
+                }
+                if bridge_edges.get(next_bridge) == Some(&edge) {
+                    continue;
+                }
+                lowlink[row] = 1;
+                lowlink[column] = 1;
+                bond_edges.push(edge);
             }
-            let edge = [row, column];
-            if bridge_edges.contains(&edge) {
-                continue;
-            }
-            ring_atom_flags[row] = true;
-            ring_atom_flags[column] = true;
-            bond_edges.push(edge);
         }
 
-        let atom_ids = ring_atom_flags
+        let atom_ids = lowlink
             .into_iter()
             .enumerate()
-            .filter_map(|(atom_id, is_ring_atom)| is_ring_atom.then_some(atom_id))
+            .filter_map(|(atom_id, is_ring_atom)| (is_ring_atom != 0).then_some(atom_id))
             .collect();
 
         RingMembership { atom_ids, bond_edges }
@@ -397,14 +416,111 @@ impl Smiles {
         self::emitter::emit(self)
     }
 
-    fn find_bridge_edges_depth_first(
+    fn ring_membership_with_packed_bridge_keys(&self, bond_count: usize) -> RingMembership {
+        let mut discovery_order = vec![0_usize; self.atom_nodes.len()];
+        let mut lowlink = vec![0_usize; self.atom_nodes.len()];
+        let mut time = 0_usize;
+        let mut bridge_keys = Vec::<u64>::with_capacity(bond_count);
+
+        for start_atom_id in 0..self.atom_nodes.len() {
+            if discovery_order[start_atom_id] == 0 {
+                self.find_bridge_keys_depth_first(
+                    start_atom_id,
+                    None,
+                    &mut time,
+                    &mut discovery_order,
+                    &mut lowlink,
+                    &mut bridge_keys,
+                );
+            }
+        }
+        if bridge_keys.len() == bond_count {
+            return RingMembership { atom_ids: Vec::new(), bond_edges: Vec::new() };
+        }
+        if bridge_keys.is_empty() {
+            lowlink.fill(0);
+            return self.ring_membership_from_all_unique_edges(bond_count, &mut lowlink);
+        }
+        bridge_keys.sort_unstable();
+
+        lowlink.fill(0);
+        let mut bond_edges = Vec::with_capacity(bond_count.saturating_sub(bridge_keys.len()));
+        let mut next_bridge = 0_usize;
+        for row in 0..self.atom_nodes.len() {
+            for column in self.bond_matrix.sparse_row(row) {
+                if row >= column {
+                    continue;
+                }
+                let edge_key = Self::packed_edge_key(row, column);
+                while let Some(bridge_key) = bridge_keys.get(next_bridge) {
+                    if *bridge_key < edge_key {
+                        next_bridge += 1;
+                    } else {
+                        break;
+                    }
+                }
+                if bridge_keys.get(next_bridge) == Some(&edge_key) {
+                    continue;
+                }
+                lowlink[row] = 1;
+                lowlink[column] = 1;
+                bond_edges.push([row, column]);
+            }
+        }
+
+        let atom_ids = lowlink
+            .into_iter()
+            .enumerate()
+            .filter_map(|(atom_id, is_ring_atom)| (is_ring_atom != 0).then_some(atom_id))
+            .collect();
+
+        RingMembership { atom_ids, bond_edges }
+    }
+
+    fn ring_membership_from_all_unique_edges(
+        &self,
+        bond_count: usize,
+        ring_atom_flags: &mut [usize],
+    ) -> RingMembership {
+        let mut bond_edges = Vec::with_capacity(bond_count);
+
+        for row in 0..self.atom_nodes.len() {
+            for column in self.bond_matrix.sparse_row(row) {
+                if row >= column {
+                    continue;
+                }
+                ring_atom_flags[row] = 1;
+                ring_atom_flags[column] = 1;
+                bond_edges.push([row, column]);
+            }
+        }
+
+        let atom_ids = ring_atom_flags
+            .iter()
+            .enumerate()
+            .filter_map(|(atom_id, &is_ring_atom)| (is_ring_atom != 0).then_some(atom_id))
+            .collect();
+
+        RingMembership { atom_ids, bond_edges }
+    }
+
+    #[inline]
+    fn packed_edge_key(node_a: usize, node_b: usize) -> u64 {
+        let node_a =
+            u32::try_from(node_a).unwrap_or_else(|_| unreachable!("guarded by ring_membership"));
+        let node_b =
+            u32::try_from(node_b).unwrap_or_else(|_| unreachable!("guarded by ring_membership"));
+        (u64::from(node_a) << 32) | u64::from(node_b)
+    }
+
+    fn find_bridge_keys_depth_first(
         &self,
         atom_id: usize,
+        parent_atom_id: Option<usize>,
         time: &mut usize,
         discovery_order: &mut [usize],
         lowlink: &mut [usize],
-        parent: &mut [Option<usize>],
-        bridge_edges: &mut HashSet<[usize; 2]>,
+        bridge_keys: &mut Vec<u64>,
     ) {
         *time += 1;
         discovery_order[atom_id] = *time;
@@ -412,24 +528,57 @@ impl Smiles {
 
         for neighbor_atom_id in self.bond_matrix.sparse_row(atom_id) {
             if discovery_order[neighbor_atom_id] == 0 {
-                parent[neighbor_atom_id] = Some(atom_id);
-                self.find_bridge_edges_depth_first(
+                self.find_bridge_keys_depth_first(
                     neighbor_atom_id,
+                    Some(atom_id),
                     time,
                     discovery_order,
                     lowlink,
-                    parent,
+                    bridge_keys,
+                );
+                lowlink[atom_id] = lowlink[atom_id].min(lowlink[neighbor_atom_id]);
+                if lowlink[neighbor_atom_id] > discovery_order[atom_id] {
+                    let (row, column) = Self::edge_key(atom_id, neighbor_atom_id);
+                    bridge_keys.push(Self::packed_edge_key(row, column));
+                }
+            } else if parent_atom_id != Some(neighbor_atom_id) {
+                lowlink[atom_id] = lowlink[atom_id].min(discovery_order[neighbor_atom_id]);
+            }
+        }
+    }
+
+    fn find_bridge_edges_depth_first(
+        &self,
+        atom_id: usize,
+        parent_atom_id: Option<usize>,
+        time: &mut usize,
+        discovery_order: &mut [usize],
+        lowlink: &mut [usize],
+        bridge_edges: &mut Vec<[usize; 2]>,
+    ) {
+        *time += 1;
+        discovery_order[atom_id] = *time;
+        lowlink[atom_id] = *time;
+
+        for neighbor_atom_id in self.bond_matrix.sparse_row(atom_id) {
+            if discovery_order[neighbor_atom_id] == 0 {
+                self.find_bridge_edges_depth_first(
+                    neighbor_atom_id,
+                    Some(atom_id),
+                    time,
+                    discovery_order,
+                    lowlink,
                     bridge_edges,
                 );
                 lowlink[atom_id] = lowlink[atom_id].min(lowlink[neighbor_atom_id]);
                 if lowlink[neighbor_atom_id] > discovery_order[atom_id] {
-                    bridge_edges.insert(if atom_id < neighbor_atom_id {
+                    bridge_edges.push(if atom_id < neighbor_atom_id {
                         [atom_id, neighbor_atom_id]
                     } else {
                         [neighbor_atom_id, atom_id]
                     });
                 }
-            } else if parent[atom_id] != Some(neighbor_atom_id) {
+            } else if parent_atom_id != Some(neighbor_atom_id) {
                 lowlink[atom_id] = lowlink[atom_id].min(discovery_order[neighbor_atom_id]);
             }
         }
