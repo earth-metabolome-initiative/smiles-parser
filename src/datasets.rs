@@ -20,12 +20,22 @@
 //! println!("{}", artifact.path().display());
 //! # Ok::<(), smiles_parser::DatasetError>(())
 //! ```
+//!
+//! ```no_run
+//! use smiles_parser::datasets::{PUBCHEM_SMILES, SmilesDatasetSource};
+//!
+//! let mut smiles = PUBCHEM_SMILES.iter_smiles()?;
+//! if let Some(first) = smiles.next() {
+//!     println!("{}", first?);
+//! }
+//! # Ok::<(), smiles_parser::DatasetError>(())
+//! ```
 
-use alloc::{borrow::ToOwned, string::String};
+use alloc::{borrow::ToOwned, boxed::Box, string::String};
 use std::{
     env,
     fs::{self, File},
-    io::{self, BufWriter, IsTerminal, Read, Write},
+    io::{self, BufRead, BufReader, BufWriter, IsTerminal, Read, Write},
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -167,6 +177,16 @@ pub enum DatasetError {
         #[source]
         source: io::Error,
     },
+    /// The dataset contents did not match the expected record layout.
+    #[error("failed to parse dataset {dataset_id} at line {line_number}: {message}")]
+    Format {
+        /// The dataset identifier.
+        dataset_id: &'static str,
+        /// The 1-based line number within the materialized dataset file.
+        line_number: usize,
+        /// A human-readable explanation of the malformed record.
+        message: String,
+    },
 }
 
 /// Metadata for a downloadable dataset source.
@@ -216,6 +236,42 @@ pub trait DatasetSource {
     }
 }
 
+/// A dataset source that can stream SMILES strings directly.
+pub trait SmilesDatasetSource: DatasetSource {
+    /// Opens a streaming iterator over the dataset SMILES using default fetch
+    /// options.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DatasetError`] if the dataset cannot be fetched or if the
+    /// materialized dataset cannot be opened for streaming.
+    fn iter_smiles(&self) -> Result<DatasetSmilesIter, DatasetError> {
+        self.iter_smiles_with_options(&DatasetFetchOptions::default())
+    }
+
+    /// Opens a streaming iterator over the dataset SMILES using explicit fetch
+    /// options.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DatasetError`] if the dataset cannot be fetched or if the
+    /// materialized dataset cannot be opened for streaming.
+    fn iter_smiles_with_options(
+        &self,
+        options: &DatasetFetchOptions,
+    ) -> Result<DatasetSmilesIter, DatasetError>;
+}
+
+/// A streaming iterator over SMILES strings extracted from a dataset file.
+pub struct DatasetSmilesIter {
+    dataset_id: &'static str,
+    path: PathBuf,
+    reader: Box<dyn BufRead>,
+    parser: DatasetSmilesParser,
+    line_number: usize,
+    line_buffer: String,
+}
+
 /// The official PubChem `CID-SMILES.gz` bulk download.
 ///
 /// Source:
@@ -245,6 +301,16 @@ impl DatasetSource for PubChemSmiles {
     }
 }
 
+impl SmilesDatasetSource for PubChemSmiles {
+    fn iter_smiles_with_options(
+        &self,
+        options: &DatasetFetchOptions,
+    ) -> Result<DatasetSmilesIter, DatasetError> {
+        let artifact = self.fetch_with_options(options)?;
+        DatasetSmilesIter::for_pubchem(&artifact)
+    }
+}
+
 /// The official MassSpecGym benchmark TSV containing a `smiles` column.
 ///
 /// Source:
@@ -263,6 +329,16 @@ impl DatasetSource for MassSpecGymSmiles {
 
     fn file_name(&self) -> &'static str {
         "MassSpecGym.tsv"
+    }
+}
+
+impl SmilesDatasetSource for MassSpecGymSmiles {
+    fn iter_smiles_with_options(
+        &self,
+        options: &DatasetFetchOptions,
+    ) -> Result<DatasetSmilesIter, DatasetError> {
+        let artifact = self.fetch_with_options(options)?;
+        DatasetSmilesIter::for_mass_spec_gym(&artifact)
     }
 }
 
@@ -292,6 +368,142 @@ pub fn default_dataset_cache_dir() -> PathBuf {
         return PathBuf::from(path).join(".cache").join("smiles-parser").join("datasets");
     }
     env::temp_dir().join("smiles-parser").join("datasets")
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum DatasetSmilesParser {
+    PubChem,
+    MassSpecGym { smiles_column: usize },
+}
+
+impl DatasetSmilesIter {
+    fn for_pubchem(artifact: &DatasetArtifact) -> Result<Self, DatasetError> {
+        Self::from_artifact(artifact, DatasetSmilesParser::PubChem)
+    }
+
+    fn for_mass_spec_gym(artifact: &DatasetArtifact) -> Result<Self, DatasetError> {
+        let dataset_id = artifact.dataset_id;
+        let path = artifact.path.clone();
+        let mut reader = open_text_reader(&path)?;
+        let mut header = String::new();
+        let bytes_read = reader
+            .read_line(&mut header)
+            .map_err(|source| DatasetError::Io { path: path.clone(), source })?;
+        if bytes_read == 0 {
+            return Err(DatasetError::Format {
+                dataset_id,
+                line_number: 1,
+                message: "expected a TSV header row with a smiles column".into(),
+            });
+        }
+
+        let smiles_column = header
+            .trim_end_matches(['\r', '\n'])
+            .split('\t')
+            .position(|field| field.eq_ignore_ascii_case("smiles"))
+            .ok_or_else(|| {
+                DatasetError::Format {
+                    dataset_id,
+                    line_number: 1,
+                    message: "expected a TSV header containing a smiles column".into(),
+                }
+            })?;
+
+        Ok(Self {
+            dataset_id,
+            path,
+            reader,
+            parser: DatasetSmilesParser::MassSpecGym { smiles_column },
+            line_number: 1,
+            line_buffer: String::new(),
+        })
+    }
+
+    fn from_artifact(
+        artifact: &DatasetArtifact,
+        parser: DatasetSmilesParser,
+    ) -> Result<Self, DatasetError> {
+        let path = artifact.path.clone();
+        Ok(Self {
+            dataset_id: artifact.dataset_id,
+            path: path.clone(),
+            reader: open_text_reader(&path)?,
+            parser,
+            line_number: 0,
+            line_buffer: String::new(),
+        })
+    }
+}
+
+impl Iterator for DatasetSmilesIter {
+    type Item = Result<String, DatasetError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            self.line_buffer.clear();
+            match self.reader.read_line(&mut self.line_buffer) {
+                Ok(0) => return None,
+                Ok(_) => {
+                    self.line_number += 1;
+                }
+                Err(source) => {
+                    return Some(Err(DatasetError::Io { path: self.path.clone(), source }));
+                }
+            }
+
+            let line = self.line_buffer.trim_end_matches(['\r', '\n']);
+            if line.is_empty() {
+                continue;
+            }
+
+            return Some(parse_smiles_line(self.dataset_id, self.line_number, self.parser, line));
+        }
+    }
+}
+
+fn parse_smiles_line(
+    dataset_id: &'static str,
+    line_number: usize,
+    parser: DatasetSmilesParser,
+    line: &str,
+) -> Result<String, DatasetError> {
+    match parser {
+        DatasetSmilesParser::PubChem => {
+            let (_, smiles) = line.split_once('\t').ok_or_else(|| {
+                DatasetError::Format {
+                    dataset_id,
+                    line_number,
+                    message: "expected a CID<TAB>SMILES record".into(),
+                }
+            })?;
+            Ok(smiles.to_owned())
+        }
+        DatasetSmilesParser::MassSpecGym { smiles_column } => {
+            let smiles = tsv_field(line, smiles_column).ok_or_else(|| {
+                DatasetError::Format {
+                    dataset_id,
+                    line_number,
+                    message: "expected a TSV row with a smiles column value".into(),
+                }
+            })?;
+            Ok(smiles.to_owned())
+        }
+    }
+}
+
+fn tsv_field(line: &str, column_index: usize) -> Option<&str> {
+    line.split('\t').nth(column_index)
+}
+
+fn open_text_reader(path: &Path) -> Result<Box<dyn BufRead>, DatasetError> {
+    let file =
+        File::open(path).map_err(|source| DatasetError::Io { path: path.to_path_buf(), source })?;
+
+    if path.extension().is_some_and(|extension| extension == "gz") {
+        Ok(Box::new(BufReader::new(GzDecoder::new(file))))
+    } else {
+        Ok(Box::new(BufReader::new(file)))
+    }
 }
 
 fn fetch_dataset<D: DatasetSource + ?Sized>(
@@ -527,14 +739,15 @@ mod tests {
         io::Write,
         path::PathBuf,
         time::{SystemTime, UNIX_EPOCH},
+        vec::Vec,
     };
 
     use flate2::{Compression, write::GzEncoder};
 
     use super::{
-        CacheMode, DatasetCompression, DatasetFetchOptions, DatasetSource, GzipMode,
-        MASS_SPEC_GYM_SMILES, PUBCHEM_SMILES, PubChemSmiles, default_dataset_cache_dir,
-        gunzip_file,
+        CacheMode, DatasetArtifact, DatasetCompression, DatasetFetchOptions, DatasetSmilesIter,
+        DatasetSource, GzipMode, MASS_SPEC_GYM_SMILES, PUBCHEM_SMILES, PubChemSmiles,
+        default_dataset_cache_dir, gunzip_file,
     };
 
     fn temporary_directory(name: &str) -> PathBuf {
@@ -605,5 +818,90 @@ mod tests {
     fn pubchem_and_massspecgym_constants_are_usable_dataset_handles() {
         assert_eq!(PUBCHEM_SMILES.id(), "pubchem-smiles");
         assert_eq!(MASS_SPEC_GYM_SMILES.id(), "massspecgym-smiles");
+    }
+
+    #[test]
+    fn pubchem_smiles_iterator_streams_smiles_from_gzip_records() {
+        let directory = temporary_directory("datasets-pubchem-iter");
+        fs::create_dir_all(&directory).unwrap();
+        let compressed_path = directory.join("CID-SMILES.gz");
+
+        {
+            let file = File::create(&compressed_path).unwrap();
+            let mut encoder = GzEncoder::new(file, Compression::default());
+            encoder.write_all(b"1\tCCO\n2\tc1ccccc1\n").unwrap();
+            encoder.finish().unwrap();
+        }
+
+        let artifact = DatasetArtifact {
+            dataset_id: "pubchem-smiles",
+            path: compressed_path.clone(),
+            compressed_path: Some(compressed_path),
+            decompressed_path: None,
+            was_downloaded: false,
+            was_decompressed: false,
+        };
+        let smiles = DatasetSmilesIter::for_pubchem(&artifact)
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        assert_eq!(smiles, ["CCO", "c1ccccc1"]);
+
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn massspecgym_smiles_iterator_uses_smiles_tsv_column() {
+        let directory = temporary_directory("datasets-massspecgym-iter");
+        fs::create_dir_all(&directory).unwrap();
+        let dataset_path = directory.join("MassSpecGym.tsv");
+        fs::write(&dataset_path, "spec_id\tname\tsmiles\n1\tethanol\tCCO\n2\tbenzene\tc1ccccc1\n")
+            .unwrap();
+
+        let artifact = DatasetArtifact {
+            dataset_id: "massspecgym-smiles",
+            path: dataset_path,
+            compressed_path: None,
+            decompressed_path: None,
+            was_downloaded: false,
+            was_decompressed: false,
+        };
+        let smiles = DatasetSmilesIter::for_mass_spec_gym(&artifact)
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        assert_eq!(smiles, ["CCO", "c1ccccc1"]);
+
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn massspecgym_smiles_iterator_requires_smiles_header_column() {
+        let directory = temporary_directory("datasets-massspecgym-header");
+        fs::create_dir_all(&directory).unwrap();
+        let dataset_path = directory.join("MassSpecGym.tsv");
+        fs::write(&dataset_path, "spec_id\tname\n1\tethanol\n").unwrap();
+
+        let artifact = DatasetArtifact {
+            dataset_id: "massspecgym-smiles",
+            path: dataset_path,
+            compressed_path: None,
+            decompressed_path: None,
+            was_downloaded: false,
+            was_decompressed: false,
+        };
+        match DatasetSmilesIter::for_mass_spec_gym(&artifact) {
+            Ok(_) => panic!("expected a missing smiles header to fail"),
+            Err(super::DatasetError::Format {
+                dataset_id: "massspecgym-smiles",
+                line_number: 1,
+                ..
+            }) => {}
+            Err(error) => panic!("unexpected error: {error}"),
+        }
+
+        fs::remove_dir_all(directory).unwrap();
     }
 }
