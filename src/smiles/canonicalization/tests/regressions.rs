@@ -150,9 +150,8 @@ fn canonicalization_spelling_normal_form_preserves_semantic_implicit_hydrogens()
         .into_aromaticized();
     let rewritten = aromaticized.canonicalization_spelling_normal_form();
 
-    assert!(aromaticized.implicit_hydrogen_cache.is_some());
     assert_eq!(rewritten.implicit_hydrogen_counts(), aromaticized.implicit_hydrogen_counts());
-    assert_eq!(rewritten.implicit_hydrogen_cache, Some(aromaticized.implicit_hydrogen_counts()));
+    assert_eq!(rewritten.implicit_hydrogen_cache, aromaticized.implicit_hydrogen_counts());
 }
 
 #[test]

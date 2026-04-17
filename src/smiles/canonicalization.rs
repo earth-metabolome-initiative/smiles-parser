@@ -138,10 +138,8 @@ impl Smiles {
             })
             .collect();
 
-        let implicit_hydrogen_cache = self
-            .implicit_hydrogen_cache
-            .as_ref()
-            .map(|cache| order.iter().copied().map(|old_node| cache[old_node]).collect());
+        let implicit_hydrogen_cache =
+            order.iter().copied().map(|old_node| self.implicit_hydrogen_cache[old_node]).collect();
 
         Self::from_bond_matrix_parts_with_sidecars(
             atom_nodes,
@@ -218,7 +216,7 @@ impl Smiles {
             atom_nodes,
             self.bond_matrix.clone(),
             self.parsed_stereo_neighbors.clone(),
-            Some(implicit_hydrogen_cache),
+            implicit_hydrogen_cache,
             None,
         )
     }
@@ -368,12 +366,10 @@ impl Smiles {
             })
             .collect::<Vec<_>>();
 
-        Self::from_bond_matrix_parts_with_sidecars(
+        Self::from_bond_matrix_parts_with_parsed_stereo(
             atom_nodes,
             builder.finish(kept_nodes.len()),
             parsed_stereo_neighbors,
-            None,
-            None,
         )
     }
 
@@ -509,9 +505,7 @@ fn canonicalization_implicit_hydrogen_count(
     rewritten_atom: Atom,
 ) -> u8 {
     if rewritten_atom == smiles.nodes()[node_id] {
-        return smiles
-            .implicit_hydrogen_count(node_id)
-            .unwrap_or_else(|| unreachable!("canonicalization only rewrites existing atoms"));
+        return smiles.implicit_hydrogen_count(node_id);
     }
     match rewritten_atom.syntax() {
         AtomSyntax::Bracket => 0,

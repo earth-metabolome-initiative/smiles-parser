@@ -170,14 +170,11 @@ impl Smiles {
         )
         .unwrap_or_else(|_| unreachable!("existing bond matrix entries are already valid"));
 
-        let mut kekulized = Self::from_bond_matrix_parts_with_sidecars(
+        let kekulized = Self::from_bond_matrix_parts_with_parsed_stereo(
             atom_nodes,
             bond_matrix,
             self.parsed_stereo_neighbors.clone(),
-            None,
-            None,
         );
-        kekulized.implicit_hydrogen_cache = Some(kekulized.implicit_hydrogen_counts());
         Ok(kekulized)
     }
 
@@ -547,9 +544,7 @@ mod tests {
             .nodes()
             .iter()
             .enumerate()
-            .map(|(atom_id, atom)| {
-                atom.hydrogen_count() + smiles.implicit_hydrogen_count(atom_id).unwrap_or(0)
-            })
+            .map(|(atom_id, atom)| atom.hydrogen_count() + smiles.implicit_hydrogen_count(atom_id))
             .collect::<Vec<_>>();
         let aromaticized = smiles
             .perceive_aromaticity()
@@ -561,7 +556,7 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(atom_id, atom)| {
-                atom.hydrogen_count() + aromaticized.implicit_hydrogen_count(atom_id).unwrap_or(0)
+                atom.hydrogen_count() + aromaticized.implicit_hydrogen_count(atom_id)
             })
             .collect::<Vec<_>>();
 
@@ -601,9 +596,7 @@ mod tests {
             .nodes()
             .iter()
             .enumerate()
-            .map(|(atom_id, atom)| {
-                atom.hydrogen_count() + smiles.implicit_hydrogen_count(atom_id).unwrap_or(0)
-            })
+            .map(|(atom_id, atom)| atom.hydrogen_count() + smiles.implicit_hydrogen_count(atom_id))
             .collect::<Vec<_>>();
         let aromaticized =
             smiles.perceive_aromaticity().expect("indole should aromaticize").into_aromaticized();
@@ -613,7 +606,7 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(atom_id, atom)| {
-                atom.hydrogen_count() + aromaticized.implicit_hydrogen_count(atom_id).unwrap_or(0)
+                atom.hydrogen_count() + aromaticized.implicit_hydrogen_count(atom_id)
             })
             .collect::<Vec<_>>();
 
@@ -698,7 +691,7 @@ mod tests {
                     atom.aromatic(),
                     atom.charge_value(),
                     atom.hydrogen_count(),
-                    perceived.aromaticized().implicit_hydrogen_count(atom_id).unwrap_or(0),
+                    perceived.aromaticized().implicit_hydrogen_count(atom_id),
                     perceived.aromaticized().edge_count_for_node(atom_id),
                 )
             })
@@ -740,7 +733,7 @@ mod tests {
                     atom.aromatic(),
                     atom.charge_value(),
                     atom.hydrogen_count(),
-                    reparsed.implicit_hydrogen_count(atom_id).unwrap_or(0),
+                    reparsed.implicit_hydrogen_count(atom_id),
                     reparsed.edge_count_for_node(atom_id),
                 )
             })

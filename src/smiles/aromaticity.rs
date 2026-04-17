@@ -647,7 +647,7 @@ impl Smiles {
             atom_nodes,
             bond_matrix,
             self.parsed_stereo_neighbors.clone(),
-            Some(implicit_hydrogen_cache),
+            implicit_hydrogen_cache,
             kekulization_source,
         ))
     }

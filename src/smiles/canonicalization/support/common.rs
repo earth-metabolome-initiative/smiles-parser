@@ -67,10 +67,8 @@ pub(crate) fn permute_smiles(smiles: &Smiles, order: &[usize]) -> Smiles {
         })
         .collect::<Vec<_>>();
 
-    let implicit_hydrogen_cache = smiles
-        .implicit_hydrogen_cache
-        .as_ref()
-        .map(|cache| order.iter().copied().map(|old_node| cache[old_node]).collect());
+    let implicit_hydrogen_cache =
+        order.iter().copied().map(|old_node| smiles.implicit_hydrogen_cache[old_node]).collect();
 
     Smiles::from_bond_matrix_parts_with_sidecars(
         atom_nodes,

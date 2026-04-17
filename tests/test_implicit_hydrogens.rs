@@ -75,9 +75,12 @@ fn assert_cases_match_expected(cases: &[ImplicitHydrogenCase]) {
         let expected = case.atoms.iter().map(|atom| atom.implicit_hydrogens).collect::<Vec<_>>();
 
         assert_eq!(
-            actual, expected,
+            actual,
+            expected.as_slice(),
             "implicit hydrogen mismatch for fixture {} ({})\nnote: {}",
-            case.name, case.smiles, case.note
+            case.name,
+            case.smiles,
+            case.note
         );
     }
 }
