@@ -52,6 +52,7 @@ mod spanning_tree;
 mod stereo;
 mod symmetry;
 
+use self::implicit_hydrogens::explicit_valence;
 pub use self::{
     aromaticity::{
         AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
@@ -269,6 +270,51 @@ impl Smiles {
             self.atom_nodes.len()
         );
         self.bond_matrix.sparse_row_values_ref(id).count()
+    }
+
+    /// Returns the connectivity count for the provided atom id.
+    ///
+    /// This is the local RDKit-style count used by this crate:
+    /// `degree + explicit hydrogens + implicit hydrogens`.
+    ///
+    /// # Panics
+    /// Panics if `id` is not a valid atom index in this graph, or if the
+    /// resulting count does not fit into `u8`.
+    #[inline]
+    #[must_use]
+    pub fn connectivity_count(&self, id: usize) -> u8 {
+        let atom = self.node_by_id(id).unwrap_or_else(|| {
+            panic!("invalid atom index {id} for graph with {} atoms", self.atom_nodes.len())
+        });
+        let connectivity = self
+            .edge_count_for_node(id)
+            .saturating_add(usize::from(atom.hydrogen_count()))
+            .saturating_add(usize::from(self.implicit_hydrogen_count(id)));
+        u8::try_from(connectivity).unwrap_or_else(|_| {
+            panic!("connectivity count {connectivity} for atom {id} does not fit into u8")
+        })
+    }
+
+    /// Returns the total valence for the provided atom id.
+    ///
+    /// This is the local RDKit-style total valence used by this crate:
+    /// `bond-order sum + explicit hydrogens + implicit hydrogens`.
+    ///
+    /// # Panics
+    /// Panics if `id` is not a valid atom index in this graph, or if the
+    /// resulting valence does not fit into `u8`.
+    #[inline]
+    #[must_use]
+    pub fn total_valence(&self, id: usize) -> u8 {
+        let atom = self.node_by_id(id).unwrap_or_else(|| {
+            panic!("invalid atom index {id} for graph with {} atoms", self.atom_nodes.len())
+        });
+        let valence = usize::from(explicit_valence(self, id))
+            .saturating_add(usize::from(atom.hydrogen_count()))
+            .saturating_add(usize::from(self.implicit_hydrogen_count(id)));
+        u8::try_from(valence).unwrap_or_else(|_| {
+            panic!("total valence {valence} for atom {id} does not fit into u8")
+        })
     }
 
     /// Returns a zero-allocation iterator over the bonds incident to the
@@ -954,6 +1000,39 @@ mod tests {
         );
 
         let _ = smiles.edge_count_for_node(99);
+    }
+
+    #[test]
+    fn connectivity_count_and_total_valence_follow_rdkit_style_local_counts() {
+        let alcohol: Smiles = "CO".parse().expect("valid SMILES");
+        assert_eq!(alcohol.connectivity_count(0), 4);
+        assert_eq!(alcohol.total_valence(0), 4);
+        assert_eq!(alcohol.connectivity_count(1), 2);
+        assert_eq!(alcohol.total_valence(1), 2);
+
+        let alkene: Smiles = "C=C".parse().expect("valid SMILES");
+        assert_eq!(alkene.connectivity_count(0), 3);
+        assert_eq!(alkene.total_valence(0), 4);
+        assert_eq!(alkene.connectivity_count(1), 3);
+        assert_eq!(alkene.total_valence(1), 4);
+
+        let bracketed: Smiles = "[CH3]".parse().expect("valid SMILES");
+        assert_eq!(bracketed.connectivity_count(0), 3);
+        assert_eq!(bracketed.total_valence(0), 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid atom index 99 for graph with 2 atoms")]
+    fn connectivity_count_panics_for_invalid_atom_id() {
+        let smiles: Smiles = "CO".parse().expect("valid SMILES");
+        let _ = smiles.connectivity_count(99);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid atom index 99 for graph with 2 atoms")]
+    fn total_valence_panics_for_invalid_atom_id() {
+        let smiles: Smiles = "CO".parse().expect("valid SMILES");
+        let _ = smiles.total_valence(99);
     }
 
     #[test]

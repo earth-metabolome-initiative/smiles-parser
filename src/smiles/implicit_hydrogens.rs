@@ -143,7 +143,7 @@ pub(super) fn implicit_hydrogens_if_written_unbracketed(
 /// This split also mirrors raw `RDKit`: bracket hydrogens stay explicit instead
 /// of being folded back into a later implicit-hydrogen completion step.
 #[inline]
-fn explicit_valence(smiles: &Smiles, node_id: usize) -> u8 {
+pub(crate) fn explicit_valence(smiles: &Smiles, node_id: usize) -> u8 {
     smiles.bond_matrix().sparse_row_values_ref(node_id).map(|entry| bond_order(entry.bond())).sum()
 }
 
@@ -155,7 +155,7 @@ fn explicit_valence(smiles: &Smiles, node_id: usize) -> u8 {
 /// That choice matches raw `RDKit` on unsanitized molecules before any aromatic
 /// normalization pass is applied.
 #[inline]
-fn bond_order(bond: Bond) -> u8 {
+pub(crate) fn bond_order(bond: Bond) -> u8 {
     match bond {
         Bond::Single | Bond::Up | Bond::Down | Bond::Aromatic => 1,
         Bond::Double => 2,

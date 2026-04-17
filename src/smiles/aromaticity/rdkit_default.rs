@@ -220,7 +220,7 @@ impl RdkitPreAromaticityNormalization {
             if atom.element() != Some(Element::P) || atom.charge_value() != 0 {
                 continue;
             }
-            if raw_total_valence(smiles, phosphorus_atom_id, atom) != 5 {
+            if raw_total_valence(smiles, phosphorus_atom_id) != 5 {
                 continue;
             }
 
@@ -1463,7 +1463,7 @@ fn assign_radicals_for_atom(smiles: &Smiles, atom_id: usize, atom: &Atom) -> u8 
 
     let charge = i16::from(atom.charge_value());
     let outer_electrons = i16::from(rdkit_outer_electrons(element));
-    let total_valence = raw_total_valence(smiles, atom_id, atom);
+    let total_valence = raw_total_valence(smiles, atom_id);
     let allowed_valences = element.allowed_valences();
 
     if !allowed_valences.is_empty() {
@@ -1495,14 +1495,8 @@ fn assign_radicals_for_atom(smiles: &Smiles, atom_id: usize, atom: &Atom) -> u8 
     u8::try_from(available_valence % 2).unwrap_or(0)
 }
 
-fn raw_total_valence(smiles: &Smiles, atom_id: usize, atom: &Atom) -> i16 {
-    let bond_valence = smiles
-        .edges_for_node(atom_id)
-        .map(|edge| {
-            i16::try_from(bond_valence_contribution(edge.2.without_direction())).unwrap_or(i16::MAX)
-        })
-        .sum::<i16>();
-    bond_valence + i16::from(atom.hydrogen_count())
+fn raw_total_valence(smiles: &Smiles, atom_id: usize) -> i16 {
+    i16::from(smiles.total_valence(atom_id))
 }
 
 fn bond_valence_contribution(bond: Bond) -> usize {
