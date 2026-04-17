@@ -12,6 +12,7 @@ use crate::{
 };
 
 mod rdkit_default;
+pub(crate) use self::rdkit_default::rdkit_smarts_total_valence;
 
 /// Aromaticity-model interface for [`Smiles`].
 ///

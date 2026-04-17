@@ -1499,6 +1499,27 @@ fn raw_total_valence(smiles: &Smiles, atom_id: usize) -> i16 {
     i16::from(smiles.total_valence(atom_id))
 }
 
+pub(crate) fn rdkit_smarts_total_valence(
+    smiles: &Smiles,
+    atom_id: usize,
+    aromaticity: &AromaticityAssignment,
+) -> u8 {
+    let raw_total_valence = smiles.total_valence(atom_id);
+    if !aromaticity.contains_atom(atom_id) {
+        return raw_total_valence;
+    }
+
+    let Some(atom) = smiles.node_by_id(atom_id) else {
+        unreachable!("caller validates atom id before delegating to RDKit SMARTS valence helper");
+    };
+    let Some(element) = atom.element() else {
+        return raw_total_valence;
+    };
+
+    rdkit_adjusted_default_valence(element, atom.charge_value())
+        .map_or(raw_total_valence, |default_valence| raw_total_valence.max(default_valence))
+}
+
 fn bond_valence_contribution(bond: Bond) -> usize {
     match bond {
         Bond::Single | Bond::Up | Bond::Down | Bond::Aromatic => 1,

@@ -52,7 +52,7 @@ mod spanning_tree;
 mod stereo;
 mod symmetry;
 
-use self::implicit_hydrogens::explicit_valence;
+use self::{aromaticity::rdkit_smarts_total_valence, implicit_hydrogens::explicit_valence};
 pub use self::{
     aromaticity::{
         AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
@@ -507,6 +507,37 @@ impl Smiles {
         u8::try_from(valence).unwrap_or_else(|_| {
             panic!("total valence {valence} for atom {id} does not fit into u8")
         })
+    }
+
+    /// Returns the RDKit-style SMARTS total valence for the provided atom id
+    /// under the supplied aromaticity assignment.
+    ///
+    /// This keeps the raw parsed-graph behavior of [`Smiles::total_valence`]
+    /// for non-aromatic atoms, but upgrades aromatic atoms to the aromaticity-
+    /// aware SMARTS `v` interpretation used by RDKit.
+    ///
+    /// # Panics
+    /// Panics if `id` is not a valid atom index in this graph.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::{AromaticityPolicy, Smiles};
+    ///
+    /// let smiles: Smiles = "c1ccccc1".parse()?;
+    /// let aromaticity = smiles.aromaticity_assignment_for(AromaticityPolicy::RdkitDefault);
+    /// assert_eq!(smiles.smarts_total_valence(0, &aromaticity), 4);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn smarts_total_valence(&self, id: usize, aromaticity: &AromaticityAssignment) -> u8 {
+        assert!(
+            id < self.atom_nodes.len(),
+            "invalid atom index {id} for graph with {} atoms",
+            self.atom_nodes.len()
+        );
+        rdkit_smarts_total_valence(self, id, aromaticity)
     }
 
     /// Returns a zero-allocation iterator over the bonds incident to the
@@ -1306,6 +1337,52 @@ mod tests {
     fn total_valence_panics_for_invalid_atom_id() {
         let smiles: Smiles = "CO".parse().expect("valid SMILES");
         let _ = smiles.total_valence(99);
+    }
+
+    #[test]
+    fn smarts_total_valence_preserves_raw_non_aromatic_values() {
+        let sodium: Smiles = "[Na+]".parse().expect("valid sodium cation");
+        let sodium_aromaticity = sodium.aromaticity_assignment_for(AromaticityPolicy::RdkitDefault);
+        assert_eq!(sodium.smarts_total_valence(0, &sodium_aromaticity), 0);
+
+        let ammonium: Smiles = "[NH4+]".parse().expect("valid ammonium");
+        let ammonium_aromaticity =
+            ammonium.aromaticity_assignment_for(AromaticityPolicy::RdkitDefault);
+        assert_eq!(ammonium.smarts_total_valence(0, &ammonium_aromaticity), 4);
+
+        let phosphoric_acid: Smiles = "P(=O)(O)(O)O".parse().expect("valid phosphoric acid");
+        let phosphorus_aromaticity =
+            phosphoric_acid.aromaticity_assignment_for(AromaticityPolicy::RdkitDefault);
+        assert_eq!(phosphoric_acid.smarts_total_valence(0, &phosphorus_aromaticity), 5);
+    }
+
+    #[test]
+    fn smarts_total_valence_matches_rdkit_aromatic_expectations() {
+        let benzene: Smiles = "c1ccccc1".parse().expect("valid aromatic benzene");
+        let benzene_aromaticity =
+            benzene.aromaticity_assignment_for(AromaticityPolicy::RdkitDefault);
+        assert_eq!(benzene.total_valence(0), 3);
+        assert_eq!(benzene.smarts_total_valence(0, &benzene_aromaticity), 4);
+
+        let pyridine: Smiles = "c1ncccc1".parse().expect("valid aromatic pyridine");
+        let pyridine_aromaticity =
+            pyridine.aromaticity_assignment_for(AromaticityPolicy::RdkitDefault);
+        assert_eq!(pyridine.total_valence(1), 2);
+        assert_eq!(pyridine.smarts_total_valence(1, &pyridine_aromaticity), 3);
+
+        let pyrrolic_nitrogen: Smiles = "[nH]1cccc1".parse().expect("valid aromatic pyrrole");
+        let pyrrolic_aromaticity =
+            pyrrolic_nitrogen.aromaticity_assignment_for(AromaticityPolicy::RdkitDefault);
+        assert_eq!(pyrrolic_nitrogen.total_valence(0), 3);
+        assert_eq!(pyrrolic_nitrogen.smarts_total_valence(0, &pyrrolic_aromaticity), 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid atom index 99 for graph with 1 atoms")]
+    fn smarts_total_valence_panics_for_invalid_atom_id() {
+        let smiles: Smiles = "C".parse().expect("valid SMILES");
+        let aromaticity = smiles.aromaticity_assignment_for(AromaticityPolicy::RdkitDefault);
+        let _ = smiles.smarts_total_valence(99, &aromaticity);
     }
 
     #[test]
