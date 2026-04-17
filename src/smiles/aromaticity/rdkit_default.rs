@@ -330,7 +330,7 @@ impl RdkitAtomAromContext {
         let implicit_hydrogens = implicit_hydrogen_overrides
             .get(&atom_id)
             .copied()
-            .unwrap_or_else(|| smiles.implicit_hydrogen_count(atom_id).unwrap_or(0));
+            .unwrap_or_else(|| smiles.implicit_hydrogen_count(atom_id));
         let total_hydrogens = explicit_hydrogens.saturating_add(implicit_hydrogens);
         let degree = smiles.edge_count_for_node(atom_id);
         let edges = smiles.edges_for_node(atom_id);
