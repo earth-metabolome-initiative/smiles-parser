@@ -14,6 +14,15 @@ impl Charge {
     /// # Errors
     /// - Returns [`SmilesError::ChargeUnderflow`] if `i8` is less than `-15`
     /// - Returns [`SmilesError::ChargeOverflow`] if `i8` is greater than `15`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::atom::bracketed::charge::Charge;
+    ///
+    /// assert_eq!(Charge::try_new(2)?.get(), 2);
+    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// ```
     pub fn try_new(num: i8) -> Result<Self, SmilesError> {
         (-15..=15).contains(&num).then_some(Self(num)).ok_or(if num.is_negative() {
             SmilesError::ChargeUnderflow(num)
@@ -23,6 +32,15 @@ impl Charge {
     }
 
     /// Returns the `Charge` value as `i8`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::atom::bracketed::charge::Charge;
+    ///
+    /// assert_eq!(Charge::try_new(-1)?.get(), -1);
+    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// ```
     #[must_use]
     pub fn get(&self) -> i8 {
         self.0

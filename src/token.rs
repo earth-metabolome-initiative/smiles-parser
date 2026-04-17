@@ -55,36 +55,111 @@ pub struct TokenWithSpan {
 
 impl TokenWithSpan {
     /// Generates a new token with a specified span
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{
+    ///     bond::Bond,
+    ///     token::{Token, TokenWithSpan},
+    /// };
+    ///
+    /// let token = TokenWithSpan::new(Token::Bond(Bond::Double), 1, 2);
+    /// assert_eq!(token.token(), Token::Bond(Bond::Double));
+    /// ```
     #[must_use]
     pub fn new(token: Token, start: usize, end: usize) -> Self {
         Self { token, span: start..end }
     }
     /// Returns the token
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{
+    ///     bond::Bond,
+    ///     token::{Token, TokenWithSpan},
+    /// };
+    ///
+    /// let token = TokenWithSpan::new(Token::Bond(Bond::Single), 0, 1);
+    /// assert_eq!(token.token(), Token::Bond(Bond::Single));
+    /// ```
     #[must_use]
     pub fn token(&self) -> Token {
         self.token
     }
     /// Returns the token kind without the payload.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::token::{Token, TokenKind, TokenWithSpan};
+    ///
+    /// let token = TokenWithSpan::new(Token::LeftParentheses, 2, 3);
+    /// assert_eq!(token.token_kind(), TokenKind::LeftParentheses);
+    /// ```
     #[must_use]
     pub fn token_kind(&self) -> TokenKind {
         self.token.kind()
     }
     /// Returns the span as [`Range`]
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::token::{Token, TokenWithSpan};
+    ///
+    /// let token = TokenWithSpan::new(Token::RightParentheses, 4, 5);
+    /// assert_eq!(token.span(), 4..5);
+    /// ```
     #[must_use]
     pub fn span(&self) -> Range<usize> {
         self.span.start..self.span.end
     }
     /// Returns the start of the span as [`usize`]
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::token::{Token, TokenWithSpan};
+    ///
+    /// let token = TokenWithSpan::new(Token::NonBond, 6, 7);
+    /// assert_eq!(token.start(), 6);
+    /// ```
     #[must_use]
     pub fn start(&self) -> usize {
         self.span.start
     }
     /// Returns the end of the span as [`usize`]
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::token::{Token, TokenWithSpan};
+    ///
+    /// let token = TokenWithSpan::new(Token::NonBond, 6, 7);
+    /// assert_eq!(token.end(), 7);
+    /// ```
     #[must_use]
     pub fn end(&self) -> usize {
         self.span.end
     }
     /// Returns whether the token is a bond
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{
+    ///     bond::Bond,
+    ///     token::{Token, TokenWithSpan},
+    /// };
+    ///
+    /// let bond = TokenWithSpan::new(Token::Bond(Bond::Triple), 1, 2);
+    /// let atom = TokenWithSpan::new(Token::NonBond, 3, 4);
+    ///
+    /// assert!(bond.is_bond());
+    /// assert!(!atom.is_bond());
+    /// ```
     #[must_use]
     pub fn is_bond(&self) -> bool {
         self.token_kind() == TokenKind::Bond
@@ -93,6 +168,18 @@ impl TokenWithSpan {
 
 impl Token {
     /// Returns the payload-free category of the token.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{
+    ///     bond::Bond,
+    ///     token::{Token, TokenKind},
+    /// };
+    ///
+    /// assert_eq!(Token::Bond(Bond::Aromatic).kind(), TokenKind::Bond);
+    /// assert_eq!(Token::NonBond.kind(), TokenKind::NonBond);
+    /// ```
     #[inline]
     #[must_use]
     pub fn kind(self) -> TokenKind {

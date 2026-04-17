@@ -77,18 +77,48 @@ pub struct SymmSssrStatus {
 
 impl SymmSssrStatus {
     /// Returns whether the SSSR search completed without fallback or cutoff.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let result = "c1ccccc1".parse::<Smiles>()?.symm_sssr_result();
+    /// assert!(result.status().is_complete());
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[must_use]
     pub fn is_complete(self) -> bool {
         !self.used_fallback && !self.hit_queue_cutoff
     }
 
     /// Returns whether the search fell back to the approximate ring finder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let status = "c1ccccc1".parse::<Smiles>()?.symm_sssr_result().status();
+    /// assert!(!status.used_fallback());
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[must_use]
     pub fn used_fallback(self) -> bool {
         self.used_fallback
     }
 
     /// Returns whether the search hit the BFS queue cutoff.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let status = "c1ccccc1".parse::<Smiles>()?.symm_sssr_result().status();
+    /// assert!(!status.hit_queue_cutoff());
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[must_use]
     pub fn hit_queue_cutoff(self) -> bool {
         self.hit_queue_cutoff
@@ -104,12 +134,32 @@ pub struct SymmSssrResult {
 
 impl SymmSssrResult {
     /// Returns the canonicalized cycle set.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let result = "c1ccccc1".parse::<Smiles>()?.symm_sssr_result();
+    /// assert_eq!(result.cycles().len(), 1);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[must_use]
     pub fn cycles(&self) -> &[Vec<usize>] {
         &self.cycles
     }
 
     /// Returns the search status for the cycle set.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let result = "c1ccccc1".parse::<Smiles>()?.symm_sssr_result();
+    /// assert!(result.status().is_complete());
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[must_use]
     pub fn status(&self) -> SymmSssrStatus {
         self.status
@@ -125,6 +175,16 @@ pub struct RingMembership {
 
 impl RingMembership {
     /// Returns the atom ids that belong to at least one ring.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let ring = "C1CC1O".parse::<Smiles>()?.ring_membership();
+    /// assert_eq!(ring.atom_ids(), &[0, 1, 2]);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn atom_ids(&self) -> &[usize] {
@@ -132,6 +192,16 @@ impl RingMembership {
     }
 
     /// Returns the bond edges that belong to at least one ring.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let ring = "C1CC1O".parse::<Smiles>()?.ring_membership();
+    /// assert_eq!(ring.bond_edges(), &[[0, 1], [0, 2], [1, 2]]);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn bond_edges(&self) -> &[[usize; 2]] {
@@ -139,6 +209,17 @@ impl RingMembership {
     }
 
     /// Returns whether the given atom id belongs to at least one ring.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let ring = "C1CC1O".parse::<Smiles>()?.ring_membership();
+    /// assert!(ring.contains_atom(1));
+    /// assert!(!ring.contains_atom(3));
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn contains_atom(&self, atom_id: usize) -> bool {
@@ -146,6 +227,17 @@ impl RingMembership {
     }
 
     /// Returns whether the given edge belongs to at least one ring.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let ring = "C1CC1O".parse::<Smiles>()?.ring_membership();
+    /// assert!(ring.contains_edge(0, 1));
+    /// assert!(!ring.contains_edge(2, 3));
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn contains_edge(&self, node_a: usize, node_b: usize) -> bool {
@@ -163,6 +255,16 @@ pub struct RingAtomMembership {
 impl RingAtomMembership {
     /// Returns a flag slice indicating which atom ids belong to at least one
     /// ring.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let ring = "C1CC1O".parse::<Smiles>()?.ring_atom_membership();
+    /// assert_eq!(ring.atom_flags(), &[true, true, true, false]);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn atom_flags(&self) -> &[bool] {
@@ -173,6 +275,17 @@ impl RingAtomMembership {
     ///
     /// # Panics
     /// Panics if `atom_id` is not a valid atom index in this summary.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let ring = "C1CC1O".parse::<Smiles>()?.ring_atom_membership();
+    /// assert!(ring.contains_atom(2));
+    /// assert!(!ring.contains_atom(3));
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn contains_atom(&self, atom_id: usize) -> bool {
@@ -206,6 +319,15 @@ pub struct Smiles {
 
 impl Smiles {
     /// Creates a new empty [`Smiles`] graph.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles = Smiles::new();
+    /// assert!(smiles.nodes().is_empty());
+    /// ```
     #[inline]
     #[must_use]
     pub fn new() -> Self {
@@ -219,6 +341,16 @@ impl Smiles {
     }
 
     /// Returns a slice of all parsed [`Atom`] values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "CO".parse()?;
+    /// assert_eq!(smiles.nodes().len(), 2);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn nodes(&self) -> &[Atom] {
@@ -226,6 +358,18 @@ impl Smiles {
     }
 
     /// Returns the atom with the given positional index, if present.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "CO".parse()?;
+    /// assert_eq!(smiles.node_by_id(1).and_then(|atom| atom.element()), Some(Element::O));
+    /// assert!(smiles.node_by_id(99).is_none());
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn node_by_id(&self, id: usize) -> Option<&Atom> {
@@ -233,6 +377,14 @@ impl Smiles {
     }
 
     /// Returns a normalized edge key with node IDs in ascending order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// assert_eq!(Smiles::edge_key(4, 1), (1, 4));
+    /// ```
     #[inline]
     #[must_use]
     pub fn edge_key(node_a: usize, node_b: usize) -> (usize, usize) {
@@ -240,6 +392,16 @@ impl Smiles {
     }
 
     /// Returns the bond connecting the given pair of node ids, if present.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{bond::Bond, prelude::Smiles};
+    ///
+    /// let smiles: Smiles = "C=O".parse()?;
+    /// assert_eq!(smiles.edge_for_node_pair((0, 1)), Some((0, 1, Bond::Double, None)));
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn edge_for_node_pair(&self, nodes: (usize, usize)) -> Option<BondEdge> {
@@ -261,6 +423,16 @@ impl Smiles {
     ///
     /// # Panics
     /// Panics if `id` is not a valid atom index in this graph.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "CCO".parse()?;
+    /// assert_eq!(smiles.edge_count_for_node(1), 2);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn edge_count_for_node(&self, id: usize) -> usize {
@@ -280,6 +452,16 @@ impl Smiles {
     /// # Panics
     /// Panics if `id` is not a valid atom index in this graph, or if the
     /// resulting count does not fit into `u8`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "C=C".parse()?;
+    /// assert_eq!(smiles.connectivity_count(0), 3);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn connectivity_count(&self, id: usize) -> u8 {
@@ -303,6 +485,16 @@ impl Smiles {
     /// # Panics
     /// Panics if `id` is not a valid atom index in this graph, or if the
     /// resulting valence does not fit into `u8`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "C=C".parse()?;
+    /// assert_eq!(smiles.total_valence(0), 4);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn total_valence(&self, id: usize) -> u8 {
@@ -322,6 +514,19 @@ impl Smiles {
     ///
     /// # Panics
     /// Panics if `id` is not a valid atom index in this graph.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{bond::Bond, prelude::Smiles};
+    ///
+    /// let smiles: Smiles = "CCO".parse()?;
+    /// let edges = smiles.edges_for_node(1).collect::<Vec<_>>();
+    ///
+    /// assert!(edges.contains(&(1, 0, Bond::Single, None)));
+    /// assert!(edges.contains(&(1, 2, Bond::Single, None)));
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     pub fn edges_for_node(&self, id: usize) -> impl Iterator<Item = BondEdge> + '_ {
         assert!(
@@ -339,6 +544,16 @@ impl Smiles {
     ///
     /// Ring membership is derived from the cyclic biconnected components of
     /// the graph, so chain attachments and bridges are excluded.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let ring = "C1CC1O".parse::<Smiles>()?.ring_membership();
+    /// assert_eq!(ring.atom_ids(), &[0, 1, 2]);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[must_use]
     pub fn ring_membership(&self) -> RingMembership {
         let bond_count = self.number_of_bonds();
@@ -414,6 +629,16 @@ impl Smiles {
     /// This is derived from the same cyclic biconnected components as
     /// [`Self::ring_membership()`], but it only materializes per-atom boolean
     /// flags and skips ring-bond collection.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let ring = "C1CC1O".parse::<Smiles>()?.ring_atom_membership();
+    /// assert_eq!(ring.atom_flags(), &[true, true, true, false]);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[must_use]
     pub fn ring_atom_membership(&self) -> RingAtomMembership {
         let mut ring_atom_membership = RingAtomMembership::default();
@@ -428,6 +653,20 @@ impl Smiles {
     /// This computes the same result as [`Self::ring_atom_membership()`], but
     /// it allows callers processing many molecules to reuse allocations across
     /// calls.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{RingAtomMembership, RingAtomMembershipScratch, prelude::Smiles};
+    ///
+    /// let smiles: Smiles = "C1CC1O".parse()?;
+    /// let mut membership = RingAtomMembership::default();
+    /// let mut scratch = RingAtomMembershipScratch::default();
+    ///
+    /// smiles.write_ring_atom_membership(&mut membership, &mut scratch);
+    /// assert_eq!(membership.atom_flags(), &[true, true, true, false]);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     pub fn write_ring_atom_membership(
         &self,
         ring_atom_membership: &mut RingAtomMembership,
@@ -488,6 +727,17 @@ impl Smiles {
     /// The current implementation mirrors `RDKit`'s ring-finding pipeline,
     /// including its approximate fallback behavior on some highly fused
     /// systems.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let result = "c1ccccc1".parse::<Smiles>()?.symm_sssr_result();
+    /// assert_eq!(result.cycles().len(), 1);
+    /// assert!(result.status().is_complete());
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[must_use]
     pub fn symm_sssr_result(&self) -> SymmSssrResult {
         let ring_membership = self.ring_membership();
@@ -500,6 +750,19 @@ impl Smiles {
     /// This is intended for chemistry-facing matching paths where bond order
     /// should be compared without carrying slash/backslash directional notation
     /// through the MCES bond type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{bond::Bond, prelude::Smiles};
+    ///
+    /// let raw: Smiles = "C/C=C\\C".parse()?;
+    /// let collapsed = raw.with_directional_bonds_collapsed();
+    ///
+    /// assert_eq!(collapsed.edge_for_node_pair((0, 1)).unwrap().2, Bond::Single);
+    /// assert_eq!(collapsed.edge_for_node_pair((2, 3)).unwrap().2, Bond::Single);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn with_directional_bonds_collapsed(&self) -> Self {
@@ -570,6 +833,16 @@ impl Smiles {
     ///
     /// [`fmt::Display`] uses this exact pipeline by delegating to `render()`
     /// and then writing the finished string into the formatter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "C=O".parse()?;
+    /// assert_eq!(smiles.render(), "C=O");
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[must_use]
     pub fn render(&self) -> String {
         self::emitter::emit(self)

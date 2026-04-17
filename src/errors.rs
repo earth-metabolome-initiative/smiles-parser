@@ -154,36 +154,94 @@ pub struct SmilesErrorWithSpan {
 
 impl SmilesErrorWithSpan {
     /// Creates a new error from the [`SmilesError`] and the `span`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{SmilesError, SmilesErrorWithSpan};
+    ///
+    /// let err = SmilesErrorWithSpan::new(SmilesError::UnexpectedEndOfString, 2, 3);
+    /// assert_eq!(err.start(), 2);
+    /// assert_eq!(err.end(), 3);
+    /// ```
     #[must_use]
     pub fn new(smiles_error: SmilesError, start: usize, end: usize) -> Self {
         Self { smiles_error, span: Range { start, end } }
     }
 
     /// Returns the [`SmilesError`]
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{SmilesError, SmilesErrorWithSpan};
+    ///
+    /// let err = SmilesErrorWithSpan::new(SmilesError::InvalidNumber, 0, 1);
+    /// assert_eq!(err.smiles_error(), SmilesError::InvalidNumber);
+    /// ```
     #[must_use]
     pub fn smiles_error(&self) -> SmilesError {
         self.smiles_error
     }
 
     /// Returns the start of the span
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{SmilesError, SmilesErrorWithSpan};
+    ///
+    /// let err = SmilesErrorWithSpan::new(SmilesError::InvalidClass, 4, 6);
+    /// assert_eq!(err.start(), 4);
+    /// ```
     #[must_use]
     pub fn start(&self) -> usize {
         self.span.start
     }
 
     /// Returns the end of the span
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{SmilesError, SmilesErrorWithSpan};
+    ///
+    /// let err = SmilesErrorWithSpan::new(SmilesError::InvalidClass, 4, 6);
+    /// assert_eq!(err.end(), 6);
+    /// ```
     #[must_use]
     pub fn end(&self) -> usize {
         self.span.end
     }
 
     /// Returns the full span for the error
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{SmilesError, SmilesErrorWithSpan};
+    ///
+    /// let err = SmilesErrorWithSpan::new(SmilesError::UnexpectedLeftBracket, 1, 2);
+    /// assert_eq!(err.span(), 1..2);
+    /// ```
     #[must_use]
     pub fn span(&self) -> Range<usize> {
         self.span.start..self.span.end
     }
 
     /// Render the error pointing back to location in the original string
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{SmilesError, SmilesErrorWithSpan};
+    ///
+    /// let err = SmilesErrorWithSpan::new(SmilesError::UnexpectedRightBracket, 1, 2);
+    /// let rendered = err.render("C]");
+    ///
+    /// assert!(rendered.contains("C]"));
+    /// assert!(rendered.contains("^"));
+    /// ```
     #[must_use]
     pub fn render(&self, input: &str) -> String {
         let start = self.start().min(input.len());

@@ -13,11 +13,30 @@ impl RingNum {
     /// # Errors
     /// - Returns a [`SmilesError::RingNumberOverflow`] if the value is above
     ///   `99`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::bond::ring_num::RingNum;
+    ///
+    /// let ring = RingNum::try_new(12)?;
+    /// assert_eq!(ring.get(), 12);
+    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// ```
     pub fn try_new(num: u8) -> Result<Self, SmilesError> {
         (num <= 99).then_some(Self(num)).ok_or(SmilesError::RingNumberOverflow(num))
     }
 
     /// Returns the value for the [`RingNum`]
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::bond::ring_num::RingNum;
+    ///
+    /// assert_eq!(RingNum::try_new(7)?.get(), 7);
+    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// ```
     #[must_use]
     pub fn get(&self) -> u8 {
         self.0

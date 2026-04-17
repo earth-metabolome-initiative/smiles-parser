@@ -22,6 +22,16 @@ impl<'a> SmilesComponents<'a> {
     }
 
     /// Returns the number of connected components in the graph.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "CC.O".parse()?;
+    /// assert_eq!(smiles.connected_components().number_of_components(), 2);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn number_of_components(&self) -> usize {
@@ -29,6 +39,16 @@ impl<'a> SmilesComponents<'a> {
     }
 
     /// Returns the size of the largest connected component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "CC.O".parse()?;
+    /// assert_eq!(smiles.connected_components().largest_component_size(), 2);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn largest_component_size(&self) -> usize {
@@ -36,6 +56,16 @@ impl<'a> SmilesComponents<'a> {
     }
 
     /// Returns the size of the smallest connected component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "CC.O".parse()?;
+    /// assert_eq!(smiles.connected_components().smallest_component_size(), 1);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn smallest_component_size(&self) -> usize {
@@ -43,6 +73,19 @@ impl<'a> SmilesComponents<'a> {
     }
 
     /// Returns the connected-component identifier of the provided node id.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "CC.O".parse()?;
+    /// let components = smiles.connected_components();
+    ///
+    /// assert_eq!(components.component_of_node(0), components.component_of_node(1));
+    /// assert_ne!(components.component_of_node(0), components.component_of_node(2));
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn component_of_node(&self, node: usize) -> usize {
@@ -51,12 +94,37 @@ impl<'a> SmilesComponents<'a> {
 
     /// Returns an iterator over the connected-component identifier of each
     /// node.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "CC.O".parse()?;
+    /// let identifiers = smiles.connected_components().component_identifiers().collect::<Vec<_>>();
+    ///
+    /// assert_eq!(identifiers.len(), smiles.nodes().len());
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     pub fn component_identifiers(&self) -> impl Iterator<Item = usize> + '_ {
         self.inner.component_identifiers()
     }
 
     /// Returns an iterator over the node ids belonging to the given component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "CC.O".parse()?;
+    /// let components = smiles.connected_components();
+    /// let first_component = components.component_of_node(0);
+    ///
+    /// assert_eq!(components.node_ids_of_component(first_component).collect::<Vec<_>>(), vec![0, 1]);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     pub fn node_ids_of_component(
         &self,
@@ -66,6 +134,26 @@ impl<'a> SmilesComponents<'a> {
     }
 
     /// Returns an iterator over the atoms belonging to the given component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "CC.O".parse()?;
+    /// let components = smiles.connected_components();
+    /// let oxygen_component = components.component_of_node(2);
+    ///
+    /// assert_eq!(
+    ///     components
+    ///         .nodes_of_component(oxygen_component)
+    ///         .map(|atom| atom.element())
+    ///         .collect::<Vec<_>>(),
+    ///     vec![Some(Element::O)]
+    /// );
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     pub fn nodes_of_component(
         &self,
@@ -87,6 +175,17 @@ impl Smiles {
     /// Panics if the underlying geometric-traits connected-components routine
     /// ever reports marker overflow for `usize` component identifiers. That
     /// would indicate a bug in the graph library or an invalid graph size.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "CC.O".parse()?;
+    /// let components = smiles.connected_components();
+    /// assert_eq!(components.number_of_components(), 2);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn connected_components(&self) -> SmilesComponents<'_> {

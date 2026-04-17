@@ -117,6 +117,16 @@ pub struct DatasetArtifact {
 
 impl DatasetArtifact {
     /// Returns the dataset identifier that produced this artifact.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use smiles_parser::datasets::{DatasetSource, MASS_SPEC_GYM_SMILES};
+    ///
+    /// let artifact = MASS_SPEC_GYM_SMILES.fetch()?;
+    /// assert_eq!(artifact.dataset_id(), "massspecgym-smiles");
+    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// ```
     #[must_use]
     pub fn dataset_id(&self) -> &'static str {
         self.dataset_id
@@ -126,30 +136,94 @@ impl DatasetArtifact {
     ///
     /// This is the decompressed path when one was requested, otherwise the
     /// cached upstream file path.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use smiles_parser::datasets::{DatasetSource, MASS_SPEC_GYM_SMILES};
+    ///
+    /// let artifact = MASS_SPEC_GYM_SMILES.fetch()?;
+    /// println!("{}", artifact.path().display());
+    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// ```
     #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
     }
 
     /// Returns the cached compressed path, when present.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use smiles_parser::datasets::{DatasetFetchOptions, DatasetSource, GzipMode, PUBCHEM_SMILES};
+    ///
+    /// let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
+    ///     gzip_mode: GzipMode::KeepBoth,
+    ///     ..DatasetFetchOptions::default()
+    /// })?;
+    /// assert!(artifact.compressed_path().is_some());
+    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// ```
     #[must_use]
     pub fn compressed_path(&self) -> Option<&Path> {
         self.compressed_path.as_deref()
     }
 
     /// Returns the cached decompressed path, when present.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use smiles_parser::datasets::{DatasetFetchOptions, DatasetSource, GzipMode, PUBCHEM_SMILES};
+    ///
+    /// let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
+    ///     gzip_mode: GzipMode::Decompress,
+    ///     ..DatasetFetchOptions::default()
+    /// })?;
+    /// assert!(artifact.decompressed_path().is_some());
+    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// ```
     #[must_use]
     pub fn decompressed_path(&self) -> Option<&Path> {
         self.decompressed_path.as_deref()
     }
 
     /// Returns whether the upstream artifact was downloaded during this call.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use smiles_parser::datasets::{
+    ///     CacheMode, DatasetFetchOptions, DatasetSource, MASS_SPEC_GYM_SMILES,
+    /// };
+    ///
+    /// let artifact = MASS_SPEC_GYM_SMILES.fetch_with_options(&DatasetFetchOptions {
+    ///     cache_mode: CacheMode::UseCache,
+    ///     ..DatasetFetchOptions::default()
+    /// })?;
+    /// let _downloaded = artifact.was_downloaded();
+    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// ```
     #[must_use]
     pub fn was_downloaded(&self) -> bool {
         self.was_downloaded
     }
 
     /// Returns whether a decompressed copy was created during this call.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use smiles_parser::datasets::{DatasetFetchOptions, DatasetSource, GzipMode, PUBCHEM_SMILES};
+    ///
+    /// let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
+    ///     gzip_mode: GzipMode::Decompress,
+    ///     ..DatasetFetchOptions::default()
+    /// })?;
+    /// let _decompressed = artifact.was_decompressed();
+    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// ```
     #[must_use]
     pub fn was_decompressed(&self) -> bool {
         self.was_decompressed
@@ -218,6 +292,16 @@ pub trait DatasetSource {
     ///
     /// Returns [`DatasetError`] if the download fails or the cached artifact
     /// cannot be materialized on disk.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use smiles_parser::datasets::{DatasetSource, MASS_SPEC_GYM_SMILES};
+    ///
+    /// let artifact = MASS_SPEC_GYM_SMILES.fetch()?;
+    /// assert!(artifact.path().ends_with("MassSpecGym.tsv"));
+    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// ```
     fn fetch(&self) -> Result<DatasetArtifact, DatasetError> {
         self.fetch_with_options(&DatasetFetchOptions::default())
     }
@@ -228,6 +312,19 @@ pub trait DatasetSource {
     ///
     /// Returns [`DatasetError`] if the download fails or the requested cached
     /// artifact layout cannot be materialized on disk.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use smiles_parser::datasets::{DatasetFetchOptions, DatasetSource, GzipMode, PUBCHEM_SMILES};
+    ///
+    /// let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
+    ///     gzip_mode: GzipMode::Decompress,
+    ///     ..DatasetFetchOptions::default()
+    /// })?;
+    /// assert!(artifact.path().ends_with("CID-SMILES"));
+    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// ```
     fn fetch_with_options(
         &self,
         options: &DatasetFetchOptions,
@@ -245,6 +342,18 @@ pub trait SmilesDatasetSource: DatasetSource {
     ///
     /// Returns [`DatasetError`] if the dataset cannot be fetched or if the
     /// materialized dataset cannot be opened for streaming.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use smiles_parser::datasets::{PUBCHEM_SMILES, SmilesDatasetSource};
+    ///
+    /// let mut smiles = PUBCHEM_SMILES.iter_smiles()?;
+    /// if let Some(first) = smiles.next() {
+    ///     let _ = first?;
+    /// }
+    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// ```
     fn iter_smiles(&self) -> Result<DatasetSmilesIter, DatasetError> {
         self.iter_smiles_with_options(&DatasetFetchOptions::default())
     }
@@ -256,6 +365,23 @@ pub trait SmilesDatasetSource: DatasetSource {
     ///
     /// Returns [`DatasetError`] if the dataset cannot be fetched or if the
     /// materialized dataset cannot be opened for streaming.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use smiles_parser::datasets::{
+    ///     DatasetFetchOptions, GzipMode, PUBCHEM_SMILES, SmilesDatasetSource,
+    /// };
+    ///
+    /// let mut smiles = PUBCHEM_SMILES.iter_smiles_with_options(&DatasetFetchOptions {
+    ///     gzip_mode: GzipMode::KeepCompressed,
+    ///     ..DatasetFetchOptions::default()
+    /// })?;
+    /// if let Some(first) = smiles.next() {
+    ///     let _ = first?;
+    /// }
+    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// ```
     fn iter_smiles_with_options(
         &self,
         options: &DatasetFetchOptions,
@@ -356,6 +482,14 @@ pub const MASS_SPEC_GYM_SMILES: MassSpecGymSmiles = MassSpecGymSmiles;
 /// 2. `LOCALAPPDATA/smiles-parser/datasets`
 /// 3. `HOME/.cache/smiles-parser/datasets`
 /// 4. `${TMPDIR}/smiles-parser/datasets`
+///
+/// # Examples
+///
+/// ```
+/// use smiles_parser::datasets::default_dataset_cache_dir;
+///
+/// assert!(default_dataset_cache_dir().ends_with("smiles-parser/datasets"));
+/// ```
 #[must_use]
 pub fn default_dataset_cache_dir() -> PathBuf {
     if let Some(path) = env::var_os("XDG_CACHE_HOME") {

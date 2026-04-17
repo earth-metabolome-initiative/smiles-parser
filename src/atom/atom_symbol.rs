@@ -16,6 +16,16 @@ pub enum AtomSymbol {
 
 impl AtomSymbol {
     /// Creates an atom symbol
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::atom_symbol::AtomSymbol;
+    ///
+    /// assert_eq!(AtomSymbol::new(Some(Element::C)), AtomSymbol::Element(Element::C));
+    /// assert_eq!(AtomSymbol::new(None), AtomSymbol::WildCard);
+    /// ```
     #[must_use]
     pub fn new(element_type: Option<Element>) -> Self {
         match element_type {
@@ -24,16 +34,44 @@ impl AtomSymbol {
         }
     }
     /// creates an `AtomSymbol` set as `WildCard`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::atom::atom_symbol::AtomSymbol;
+    ///
+    /// assert_eq!(AtomSymbol::new_wildcard(), AtomSymbol::WildCard);
+    /// ```
     #[must_use]
     pub fn new_wildcard() -> Self {
         Self::WildCard
     }
     /// Verifies whether the symbol present is a wildcard
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::atom_symbol::AtomSymbol;
+    ///
+    /// assert!(AtomSymbol::new_wildcard().is_wildcard());
+    /// assert!(!AtomSymbol::Element(Element::O).is_wildcard());
+    /// ```
     #[must_use]
     pub fn is_wildcard(&self) -> bool {
         matches!(self, AtomSymbol::WildCard)
     }
     /// Returns either the [`Element`] or `None` if wildcard
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::atom_symbol::AtomSymbol;
+    ///
+    /// assert_eq!(AtomSymbol::Element(Element::N).element(), Some(Element::N));
+    /// assert_eq!(AtomSymbol::WildCard.element(), None);
+    /// ```
     #[must_use]
     pub fn element(&self) -> Option<Element> {
         match self {
@@ -43,6 +81,16 @@ impl AtomSymbol {
     }
     /// Consumes the `AtomSymbol` and returns the [`Element`] or `None` if
     /// `WildCard`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::atom_symbol::AtomSymbol;
+    ///
+    /// assert_eq!(AtomSymbol::Element(Element::S).into_element(), Some(Element::S));
+    /// assert_eq!(AtomSymbol::WildCard.into_element(), None);
+    /// ```
     #[must_use]
     pub fn into_element(self) -> Option<Element> {
         match self {
