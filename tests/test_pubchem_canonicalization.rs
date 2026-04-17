@@ -1,5 +1,7 @@
 //! Validate canonicalization across the whole PubChem `CID-SMILES` corpus.
 
+#![cfg(feature = "datasets")]
+
 use std::{
     env,
     fs::File,
@@ -12,17 +14,16 @@ use std::{
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
-use smiles_parser::prelude::Smiles;
-
-const DEFAULT_CORPUS_PATH: &str = "tests/CID-SMILES";
+use smiles_parser::prelude::{
+    DatasetFetchOptions, DatasetSource, GzipMode, PUBCHEM_SMILES, Smiles,
+};
 
 #[test]
 #[ignore = "This test streams the whole PubChem CID-SMILES corpus and validates canonicalization in parallel."]
 fn validate_pubchem_canonicalization_corpus() -> Result<(), Box<dyn std::error::Error>> {
     require_release_build()?;
 
-    let corpus_path = env::var("PUBCHEM_CANONICALIZATION_CORPUS")
-        .map_or_else(|_| PathBuf::from(DEFAULT_CORPUS_PATH), PathBuf::from);
+    let corpus_path = pubchem_corpus_path()?;
     let limit = env_usize("PUBCHEM_CANONICALIZATION_VALIDATE_LIMIT");
     let total_records = pubchem_record_count(&corpus_path)?;
     let record_count = limit.map_or(total_records, |limit| limit.min(total_records));
@@ -73,6 +74,18 @@ fn validate_pubchem_canonicalization_corpus() -> Result<(), Box<dyn std::error::
 
 fn pubchem_record_count(path: &Path) -> Result<usize, io::Error> {
     Ok(open_pubchem_corpus(path)?.lines().count())
+}
+
+fn pubchem_corpus_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    if let Ok(path) = env::var("PUBCHEM_CANONICALIZATION_CORPUS") {
+        return Ok(PathBuf::from(path));
+    }
+
+    let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
+        gzip_mode: GzipMode::Decompress,
+        ..DatasetFetchOptions::default()
+    })?;
+    Ok(artifact.path().to_path_buf())
 }
 
 fn validate_record_line(line: &str) -> Result<(), String> {

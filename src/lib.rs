@@ -7,14 +7,24 @@ extern crate alloc;
 #[cfg(test)]
 #[macro_use]
 extern crate std;
+#[cfg(all(feature = "datasets", not(test)))]
+extern crate std;
 
 pub mod atom;
 pub mod bond;
+#[cfg(feature = "datasets")]
+pub mod datasets;
 pub mod errors;
 pub(crate) mod parser;
 pub mod smiles;
 pub mod token;
 
+#[cfg(feature = "datasets")]
+pub use crate::datasets::{
+    CacheMode, DatasetArtifact, DatasetCompression, DatasetError, DatasetFetchOptions,
+    DatasetSource, GzipMode, MASS_SPEC_GYM_SMILES, MassSpecGymSmiles, PUBCHEM_SMILES,
+    PubChemSmiles, default_dataset_cache_dir,
+};
 pub use crate::{
     errors::{SmilesError, SmilesErrorWithSpan},
     smiles::{
@@ -35,5 +45,11 @@ pub mod prelude {
         RdkitMdlAromaticity, RdkitSimpleAromaticity, RingAtomMembership, RingAtomMembershipScratch,
         RingMembership, Smiles, SmilesComponents, SmilesError, SmilesErrorWithSpan, SymmSssrResult,
         SymmSssrStatus,
+    };
+    #[cfg(feature = "datasets")]
+    pub use crate::{
+        CacheMode, DatasetArtifact, DatasetCompression, DatasetError, DatasetFetchOptions,
+        DatasetSource, GzipMode, MASS_SPEC_GYM_SMILES, MassSpecGymSmiles, PUBCHEM_SMILES,
+        PubChemSmiles, default_dataset_cache_dir,
     };
 }
