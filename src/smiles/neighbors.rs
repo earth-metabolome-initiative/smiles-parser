@@ -45,7 +45,10 @@ impl Smiles {
         let rooted = self.rooted_symmetry_classes_from_refined(refined.classes());
         self.ordered_neighbor_edges_with_planning(node_id, &invariants, refined.classes(), &rooted)
             .into_iter()
-            .map(|edge| edge.other(node_id).unwrap_or_else(|| unreachable!()))
+            .map(|edge| {
+                crate::bond::bond_edge::bond_edge_other(edge, node_id)
+                    .unwrap_or_else(|| unreachable!())
+            })
             .collect()
     }
 
@@ -163,7 +166,10 @@ mod tests {
     use super::Smiles;
     use crate::{
         atom::{Atom, atom_symbol::AtomSymbol},
-        bond::{Bond, bond_edge::BondEdge},
+        bond::{
+            Bond,
+            bond_edge::{BondEdge, bond_edge},
+        },
         smiles::BondMatrixBuilder,
     };
 
@@ -174,7 +180,7 @@ mod tests {
     fn smiles_from_edges(atom_nodes: Vec<Atom>, bond_edges: &[BondEdge]) -> Smiles {
         let mut builder = BondMatrixBuilder::with_capacity(bond_edges.len());
         for edge in bond_edges {
-            builder.push_edge(edge.node_a(), edge.node_b(), edge.bond(), edge.ring_num()).unwrap();
+            builder.push_edge(edge.0, edge.1, edge.2, edge.3).unwrap();
         }
         let number_of_nodes = atom_nodes.len();
         Smiles::from_bond_matrix_parts(atom_nodes, builder.finish(number_of_nodes))
@@ -191,13 +197,13 @@ mod tests {
     fn ordered_neighbors_preserve_all_incident_edges() {
         let smiles = smiles_from_edges(
             vec![atom(Element::C), atom(Element::O), atom(Element::N)],
-            &[BondEdge::new(0, 1, Bond::Single, None), BondEdge::new(0, 2, Bond::Double, None)],
+            &[bond_edge(0, 1, Bond::Single, None), bond_edge(0, 2, Bond::Double, None)],
         );
 
         let ordered = smiles.ordered_neighbor_edges(0);
         assert_eq!(ordered.len(), 2);
-        assert!(ordered.contains(&BondEdge::new(0, 1, Bond::Single, None)));
-        assert!(ordered.contains(&BondEdge::new(0, 2, Bond::Double, None)));
+        assert!(ordered.contains(&bond_edge(0, 1, Bond::Single, None)));
+        assert!(ordered.contains(&bond_edge(0, 2, Bond::Double, None)));
     }
 
     #[test]
@@ -223,7 +229,7 @@ mod tests {
     fn ordered_neighbors_reflect_bond_sensitive_structural_classes() {
         let smiles = smiles_from_edges(
             vec![atom(Element::C), atom(Element::O), atom(Element::O)],
-            &[BondEdge::new(0, 1, Bond::Single, None), BondEdge::new(0, 2, Bond::Double, None)],
+            &[bond_edge(0, 1, Bond::Single, None), bond_edge(0, 2, Bond::Double, None)],
         );
 
         assert_eq!(smiles.ordered_neighbor_ids(0), vec![2, 1]);

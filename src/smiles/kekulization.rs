@@ -426,7 +426,10 @@ mod tests {
     };
     use crate::{
         atom::{Atom, atom_symbol::AtomSymbol},
-        bond::{Bond, bond_edge::BondEdge},
+        bond::{
+            Bond,
+            bond_edge::{BondEdge, bond_edge},
+        },
         smiles::BondMatrixBuilder,
     };
 
@@ -449,7 +452,7 @@ mod tests {
     fn smiles_from_edges(atom_nodes: Vec<Atom>, bond_edges: &[BondEdge]) -> Smiles {
         let mut builder = BondMatrixBuilder::with_capacity(bond_edges.len());
         for edge in bond_edges {
-            builder.push_edge(edge.node_a(), edge.node_b(), edge.bond(), edge.ring_num()).unwrap();
+            builder.push_edge(edge.0, edge.1, edge.2, edge.3).unwrap();
         }
         let number_of_nodes = atom_nodes.len();
         Smiles::from_bond_matrix_parts(atom_nodes, builder.finish(number_of_nodes))
@@ -653,9 +656,9 @@ mod tests {
         let smiles = smiles_from_edges(
             vec![aromatic_carbon(), aromatic_carbon(), aromatic_carbon()],
             &[
-                BondEdge::new(0, 1, Bond::Aromatic, None),
-                BondEdge::new(1, 2, Bond::Aromatic, None),
-                BondEdge::new(2, 0, Bond::Aromatic, None),
+                bond_edge(0, 1, Bond::Aromatic, None),
+                bond_edge(1, 2, Bond::Aromatic, None),
+                bond_edge(2, 0, Bond::Aromatic, None),
             ],
         );
         let aromatic_bonds = smiles
@@ -696,7 +699,7 @@ mod tests {
                     atom.charge_value(),
                     atom.hydrogen_count(),
                     perceived.aromaticized().implicit_hydrogen_count(atom_id).unwrap_or(0),
-                    perceived.aromaticized().edges_for_node(atom_id).len(),
+                    perceived.aromaticized().edge_count_for_node(atom_id),
                 )
             })
             .collect::<Vec<_>>();
@@ -738,7 +741,7 @@ mod tests {
                     atom.charge_value(),
                     atom.hydrogen_count(),
                     reparsed.implicit_hydrogen_count(atom_id).unwrap_or(0),
-                    reparsed.edges_for_node(atom_id).len(),
+                    reparsed.edge_count_for_node(atom_id),
                 )
             })
             .collect::<Vec<_>>();

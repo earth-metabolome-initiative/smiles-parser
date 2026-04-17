@@ -364,16 +364,13 @@ pub(super) fn atom_based_substituent_priority_key(
 ) -> AtomBasedSubstituentPriorityKey {
     let atom = smiles.node_by_id(neighbor).unwrap_or_else(|| unreachable!());
     let atomic_number = atom.element().map_or(0, u8::from);
-    let bond_order_to_endpoint = match smiles
-        .edge_for_node_pair((endpoint, neighbor))
-        .unwrap_or_else(|| unreachable!())
-        .bond()
-    {
-        Bond::Single | Bond::Up | Bond::Down | Bond::Aromatic => 1,
-        Bond::Double => 2,
-        Bond::Triple => 3,
-        Bond::Quadruple => 4,
-    };
+    let bond_order_to_endpoint =
+        match smiles.edge_for_node_pair((endpoint, neighbor)).unwrap_or_else(|| unreachable!()).2 {
+            Bond::Single | Bond::Up | Bond::Down | Bond::Aromatic => 1,
+            Bond::Double => 2,
+            Bond::Triple => 3,
+            Bond::Quadruple => 4,
+        };
 
     AtomBasedSubstituentPriorityKey {
         atomic_number,

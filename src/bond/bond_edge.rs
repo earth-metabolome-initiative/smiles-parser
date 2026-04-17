@@ -1,155 +1,80 @@
-//! Module for bonds as edges for a graph structure
-
-use core::fmt;
+//! Module for bonds stored as graph edge tuples.
 
 use crate::bond::{Bond, ring_num::RingNum};
 
 /// Contains the two atom indices connected via the [`Bond`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BondEdge {
-    /// The first node
+pub type BondEdge = (usize, usize, Bond, Option<RingNum>);
+
+/// Creates a new edge tuple.
+#[inline]
+#[must_use]
+pub const fn bond_edge(
     node_a: usize,
-    /// The Second node
     node_b: usize,
-    /// The bond between the nodes
     bond: Bond,
-    /// Possible Ring Number for this edge
     ring_num: Option<RingNum>,
+) -> BondEdge {
+    (node_a, node_b, bond, ring_num)
 }
 
-impl BondEdge {
-    /// Creates a new edge
-    #[must_use]
-    pub fn new(node_a: usize, node_b: usize, bond: Bond, ring_num: Option<RingNum>) -> Self {
-        Self { node_a, node_b, bond, ring_num }
-    }
-    /// Returns the specified [`Bond`]
-    #[must_use]
-    pub fn bond(&self) -> Bond {
-        self.bond
-    }
-    /// Returns a tuple of the two vertices
-    #[must_use]
-    pub fn vertices(&self) -> (usize, usize) {
-        (self.node_a, self.node_b)
-    }
-    /// Returns the first vertex
-    #[must_use]
-    pub fn node_a(&self) -> usize {
-        self.node_a
-    }
-    /// Returns the second vertex
-    #[must_use]
-    pub fn node_b(&self) -> usize {
-        self.node_b
-    }
-    /// Checks if the `BondEdge` contains the specified node id as `usize`
-    #[must_use]
-    pub fn contains(&self, node_id: usize) -> bool {
-        self.node_a == node_id || self.node_b == node_id
-    }
-    /// Returns the other node id (if it exists)
-    #[must_use]
-    pub fn other(&self, node_id: usize) -> Option<usize> {
-        if self.node_a == node_id {
-            Some(self.node_b)
-        } else if self.node_b == node_id {
-            Some(self.node_a)
-        } else {
-            None
-        }
-    }
-    /// Returns the ring number assigned to this edge, if any.
-    #[must_use]
-    pub fn ring_num(&self) -> Option<RingNum> {
-        self.ring_num
-    }
-    /// Updates the [`RingNum`] value
-    pub fn set_ring_num(&mut self, ring_num: Option<RingNum>) {
-        self.ring_num = ring_num;
-    }
-    /// returns the [`RingNum`] value
-    #[must_use]
-    pub fn ring_num_val(&self) -> Option<u8> {
-        self.ring_num.map(|num| num.get())
+/// Returns the other node id for the provided incident edge, if any.
+#[inline]
+#[must_use]
+pub const fn bond_edge_other(edge: BondEdge, node_id: usize) -> Option<usize> {
+    if edge.0 == node_id {
+        Some(edge.1)
+    } else if edge.1 == node_id {
+        Some(edge.0)
+    } else {
+        None
     }
 }
 
-impl fmt::Display for BondEdge {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.bond.edge_symbol())
-    }
+/// Returns the ring number value stored in the edge, if any.
+#[inline]
+#[must_use]
+pub fn bond_edge_ring_num_val(edge: BondEdge) -> Option<u8> {
+    edge.3.map(|num| num.get())
 }
 
 #[cfg(test)]
 mod tests {
-    use alloc::string::ToString;
-
-    use crate::bond::{Bond, bond_edge::BondEdge, ring_num::RingNum};
+    use crate::bond::{
+        Bond,
+        bond_edge::{BondEdge, bond_edge, bond_edge_other, bond_edge_ring_num_val},
+        ring_num::RingNum,
+    };
 
     #[test]
     fn test_bond_edge_new_and_accessors() {
-        let edge = BondEdge::new(3, 7, Bond::Double, None);
+        let edge = bond_edge(3, 7, Bond::Double, None);
 
-        assert_eq!(edge.node_a(), 3);
-        assert_eq!(edge.node_b(), 7);
-        assert_eq!(edge.vertices(), (3, 7));
-        assert_eq!(edge.bond(), Bond::Double);
-        assert_eq!(edge.ring_num(), None);
-    }
-
-    #[test]
-    fn test_bond_edge_bool_content() {
-        let edge = BondEdge::new(3, 7, Bond::Single, None);
-        assert!(edge.contains(3));
-        assert!(edge.contains(7));
-        assert!(!edge.contains(5));
+        assert_eq!(edge.0, 3);
+        assert_eq!(edge.1, 7);
+        assert_eq!((edge.0, edge.1), (3, 7));
+        assert_eq!(edge.2, Bond::Double);
+        assert_eq!(edge.3, None);
     }
 
     #[test]
     fn test_bond_edge_other() {
-        let edge = BondEdge::new(10, 2, Bond::Single, None);
-        assert_eq!(edge.other(10), Some(2));
-        assert_eq!(edge.other(2), Some(10));
-        assert_eq!(edge.other(5), None);
+        let edge = bond_edge(10, 2, Bond::Single, None);
+        assert_eq!(bond_edge_other(edge, 10), Some(2));
+        assert_eq!(bond_edge_other(edge, 2), Some(10));
+        assert_eq!(bond_edge_other(edge, 5), None);
     }
 
     #[test]
-    fn test_bond_edge_num_setter() {
-        let mut edge = BondEdge::new(0, 1, Bond::Single, None);
-        assert_eq!(edge.ring_num(), None);
-        assert_eq!(edge.ring_num_val(), None);
-
+    fn test_bond_edge_ring_num_value() {
         let ring_num = RingNum::try_new(2).unwrap();
-        edge.set_ring_num(Some(ring_num));
-        assert_eq!(edge.ring_num(), Some(ring_num));
-        assert_eq!(edge.ring_num_val(), Some(2));
-
-        edge.set_ring_num(None);
-        assert_eq!(edge.ring_num(), None);
-        assert_eq!(edge.ring_num_val(), None);
-    }
-
-    #[test]
-    fn test_bond_edge_fmt_all_arms() {
-        let cases = [
-            (BondEdge::new(0, 1, Bond::Single, Some(RingNum::try_new(2).unwrap())), ""),
-            (BondEdge::new(0, 1, Bond::Double, Some(RingNum::try_new(2).unwrap())), "="),
-            (BondEdge::new(0, 1, Bond::Triple, Some(RingNum::try_new(2).unwrap())), "#"),
-            (BondEdge::new(0, 1, Bond::Quadruple, Some(RingNum::try_new(2).unwrap())), "$"),
-            (BondEdge::new(0, 1, Bond::Aromatic, Some(RingNum::try_new(2).unwrap())), ":"),
-            (BondEdge::new(0, 1, Bond::Up, Some(RingNum::try_new(2).unwrap())), "/"),
-            (BondEdge::new(0, 1, Bond::Down, Some(RingNum::try_new(2).unwrap())), "\\"),
-        ];
-
-        for (edge, expected) in cases {
-            assert_eq!(expected, edge.to_string());
-        }
+        let edge = bond_edge(0, 1, Bond::Single, Some(ring_num));
+        assert_eq!(bond_edge_ring_num_val(edge), Some(2));
+        assert_eq!(bond_edge_ring_num_val((0, 1, Bond::Single, None)), None);
     }
 
     #[test]
     fn test_bond_edge_vertices_preserve_order() {
-        let edge = BondEdge::new(10, 2, Bond::Single, None);
-        assert_eq!(edge.vertices(), (10, 2));
+        let edge: BondEdge = bond_edge(10, 2, Bond::Single, None);
+        assert_eq!((edge.0, edge.1), (10, 2));
     }
 }

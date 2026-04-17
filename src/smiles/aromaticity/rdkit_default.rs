@@ -224,17 +224,17 @@ impl RdkitPreAromaticityNormalization {
                 continue;
             }
 
-            let incident_bonds = smiles.edges_for_node(phosphorus_atom_id);
-            if incident_bonds.len() != 3 {
+            if smiles.edge_count_for_node(phosphorus_atom_id) != 3 {
                 continue;
             }
+            let incident_bonds = smiles.edges_for_node(phosphorus_atom_id);
 
             let mut oxygen_atom_id = None;
             let mut has_double_to_carbon_or_nitrogen = false;
 
             for edge in incident_bonds {
-                let bond = edge.bond().without_direction();
-                let neighbor_atom_id = edge.node_b();
+                let bond = edge.2.without_direction();
+                let neighbor_atom_id = edge.1;
                 let neighbor_atom = &smiles.nodes()[neighbor_atom_id];
 
                 if bond == Bond::Double
@@ -244,7 +244,7 @@ impl RdkitPreAromaticityNormalization {
                     oxygen_atom_id = Some(neighbor_atom_id);
                 } else if bond == Bond::Double
                     && matches!(neighbor_atom.element(), Some(Element::C | Element::N))
-                    && smiles.edges_for_node(neighbor_atom_id).len() >= 2
+                    && smiles.edge_count_for_node(neighbor_atom_id) >= 2
                 {
                     has_double_to_carbon_or_nitrogen = true;
                 }
@@ -332,8 +332,8 @@ impl RdkitAtomAromContext {
             .copied()
             .unwrap_or_else(|| smiles.implicit_hydrogen_count(atom_id).unwrap_or(0));
         let total_hydrogens = explicit_hydrogens.saturating_add(implicit_hydrogens);
+        let degree = smiles.edge_count_for_node(atom_id);
         let edges = smiles.edges_for_node(atom_id);
-        let degree = edges.len();
         let degree_plus_total_h = degree + usize::from(total_hydrogens);
         let mut explicit_valence = usize::from(explicit_hydrogens);
         let mut incident_multiple_bond = false;
@@ -342,20 +342,20 @@ impl RdkitAtomAromContext {
         let mut multiple_bond_kinds = Vec::<Bond>::new();
 
         for edge in edges {
-            let bond = edge.bond().without_direction();
+            let bond = edge.2.without_direction();
             explicit_valence += bond_valence_contribution(bond);
             if matches!(bond, Bond::Double | Bond::Triple | Bond::Quadruple | Bond::Aromatic) {
                 incident_multiple_bond = true;
-                if ring_membership.contains_edge(atom_id, edge.node_b()) {
+                if ring_membership.contains_edge(atom_id, edge.1) {
                     incident_cyclic_multiple_bond = true;
                 }
             }
             if matches!(bond, Bond::Double | Bond::Triple | Bond::Quadruple) {
                 multiple_bond_kinds.push(bond);
-                if !ring_membership.contains_edge(atom_id, edge.node_b())
+                if !ring_membership.contains_edge(atom_id, edge.1)
                     && incident_noncyclic_multiple_bond_to.is_none()
                 {
-                    incident_noncyclic_multiple_bond_to = Some(edge.node_b());
+                    incident_noncyclic_multiple_bond_to = Some(edge.1);
                 }
             }
         }
@@ -1488,7 +1488,7 @@ fn assign_radicals_for_atom(smiles: &Smiles, atom_id: usize, atom: &Atom) -> u8 
         return u8::try_from(radical_electrons).unwrap_or(0);
     }
 
-    if !smiles.edges_for_node(atom_id).is_empty() {
+    if smiles.edge_count_for_node(atom_id) != 0 {
         return 0;
     }
     let available_valence = (outer_electrons - charge).max(0);
@@ -1498,10 +1498,8 @@ fn assign_radicals_for_atom(smiles: &Smiles, atom_id: usize, atom: &Atom) -> u8 
 fn raw_total_valence(smiles: &Smiles, atom_id: usize, atom: &Atom) -> i16 {
     let bond_valence = smiles
         .edges_for_node(atom_id)
-        .iter()
         .map(|edge| {
-            i16::try_from(bond_valence_contribution(edge.bond().without_direction()))
-                .unwrap_or(i16::MAX)
+            i16::try_from(bond_valence_contribution(edge.2.without_direction())).unwrap_or(i16::MAX)
         })
         .sum::<i16>();
     bond_valence + i16::from(atom.hydrogen_count())
@@ -2325,7 +2323,7 @@ mod tests {
         assert_eq!(cleaned.implicit_hydrogen_overrides.get(&9), Some(&0));
         assert_eq!(cleaned.implicit_hydrogen_overrides.get(&10), Some(&0));
         assert_eq!(
-            cleaned.smiles.edge_for_node_pair((9, 10)).expect("cleaned P-O bond").bond(),
+            cleaned.smiles.edge_for_node_pair((9, 10)).expect("cleaned P-O bond").2,
             Bond::Single
         );
 
@@ -2365,7 +2363,7 @@ mod tests {
         assert_eq!(cleaned.implicit_hydrogen_overrides.get(&9), Some(&0));
         assert_eq!(cleaned.implicit_hydrogen_overrides.get(&10), Some(&0));
         assert_eq!(
-            cleaned.smiles.edge_for_node_pair((9, 10)).expect("phosphorus oxygen bond").bond(),
+            cleaned.smiles.edge_for_node_pair((9, 10)).expect("phosphorus oxygen bond").2,
             Bond::Single
         );
     }

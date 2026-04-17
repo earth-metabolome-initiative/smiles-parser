@@ -20,7 +20,11 @@ mod tests {
 
     use crate::{
         atom::{Atom, atom_symbol::AtomSymbol},
-        bond::{Bond, bond_edge::BondEdge, ring_num::RingNum},
+        bond::{
+            Bond,
+            bond_edge::{bond_edge, bond_edge_ring_num_val},
+            ring_num::RingNum,
+        },
         smiles::Smiles,
     };
 
@@ -37,14 +41,13 @@ mod tests {
             Atom::new_organic_subset(AtomSymbol::Element(Element::C), false),
             Atom::new_organic_subset(AtomSymbol::Element(Element::C), false),
         ];
-        let expected_ring_edge =
-            BondEdge::new(0, 5, Bond::Single, Some(RingNum::try_new(1).unwrap()));
+        let expected_ring_edge = bond_edge(0, 5, Bond::Single, Some(RingNum::try_new(1).unwrap()));
 
         assert_eq!(smiles.nodes()[0], expected_nodes[0]);
         assert_eq!(smiles.nodes()[5], expected_nodes[5]);
 
         assert_eq!(smiles.edge_for_node_pair((0, 5)), Some(expected_ring_edge));
-        assert_eq!(smiles.edge_for_node_pair((0, 5)).and_then(|edge| edge.ring_num_val()), Some(1));
+        assert_eq!(smiles.edge_for_node_pair((0, 5)).and_then(bond_edge_ring_num_val), Some(1));
         assert_eq!(smiles.node_by_id(0), Some(&expected_nodes[0]));
         assert_eq!(smiles.node_by_id(5), Some(&expected_nodes[5]));
     }

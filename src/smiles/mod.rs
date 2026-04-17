@@ -67,8 +67,6 @@ pub use self::{
 pub(crate) use self::{geometric_traits_impl::BondMatrixBuilder, stereo::StereoNeighbor};
 
 /// Error raised while deriving ring membership from a [`Smiles`] graph.
-pub type RingMembershipError = geometric_traits::errors::MonopartiteError<Smiles>;
-
 /// Status flags describing whether symmetrized SSSR completed exactly or
 /// required a fallback path.
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash)]
@@ -219,32 +217,47 @@ impl Smiles {
         Some(self.bond_matrix.select_value_ref(rank).bond())
     }
 
-    /// Returns the bonds incident to the provided node id.
+    /// Returns the number of bonds incident to the provided node id.
+    ///
+    /// # Panics
+    /// Panics if `id` is not a valid atom index in this graph.
     #[inline]
     #[must_use]
-    pub fn edges_for_node(&self, id: usize) -> Vec<BondEdge> {
-        if id >= self.atom_nodes.len() {
-            return Vec::new();
-        }
+    pub fn edge_count_for_node(&self, id: usize) -> usize {
+        assert!(
+            id < self.atom_nodes.len(),
+            "invalid atom index {id} for graph with {} atoms",
+            self.atom_nodes.len()
+        );
+        self.bond_matrix.sparse_row_values_ref(id).count()
+    }
 
+    /// Returns a zero-allocation iterator over the bonds incident to the
+    /// provided node id.
+    ///
+    /// # Panics
+    /// Panics if `id` is not a valid atom index in this graph.
+    #[inline]
+    pub fn edges_for_node(&self, id: usize) -> impl Iterator<Item = BondEdge> + '_ {
+        assert!(
+            id < self.atom_nodes.len(),
+            "invalid atom index {id} for graph with {} atoms",
+            self.atom_nodes.len()
+        );
         self.bond_matrix
             .sparse_row(id)
             .zip(self.bond_matrix.sparse_row_values_ref(id))
-            .map(|(other, entry)| entry.to_bond_edge(id, other))
-            .collect()
+            .map(move |(other, entry)| entry.to_bond_edge(id, other))
     }
 
     /// Returns the atoms and bonds that belong to at least one ring.
     ///
     /// Ring membership is derived from the cyclic biconnected components of
     /// the graph, so chain attachments and bridges are excluded.
-    ///
-    /// # Errors
-    /// Returns a [`RingMembershipError`] if the underlying graph violates the
-    /// simple undirected assumptions of the biconnected-components algorithm.
-    pub fn try_ring_membership(&self) -> Result<RingMembership, RingMembershipError> {
+    #[must_use]
+    pub fn ring_membership(&self) -> RingMembership {
         if self.atom_nodes.is_empty() || self.number_of_bonds() == 0 {
-            return Ok(RingMembership { atom_ids: Vec::new(), bond_edges: Vec::new() });
+            return RingMembership { atom_ids: Vec::new(), bond_edges: Vec::new() };
         }
 
         let mut discovery_order = vec![0_usize; self.atom_nodes.len()];
@@ -288,21 +301,7 @@ impl Smiles {
             .filter_map(|(atom_id, is_ring_atom)| is_ring_atom.then_some(atom_id))
             .collect();
 
-        Ok(RingMembership { atom_ids, bond_edges })
-    }
-
-    /// Returns the atoms and bonds that belong to at least one ring.
-    ///
-    /// This is the infallible convenience wrapper around
-    /// [`Smiles::try_ring_membership`]. The underlying biconnected-components
-    /// algorithm only fails on unsupported graph shapes such as self-loops,
-    /// which valid parsed [`Smiles`] graphs do not contain.
-    #[inline]
-    #[must_use]
-    pub fn ring_membership(&self) -> RingMembership {
-        self.try_ring_membership().unwrap_or_else(|_| {
-            unreachable!("parsed SMILES graphs satisfy the ring-membership preconditions")
-        })
+        RingMembership { atom_ids, bond_edges }
     }
 
     /// Returns the canonicalized symmetric-SSSR-style cycle set together with
@@ -523,7 +522,11 @@ mod tests {
     };
     use crate::{
         atom::{Atom, atom_symbol::AtomSymbol},
-        bond::{Bond, bond_edge::BondEdge, ring_num::RingNum},
+        bond::{
+            Bond,
+            bond_edge::{BondEdge, bond_edge},
+            ring_num::RingNum,
+        },
         errors::SmilesError,
     };
 
@@ -536,7 +539,7 @@ mod tests {
     fn smiles_from_edges(atom_nodes: Vec<Atom>, bond_edges: &[BondEdge]) -> Smiles {
         let mut builder = BondMatrixBuilder::with_capacity(bond_edges.len());
         for edge in bond_edges {
-            builder.push_edge(edge.node_a(), edge.node_b(), edge.bond(), edge.ring_num()).unwrap();
+            builder.push_edge(edge.0, edge.1, edge.2, edge.3).unwrap();
         }
         let number_of_nodes = atom_nodes.len();
         Smiles::from_bond_matrix_parts(atom_nodes, builder.finish(number_of_nodes))
@@ -572,44 +575,56 @@ mod tests {
         let ring = RingNum::try_new(1).unwrap();
         let smiles = smiles_from_edges(
             vec![atom(Element::C), atom(Element::O), atom(Element::N)],
-            &[
-                BondEdge::new(0, 1, Bond::Single, None),
-                BondEdge::new(1, 2, Bond::Double, Some(ring)),
-            ],
+            &[bond_edge(0, 1, Bond::Single, None), bond_edge(1, 2, Bond::Double, Some(ring))],
         );
 
         assert_eq!(smiles.number_of_bonds(), 2);
-        assert_eq!(
-            smiles.edge_for_node_pair((0, 1)),
-            Some(BondEdge::new(0, 1, Bond::Single, None))
-        );
-        assert_eq!(
-            smiles.edge_for_node_pair((1, 0)),
-            Some(BondEdge::new(0, 1, Bond::Single, None))
-        );
+        assert_eq!(smiles.edge_for_node_pair((0, 1)), Some(bond_edge(0, 1, Bond::Single, None)));
+        assert_eq!(smiles.edge_for_node_pair((1, 0)), Some(bond_edge(0, 1, Bond::Single, None)));
         assert_eq!(
             smiles.edge_for_node_pair((1, 2)),
-            Some(BondEdge::new(1, 2, Bond::Double, Some(ring)))
+            Some(bond_edge(1, 2, Bond::Double, Some(ring)))
         );
         assert_eq!(smiles.edge_for_node_pair((0, 2)), None);
 
-        let edges_for_1 = smiles.edges_for_node(1);
+        let edges_for_1 = smiles.edges_for_node(1).collect::<Vec<_>>();
         assert_eq!(edges_for_1.len(), 2);
-        assert!(edges_for_1.contains(&BondEdge::new(1, 0, Bond::Single, None)));
-        assert!(edges_for_1.contains(&BondEdge::new(1, 2, Bond::Double, Some(ring))));
+        assert!(edges_for_1.contains(&bond_edge(1, 0, Bond::Single, None)));
+        assert!(edges_for_1.contains(&bond_edge(1, 2, Bond::Double, Some(ring))));
 
-        let edges_for_0 = smiles.edges_for_node(0);
-        assert_eq!(edges_for_0, vec![BondEdge::new(0, 1, Bond::Single, None)]);
+        let edges_for_0 = smiles.edges_for_node(0).collect::<Vec<_>>();
+        assert_eq!(edges_for_0, vec![bond_edge(0, 1, Bond::Single, None)]);
+    }
 
-        let edges_for_99 = smiles.edges_for_node(99);
-        assert!(edges_for_99.is_empty());
+    #[test]
+    #[should_panic(expected = "invalid atom index 99 for graph with 3 atoms")]
+    fn edges_for_node_panics_for_invalid_atom_id() {
+        let ring = RingNum::try_new(7).expect("valid ring number");
+        let smiles = smiles_from_edges(
+            vec![atom(Element::C), atom(Element::O), atom(Element::N)],
+            &[bond_edge(0, 1, Bond::Single, None), bond_edge(1, 2, Bond::Double, Some(ring))],
+        );
+
+        let _ = smiles.edges_for_node(99).collect::<Vec<_>>();
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid atom index 99 for graph with 3 atoms")]
+    fn edge_count_for_node_panics_for_invalid_atom_id() {
+        let ring = RingNum::try_new(7).expect("valid ring number");
+        let smiles = smiles_from_edges(
+            vec![atom(Element::C), atom(Element::O), atom(Element::N)],
+            &[bond_edge(0, 1, Bond::Single, None), bond_edge(1, 2, Bond::Double, Some(ring))],
+        );
+
+        let _ = smiles.edge_count_for_node(99);
     }
 
     #[test]
     fn render_and_display_work_for_simple_valid_graph() {
         let smiles = smiles_from_edges(
             vec![atom(Element::C), atom(Element::O)],
-            &[BondEdge::new(0, 1, Bond::Double, None)],
+            &[bond_edge(0, 1, Bond::Double, None)],
         );
 
         let rendered = smiles.render().expect("simple graph should render");
@@ -624,17 +639,17 @@ mod tests {
 
         assert_eq!(raw.nodes(), collapsed.nodes());
         assert_eq!(raw.number_of_bonds(), collapsed.number_of_bonds());
-        assert_eq!(raw.edge_for_node_pair((0, 1)).unwrap().bond(), Bond::Up);
-        assert_eq!(raw.edge_for_node_pair((2, 3)).unwrap().bond(), Bond::Down);
-        assert_eq!(collapsed.edge_for_node_pair((0, 1)).unwrap().bond(), Bond::Single);
-        assert_eq!(collapsed.edge_for_node_pair((1, 2)).unwrap().bond(), Bond::Double);
-        assert_eq!(collapsed.edge_for_node_pair((2, 3)).unwrap().bond(), Bond::Single);
+        assert_eq!(raw.edge_for_node_pair((0, 1)).unwrap().2, Bond::Up);
+        assert_eq!(raw.edge_for_node_pair((2, 3)).unwrap().2, Bond::Down);
+        assert_eq!(collapsed.edge_for_node_pair((0, 1)).unwrap().2, Bond::Single);
+        assert_eq!(collapsed.edge_for_node_pair((1, 2)).unwrap().2, Bond::Double);
+        assert_eq!(collapsed.edge_for_node_pair((2, 3)).unwrap().2, Bond::Single);
     }
 
     #[test]
     fn ring_membership_is_empty_for_acyclic_graphs() {
         let smiles: Smiles = "CCO".parse().unwrap();
-        let ring_membership = smiles.try_ring_membership().unwrap();
+        let ring_membership = smiles.ring_membership();
 
         assert_eq!(
             ring_membership,
@@ -647,7 +662,7 @@ mod tests {
     #[test]
     fn ring_membership_captures_ring_atoms_and_bonds() {
         let smiles: Smiles = "C1CCCCC1".parse().unwrap();
-        let ring_membership = smiles.try_ring_membership().unwrap();
+        let ring_membership = smiles.ring_membership();
 
         assert_eq!(ring_membership.atom_ids(), &[0, 1, 2, 3, 4, 5]);
         assert_eq!(ring_membership.bond_edges(), &[[0, 1], [0, 5], [1, 2], [2, 3], [3, 4], [4, 5]]);
@@ -717,8 +732,8 @@ mod tests {
         assert_eq!(assignment.atom_ids(), &[0, 1, 2, 3, 4, 5]);
         assert_eq!(assignment.bond_edges(), &[[0, 1], [0, 5], [1, 2], [2, 3], [3, 4], [4, 5]]);
         assert!(aromaticized.nodes().iter().all(Atom::aromatic));
-        assert_eq!(aromaticized.edge_for_node_pair((0, 1)).unwrap().bond(), Bond::Aromatic);
-        assert_eq!(aromaticized.edge_for_node_pair((4, 5)).unwrap().bond(), Bond::Aromatic);
+        assert_eq!(aromaticized.edge_for_node_pair((0, 1)).unwrap().2, Bond::Aromatic);
+        assert_eq!(aromaticized.edge_for_node_pair((4, 5)).unwrap().2, Bond::Aromatic);
     }
 
     #[test]
@@ -739,7 +754,7 @@ mod tests {
         assert_eq!(assignment.atom_ids(), &[0, 1]);
         assert_eq!(assignment.bond_edges(), &[[0, 1]]);
         assert!(aromaticized.nodes().iter().all(Atom::aromatic));
-        assert_eq!(aromaticized.edge_for_node_pair((0, 1)).unwrap().bond(), Bond::Aromatic);
+        assert_eq!(aromaticized.edge_for_node_pair((0, 1)).unwrap().2, Bond::Aromatic);
     }
 
     #[test]
@@ -979,8 +994,8 @@ mod tests {
         assert!(aromaticized.nodes()[0].aromatic());
         assert!(aromaticized.nodes()[1].aromatic());
         assert!(!aromaticized.nodes()[2].aromatic());
-        assert_eq!(aromaticized.edge_for_node_pair((0, 1)).unwrap().bond(), Bond::Aromatic);
-        assert_eq!(aromaticized.edge_for_node_pair((1, 2)).unwrap().bond(), Bond::Single);
+        assert_eq!(aromaticized.edge_for_node_pair((0, 1)).unwrap().2, Bond::Aromatic);
+        assert_eq!(aromaticized.edge_for_node_pair((1, 2)).unwrap().2, Bond::Single);
     }
 
     #[test]
@@ -1085,8 +1100,8 @@ mod tests {
 
         let aromaticized = smiles.try_with_aromaticity_assignment(&assignment).unwrap();
 
-        assert_eq!(aromaticized.edge_for_node_pair((0, 1)).unwrap().bond(), Bond::Aromatic);
-        assert_eq!(aromaticized.edge_for_node_pair((1, 2)).unwrap().bond(), Bond::Single);
+        assert_eq!(aromaticized.edge_for_node_pair((0, 1)).unwrap().2, Bond::Aromatic);
+        assert_eq!(aromaticized.edge_for_node_pair((1, 2)).unwrap().2, Bond::Single);
     }
 
     #[test]
@@ -1125,10 +1140,7 @@ mod tests {
         assert_eq!(perception.assignment().atom_ids(), &[0, 1]);
         assert_eq!(perception.assignment().bond_edges(), &[[0, 1]]);
         assert!(perception.aromaticized().nodes().iter().all(Atom::aromatic));
-        assert_eq!(
-            perception.aromaticized().edge_for_node_pair((0, 1)).unwrap().bond(),
-            Bond::Aromatic
-        );
+        assert_eq!(perception.aromaticized().edge_for_node_pair((0, 1)).unwrap().2, Bond::Aromatic);
     }
 
     #[test]
@@ -1331,7 +1343,7 @@ mod tests {
             ]
         );
         assert!(aromaticized.nodes().iter().all(Atom::aromatic));
-        assert_eq!(aromaticized.edge_for_node_pair((3, 8)).unwrap().bond(), Bond::Aromatic);
+        assert_eq!(aromaticized.edge_for_node_pair((3, 8)).unwrap().2, Bond::Aromatic);
     }
 
     #[test]
@@ -1362,7 +1374,7 @@ mod tests {
             &[[0, 1], [0, 8], [1, 2], [2, 3], [3, 4], [3, 7], [4, 5], [5, 6], [6, 7], [7, 8]]
         );
         assert!(aromaticized.nodes().iter().all(Atom::aromatic));
-        assert_eq!(aromaticized.edge_for_node_pair((3, 7)).unwrap().bond(), Bond::Aromatic);
+        assert_eq!(aromaticized.edge_for_node_pair((3, 7)).unwrap().2, Bond::Aromatic);
     }
 
     #[test]
@@ -1405,8 +1417,8 @@ mod tests {
 
         assert_eq!(smiles.nodes().len(), 3);
         assert_eq!(smiles.number_of_bonds(), 2);
-        assert_eq!(smiles.edge_for_node_pair((0, 1)).unwrap().bond(), Bond::Single);
-        assert_eq!(smiles.edge_for_node_pair((0, 2)).unwrap().bond(), Bond::Single);
+        assert_eq!(smiles.edge_for_node_pair((0, 1)).unwrap().2, Bond::Single);
+        assert_eq!(smiles.edge_for_node_pair((0, 2)).unwrap().2, Bond::Single);
         assert_eq!(smiles.edge_for_node_pair((1, 2)), None);
     }
 
@@ -1454,7 +1466,7 @@ mod tests {
         let reparsed: Smiles = rendered.parse().unwrap();
 
         assert_eq!(rendered, reparsed.to_string());
-        assert_eq!(reparsed.edge_for_node_pair((0, 1)).unwrap().bond(), Bond::Single);
+        assert_eq!(reparsed.edge_for_node_pair((0, 1)).unwrap().2, Bond::Single);
     }
 
     #[test]

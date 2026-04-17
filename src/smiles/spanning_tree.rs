@@ -3,7 +3,10 @@ use alloc::vec::Vec;
 use geometric_traits::traits::{SparseMatrix2D, SparseValuedMatrix2DRef};
 
 use super::{Smiles, invariants::AtomInvariant};
-use crate::bond::{Bond, bond_edge::BondEdge};
+use crate::bond::{
+    Bond,
+    bond_edge::{BondEdge, bond_edge_other},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SpanningForest {
@@ -177,7 +180,7 @@ impl Smiles {
         ordered_neighbors: &[Vec<BondEdge>],
         state: &mut ForestBuildState,
     ) {
-        let neighbor_id = edge.other(node_id).unwrap_or_else(|| unreachable!());
+        let neighbor_id = bond_edge_other(edge, node_id).unwrap_or_else(|| unreachable!());
         if state.parents[node_id] == Some(neighbor_id) {
             return;
         }
@@ -187,9 +190,9 @@ impl Smiles {
         } else {
             state.visited[neighbor_id] = true;
             state.parents[neighbor_id] = Some(node_id);
-            state.parent_bonds[neighbor_id] = Some(edge.bond());
+            state.parent_bonds[neighbor_id] = Some(edge.2);
             state.children[node_id].push(neighbor_id);
-            state.child_bonds[node_id].push(edge.bond());
+            state.child_bonds[node_id].push(edge.2);
             self.build_spanning_tree_from(neighbor_id, ordered_neighbors, state);
         }
     }
@@ -215,7 +218,7 @@ impl Smiles {
         state: &mut ForestBuildState,
     ) {
         for edge in self.parser_ordered_neighbor_edges(node_id) {
-            let neighbor_id = edge.other(node_id).unwrap_or_else(|| unreachable!());
+            let neighbor_id = bond_edge_other(edge, node_id).unwrap_or_else(|| unreachable!());
             if state.parents[node_id] == Some(neighbor_id) {
                 continue;
             }
@@ -225,9 +228,9 @@ impl Smiles {
             } else {
                 state.visited[neighbor_id] = true;
                 state.parents[neighbor_id] = Some(node_id);
-                state.parent_bonds[neighbor_id] = Some(edge.bond());
+                state.parent_bonds[neighbor_id] = Some(edge.2);
                 state.children[node_id].push(neighbor_id);
-                state.child_bonds[node_id].push(edge.bond());
+                state.child_bonds[node_id].push(edge.2);
                 self.build_spanning_tree_from_parser_neighbor_order(neighbor_id, state);
             }
         }

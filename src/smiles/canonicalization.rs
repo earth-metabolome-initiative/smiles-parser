@@ -396,7 +396,7 @@ impl Smiles {
             return None;
         }
 
-        let bond = self.edge_for_node_pair((node_id, parent))?.bond();
+        let bond = self.edge_for_node_pair((node_id, parent))?.2;
         if !matches!(bond, Bond::Single | Bond::Up | Bond::Down) {
             return None;
         }

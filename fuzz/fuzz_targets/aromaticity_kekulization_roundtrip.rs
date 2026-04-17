@@ -22,7 +22,7 @@ fn has_source_aromatic_labels(smiles: &Smiles) -> bool {
             .nodes()
             .iter()
             .enumerate()
-            .any(|(atom_id, _)| smiles.edges_for_node(atom_id).iter().any(|edge| edge.bond() == Bond::Aromatic))
+            .any(|(atom_id, _)| smiles.edges_for_node(atom_id).any(|edge| edge.2 == Bond::Aromatic))
 }
 
 fn within_fuzz_bounds(smiles: &Smiles) -> bool {

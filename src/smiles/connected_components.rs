@@ -104,7 +104,10 @@ mod tests {
 
     use crate::{
         atom::{Atom, atom_symbol::AtomSymbol},
-        bond::{Bond, bond_edge::BondEdge},
+        bond::{
+            Bond,
+            bond_edge::{BondEdge, bond_edge},
+        },
         smiles::{BondMatrixBuilder, Smiles},
     };
 
@@ -115,7 +118,7 @@ mod tests {
     fn smiles_from_edges(atom_nodes: Vec<Atom>, bond_edges: &[BondEdge]) -> Smiles {
         let mut builder = BondMatrixBuilder::with_capacity(bond_edges.len());
         for edge in bond_edges {
-            builder.push_edge(edge.node_a(), edge.node_b(), edge.bond(), edge.ring_num()).unwrap();
+            builder.push_edge(edge.0, edge.1, edge.2, edge.3).unwrap();
         }
         let number_of_nodes = atom_nodes.len();
         Smiles::from_bond_matrix_parts(atom_nodes, builder.finish(number_of_nodes))
@@ -125,7 +128,7 @@ mod tests {
     fn connected_components_expose_sizes_identifiers_and_nodes() {
         let smiles = smiles_from_edges(
             vec![atom(Element::C), atom(Element::O), atom(Element::N), atom(Element::S)],
-            &[BondEdge::new(0, 1, Bond::Single, None), BondEdge::new(2, 3, Bond::Double, None)],
+            &[bond_edge(0, 1, Bond::Single, None), bond_edge(2, 3, Bond::Double, None)],
         );
         let components = smiles.connected_components();
 

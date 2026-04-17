@@ -52,8 +52,8 @@ fn canonical_stereo_neighbor_sort_key(
 }
 
 fn allene_like_stereo_center(smiles: &Smiles, node_id: usize) -> bool {
-    let incident_bonds = smiles.edges_for_node(node_id);
-    incident_bonds.len() == 2 && incident_bonds.iter().all(|edge| edge.bond() == Bond::Double)
+    smiles.edge_count_for_node(node_id) == 2
+        && smiles.edges_for_node(node_id).all(|edge| edge.2 == Bond::Double)
 }
 
 fn non_tetrahedral_default_chirality(
