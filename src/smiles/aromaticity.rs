@@ -20,6 +20,18 @@ mod rdkit_default;
 /// a transformed [`Smiles`] graph.
 pub trait AromaticityModel {
     /// Perceives aromatic atoms and bonds for the provided graph.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::{AromaticityModel, RdkitDefaultAromaticity, Smiles};
+    ///
+    /// let model = RdkitDefaultAromaticity;
+    /// let smiles: Smiles = "C1=CC=CC=C1".parse()?;
+    /// let assignment = model.assignment(&smiles);
+    /// assert!(assignment.contains_atom(0));
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     fn assignment(&self, smiles: &Smiles) -> AromaticityAssignment;
 }
 
@@ -192,6 +204,17 @@ pub struct AromaticityAssignment {
 
 impl AromaticityAssignment {
     /// Creates a canonicalized aromaticity assignment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::{AromaticityAssignment, AromaticityStatus};
+    ///
+    /// let assignment =
+    ///     AromaticityAssignment::new(AromaticityStatus::Complete, vec![1, 0], vec![[1, 0]]);
+    /// assert_eq!(assignment.atom_ids(), &[0, 1]);
+    /// assert_eq!(assignment.bond_edges(), &[[1, 0]]);
+    /// ```
     #[must_use]
     pub fn new(
         status: AromaticityStatus,
@@ -202,6 +225,23 @@ impl AromaticityAssignment {
     }
 
     /// Creates a canonicalized aromaticity assignment with diagnostic reasons.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::{AromaticityAssignment, AromaticityDiagnostic, AromaticityStatus};
+    ///
+    /// let assignment = AromaticityAssignment::new_with_diagnostics(
+    ///     AromaticityStatus::Partial,
+    ///     vec![1, 0, 1],
+    ///     vec![[0, 1], [0, 1]],
+    ///     vec![
+    ///         AromaticityDiagnostic::SymmSssrUsedFallback,
+    ///         AromaticityDiagnostic::SymmSssrUsedFallback,
+    ///     ],
+    /// );
+    /// assert_eq!(assignment.diagnostics(), &[AromaticityDiagnostic::SymmSssrUsedFallback]);
+    /// ```
     #[must_use]
     pub fn new_with_diagnostics(
         status: AromaticityStatus,
@@ -221,6 +261,16 @@ impl AromaticityAssignment {
     }
 
     /// Returns the aromaticity assignment status.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let assignment = "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment();
+    /// assert_eq!(assignment.status(), smiles_parser::AromaticityStatus::Complete);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn status(&self) -> AromaticityStatus {
@@ -228,6 +278,16 @@ impl AromaticityAssignment {
     }
 
     /// Returns the aromatic atom ids.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let assignment = "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment();
+    /// assert_eq!(assignment.atom_ids(), &[0, 1, 2, 3, 4, 5]);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn atom_ids(&self) -> &[usize] {
@@ -235,6 +295,16 @@ impl AromaticityAssignment {
     }
 
     /// Returns the aromatic bond edges.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let assignment = "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment();
+    /// assert!(assignment.bond_edges().contains(&[0, 1]));
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn bond_edges(&self) -> &[[usize; 2]] {
@@ -242,6 +312,16 @@ impl AromaticityAssignment {
     }
 
     /// Returns the diagnostic reasons attached to the assignment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let assignment = "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment();
+    /// assert!(assignment.diagnostics().is_empty());
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn diagnostics(&self) -> &[AromaticityDiagnostic] {
@@ -249,6 +329,17 @@ impl AromaticityAssignment {
     }
 
     /// Returns whether the given atom id is assigned aromatic.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let assignment = "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment();
+    /// assert!(assignment.contains_atom(0));
+    /// assert!(!assignment.contains_atom(99));
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn contains_atom(&self, atom_id: usize) -> bool {
@@ -256,6 +347,17 @@ impl AromaticityAssignment {
     }
 
     /// Returns whether the given edge is assigned aromatic.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let assignment = "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment();
+    /// assert!(assignment.contains_edge(0, 1));
+    /// assert!(!assignment.contains_edge(0, 42));
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn contains_edge(&self, node_a: usize, node_b: usize) -> bool {
@@ -273,6 +375,17 @@ impl AromaticityAssignment {
     /// Returns an [`AromaticityAssignmentApplicationError`] if the assignment
     /// is inconsistent with the graph or would require clearing information the
     /// graph no longer stores.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "C1=CC=CC=C1".parse()?;
+    /// let assignment = smiles.aromaticity_assignment();
+    /// assert!(assignment.validate_for(&smiles).is_ok());
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     pub fn validate_for(
         &self,
         smiles: &Smiles,
@@ -355,6 +468,19 @@ impl AromaticityPerception {
     }
 
     /// Returns the aromaticity assignment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let perception = "C1=CC=CC=C1"
+    ///     .parse::<Smiles>()
+    ///     .expect("valid Kekule benzene")
+    ///     .perceive_aromaticity()
+    ///     .expect("aromaticity perception should succeed");
+    /// assert!(perception.assignment().contains_atom(0));
+    /// ```
     #[inline]
     #[must_use]
     pub fn assignment(&self) -> &AromaticityAssignment {
@@ -362,6 +488,19 @@ impl AromaticityPerception {
     }
 
     /// Returns the aromaticity status.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let perception = "C1=CC=CC=C1"
+    ///     .parse::<Smiles>()
+    ///     .expect("valid Kekule benzene")
+    ///     .perceive_aromaticity()
+    ///     .expect("aromaticity perception should succeed");
+    /// assert_eq!(perception.status(), smiles_parser::AromaticityStatus::Complete);
+    /// ```
     #[inline]
     #[must_use]
     pub fn status(&self) -> AromaticityStatus {
@@ -369,6 +508,19 @@ impl AromaticityPerception {
     }
 
     /// Returns the diagnostic reasons attached to the assignment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let perception = "C1=CC=CC=C1"
+    ///     .parse::<Smiles>()
+    ///     .expect("valid Kekule benzene")
+    ///     .perceive_aromaticity()
+    ///     .expect("aromaticity perception should succeed");
+    /// assert!(perception.diagnostics().is_empty());
+    /// ```
     #[inline]
     #[must_use]
     pub fn diagnostics(&self) -> &[AromaticityDiagnostic] {
@@ -376,6 +528,19 @@ impl AromaticityPerception {
     }
 
     /// Returns the transformed graph with aromatic labels applied.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let perception = "C1=CC=CC=C1"
+    ///     .parse::<Smiles>()
+    ///     .expect("valid Kekule benzene")
+    ///     .perceive_aromaticity()
+    ///     .expect("aromaticity perception should succeed");
+    /// assert!(perception.aromaticized().node_by_id(0).unwrap().aromatic());
+    /// ```
     #[inline]
     #[must_use]
     pub fn aromaticized(&self) -> &Smiles {
@@ -383,6 +548,20 @@ impl AromaticityPerception {
     }
 
     /// Consumes the perception and returns the aromaticity assignment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let assignment = "C1=CC=CC=C1"
+    ///     .parse::<Smiles>()
+    ///     .expect("valid Kekule benzene")
+    ///     .perceive_aromaticity()
+    ///     .expect("aromaticity perception should succeed")
+    ///     .into_assignment();
+    /// assert!(assignment.contains_atom(1));
+    /// ```
     #[inline]
     #[must_use]
     pub fn into_assignment(self) -> AromaticityAssignment {
@@ -390,6 +569,20 @@ impl AromaticityPerception {
     }
 
     /// Consumes the perception and returns the aromaticized graph.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let aromaticized = "C1=CC=CC=C1"
+    ///     .parse::<Smiles>()
+    ///     .expect("valid Kekule benzene")
+    ///     .perceive_aromaticity()
+    ///     .expect("aromaticity perception should succeed")
+    ///     .into_aromaticized();
+    /// assert!(aromaticized.node_by_id(0).unwrap().aromatic());
+    /// ```
     #[inline]
     #[must_use]
     pub fn into_aromaticized(self) -> Smiles {
@@ -519,6 +712,16 @@ impl Smiles {
     /// The implementation targets `RDKit`'s default aromaticity model and is
     /// validated against the frozen fixture corpora plus the extracted whole-
     /// `PubChem` `RDKit`-default aromatic corpus used by the test suite.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let assignment = "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment();
+    /// assert!(assignment.contains_atom(0));
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn aromaticity_assignment(&self) -> AromaticityAssignment {
@@ -527,6 +730,17 @@ impl Smiles {
 
     /// Returns the aromaticity assignment produced by the provided named
     /// policy preset.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::{AromaticityPolicy, Smiles};
+    ///
+    /// let assignment =
+    ///     "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment_for(AromaticityPolicy::RdkitSimple);
+    /// assert!(assignment.contains_edge(0, 1));
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn aromaticity_assignment_for(&self, policy: AromaticityPolicy) -> AromaticityAssignment {
@@ -534,6 +748,17 @@ impl Smiles {
     }
 
     /// Returns the aromaticity assignment produced by the provided model.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::{RdkitDefaultAromaticity, Smiles};
+    ///
+    /// let model = RdkitDefaultAromaticity;
+    /// let assignment = "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment_with(&model);
+    /// assert!(assignment.contains_atom(3));
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn aromaticity_assignment_with<M: AromaticityModel>(
@@ -553,6 +778,16 @@ impl Smiles {
     /// Returns an [`AromaticityAssignmentApplicationError`] if the assignment
     /// is inconsistent with the graph or would require clearing pre-existing
     /// aromatic labels from the source graph.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles = "C1=CC=CC=C1".parse::<Smiles>().expect("valid Kekule benzene");
+    /// let perception = smiles.perceive_aromaticity().expect("aromaticity perception should succeed");
+    /// assert!(perception.assignment().contains_atom(2));
+    /// ```
     pub fn perceive_aromaticity(
         &self,
     ) -> Result<AromaticityPerception, AromaticityAssignmentApplicationError> {
@@ -566,6 +801,19 @@ impl Smiles {
     /// Returns an [`AromaticityAssignmentApplicationError`] if the assignment
     /// is inconsistent with the graph or would require clearing pre-existing
     /// aromatic labels from the source graph.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::{AromaticityPolicy, Smiles};
+    ///
+    /// let perception = "C1=CC=CC=C1"
+    ///     .parse::<Smiles>()
+    ///     .expect("valid Kekule benzene")
+    ///     .perceive_aromaticity_for(AromaticityPolicy::RdkitDefault)
+    ///     .expect("aromaticity perception should succeed");
+    /// assert!(perception.assignment().contains_atom(4));
+    /// ```
     pub fn perceive_aromaticity_for(
         &self,
         policy: AromaticityPolicy,
@@ -580,6 +828,18 @@ impl Smiles {
     /// Returns an [`AromaticityAssignmentApplicationError`] if the assignment
     /// is inconsistent with the graph or would require clearing pre-existing
     /// aromatic labels from the source graph.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::{RdkitDefaultAromaticity, Smiles};
+    ///
+    /// let model = RdkitDefaultAromaticity;
+    /// let smiles = "C1=CC=CC=C1".parse::<Smiles>().expect("valid Kekule benzene");
+    /// let perception =
+    ///     smiles.perceive_aromaticity_with(&model).expect("aromaticity perception should succeed");
+    /// assert!(perception.aromaticized().node_by_id(0).unwrap().aromatic());
+    /// ```
     pub fn perceive_aromaticity_with<M: AromaticityModel>(
         &self,
         model: &M,
@@ -605,6 +865,20 @@ impl Smiles {
     /// Returns an [`AromaticityAssignmentApplicationError`] if the assignment
     /// is inconsistent with the graph or would require clearing pre-existing
     /// aromatic labels from the source graph.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "C1=CC=CC=C1".parse().expect("valid Kekule benzene");
+    /// let assignment = smiles.aromaticity_assignment();
+    /// let aromaticized = smiles
+    ///     .try_with_aromaticity_assignment(&assignment)
+    ///     .expect("aromaticity assignment should apply");
+    ///
+    /// assert!(aromaticized.node_by_id(0).unwrap().aromatic());
+    /// ```
     pub fn try_with_aromaticity_assignment(
         &self,
         assignment: &AromaticityAssignment,

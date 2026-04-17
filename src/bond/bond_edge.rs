@@ -6,6 +6,15 @@ use crate::bond::{Bond, ring_num::RingNum};
 pub type BondEdge = (usize, usize, Bond, Option<RingNum>);
 
 /// Creates a new edge tuple.
+///
+/// # Examples
+///
+/// ```
+/// use smiles_parser::bond::{Bond, bond_edge::bond_edge};
+///
+/// let edge = bond_edge(0, 1, Bond::Double, None);
+/// assert_eq!(edge, (0, 1, Bond::Double, None));
+/// ```
 #[inline]
 #[must_use]
 pub const fn bond_edge(
@@ -18,6 +27,19 @@ pub const fn bond_edge(
 }
 
 /// Returns the other node id for the provided incident edge, if any.
+///
+/// # Examples
+///
+/// ```
+/// use smiles_parser::bond::{
+///     Bond,
+///     bond_edge::{bond_edge, bond_edge_other},
+/// };
+///
+/// let edge = bond_edge(2, 5, Bond::Single, None);
+/// assert_eq!(bond_edge_other(edge, 2), Some(5));
+/// assert_eq!(bond_edge_other(edge, 99), None);
+/// ```
 #[inline]
 #[must_use]
 pub const fn bond_edge_other(edge: BondEdge, node_id: usize) -> Option<usize> {
@@ -31,6 +53,20 @@ pub const fn bond_edge_other(edge: BondEdge, node_id: usize) -> Option<usize> {
 }
 
 /// Returns the ring number value stored in the edge, if any.
+///
+/// # Examples
+///
+/// ```
+/// use smiles_parser::bond::{
+///     Bond,
+///     bond_edge::{bond_edge, bond_edge_ring_num_val},
+///     ring_num::RingNum,
+/// };
+///
+/// let edge = bond_edge(0, 1, Bond::Single, Some(RingNum::try_new(7)?));
+/// assert_eq!(bond_edge_ring_num_val(edge), Some(7));
+/// # Ok::<(), smiles_parser::SmilesError>(())
+/// ```
 #[inline]
 #[must_use]
 pub fn bond_edge_ring_num_val(edge: BondEdge) -> Option<u8> {

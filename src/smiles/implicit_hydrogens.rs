@@ -65,6 +65,16 @@ impl Smiles {
     /// behaviors, the current implementation prefers the behavior observed from
     /// raw `RDKit` (`sanitize=False`, then
     /// `UpdatePropertyCache(strict=False)`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "CO".parse()?;
+    /// assert_eq!(smiles.implicit_hydrogen_counts(), &[3, 1]);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn implicit_hydrogen_counts(&self) -> &[u8] {
@@ -78,6 +88,16 @@ impl Smiles {
     ///
     /// # Panics
     /// Panics if `id` is not a valid atom index in this graph.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "CO".parse()?;
+    /// assert_eq!(smiles.implicit_hydrogen_count(0), 3);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn implicit_hydrogen_count(&self, id: usize) -> u8 {

@@ -31,6 +31,19 @@ pub struct BondEntry {
 
 impl BondEntry {
     /// Creates a new stored bond value for the adjacency matrix.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{
+    ///     bond::{Bond, ring_num::RingNum},
+    ///     smiles::BondEntry,
+    /// };
+    ///
+    /// let entry = BondEntry::new(Bond::Double, Some(RingNum::try_new(1)?), 0);
+    /// assert_eq!(entry.bond(), Bond::Double);
+    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// ```
     #[inline]
     #[must_use]
     pub const fn new(bond: Bond, ring_num: Option<RingNum>, order: usize) -> Self {
@@ -38,6 +51,15 @@ impl BondEntry {
     }
 
     /// Returns the bond type stored for this adjacency entry.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{bond::Bond, smiles::BondEntry};
+    ///
+    /// let entry = BondEntry::new(Bond::Triple, None, 0);
+    /// assert_eq!(entry.bond(), Bond::Triple);
+    /// ```
     #[inline]
     #[must_use]
     pub const fn bond(self) -> Bond {
@@ -45,6 +67,19 @@ impl BondEntry {
     }
 
     /// Returns the ring number stored for this adjacency entry, if any.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{
+    ///     bond::{Bond, ring_num::RingNum},
+    ///     smiles::BondEntry,
+    /// };
+    ///
+    /// let entry = BondEntry::new(Bond::Single, Some(RingNum::try_new(4)?), 0);
+    /// assert_eq!(entry.ring_num().map(|num| num.get()), Some(4));
+    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// ```
     #[inline]
     #[must_use]
     pub const fn ring_num(self) -> Option<RingNum> {
@@ -278,6 +313,17 @@ impl Smiles {
     }
 
     /// Returns the symmetric valued sparse matrix storing the graph bonds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use geometric_traits::traits::SizedSparseMatrix;
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "C=O".parse()?;
+    /// assert_eq!(smiles.bond_matrix().number_of_defined_values(), 2);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn bond_matrix(&self) -> &BondMatrix {
@@ -285,6 +331,16 @@ impl Smiles {
     }
 
     /// Returns the number of unique chemical bonds in the graph.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "CCO".parse()?;
+    /// assert_eq!(smiles.number_of_bonds(), 2);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn number_of_bonds(&self) -> usize {

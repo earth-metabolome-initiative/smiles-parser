@@ -44,6 +44,16 @@ impl SmilesCanonicalLabeling {
     }
 
     /// Returns original node ids in canonical order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let labeling = "OC".parse::<Smiles>()?.canonical_labeling();
+    /// assert_eq!(labeling.order(), &[1, 0]);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn order(&self) -> &[usize] {
@@ -51,6 +61,16 @@ impl SmilesCanonicalLabeling {
     }
 
     /// Returns the new canonical index for each original node id.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let labeling = "OC".parse::<Smiles>()?.canonical_labeling();
+    /// assert_eq!(labeling.new_index_of_old_node(), &[1, 0]);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[inline]
     #[must_use]
     pub fn new_index_of_old_node(&self) -> &[usize] {
@@ -222,6 +242,16 @@ impl Smiles {
     }
 
     /// Returns the canonical labeling of the current graph.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let labeling = "OC".parse::<Smiles>()?.canonical_labeling();
+    /// assert_eq!(labeling.order().len(), 2);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[must_use]
     pub fn canonical_labeling(&self) -> SmilesCanonicalLabeling {
         self.canonicalization_normal_form()
@@ -231,6 +261,16 @@ impl Smiles {
     }
 
     /// Returns whether the current graph is already in canonical form.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let canonical = "CO".parse::<Smiles>()?.canonicalize();
+    /// assert!(canonical.is_canonical());
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[must_use]
     pub fn is_canonical(&self) -> bool {
         let canonicalized = self.canonicalize();
@@ -242,6 +282,16 @@ impl Smiles {
     }
 
     /// Returns the graph rewritten into canonical node order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let canonical = "OC".parse::<Smiles>()?.canonicalize();
+    /// assert_eq!(canonical.to_string(), "CO");
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
     #[must_use]
     pub fn canonicalize(&self) -> Self {
         self.canonicalize_orbit_min()
