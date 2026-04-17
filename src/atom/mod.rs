@@ -59,6 +59,17 @@ pub struct McesAtomType {
 
 impl McesAtomType {
     /// Returns the atom symbol used by the MCES label.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use geometric_traits::traits::TypedNode;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    ///
+    /// let atom = Atom::builder().with_symbol(AtomSymbol::Element(Element::N)).build();
+    /// assert_eq!(atom.node_type().symbol(), AtomSymbol::Element(Element::N));
+    /// ```
     #[inline]
     #[must_use]
     pub fn symbol(self) -> AtomSymbol {
@@ -66,6 +77,17 @@ impl McesAtomType {
     }
 
     /// Returns whether the MCES label treats the atom as aromatic.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use geometric_traits::traits::TypedNode;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    ///
+    /// let atom = Atom::new_organic_subset(AtomSymbol::Element(Element::C), true);
+    /// assert!(atom.node_type().aromatic());
+    /// ```
     #[inline]
     #[must_use]
     pub fn aromatic(self) -> bool {
@@ -73,6 +95,18 @@ impl McesAtomType {
     }
 
     /// Returns the isotope mass number, if one is part of the MCES label.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use geometric_traits::traits::TypedNode;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    ///
+    /// let atom =
+    ///     Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).with_isotope(13).build();
+    /// assert_eq!(atom.node_type().isotope_mass_number(), Some(13));
+    /// ```
     #[inline]
     #[must_use]
     pub fn isotope_mass_number(self) -> Option<u16> {
@@ -80,6 +114,20 @@ impl McesAtomType {
     }
 
     /// Returns the formal charge used by the MCES label.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use geometric_traits::traits::TypedNode;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol, bracketed::charge::Charge};
+    ///
+    /// let atom = Atom::builder()
+    ///     .with_symbol(AtomSymbol::Element(Element::N))
+    ///     .with_charge(Charge::try_new(1).expect("valid charge"))
+    ///     .build();
+    /// assert_eq!(atom.node_type().formal_charge(), 1);
+    /// ```
     #[inline]
     #[must_use]
     pub fn formal_charge(self) -> i8 {
@@ -89,6 +137,15 @@ impl McesAtomType {
 
 impl Atom {
     /// Returns a builder for bracket atoms.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::atom::Atom;
+    ///
+    /// let atom = Atom::builder().build();
+    /// assert!(atom.is_bracket_atom());
+    /// ```
     #[inline]
     #[must_use]
     pub fn builder() -> AtomBuilder {
@@ -107,6 +164,17 @@ impl Atom {
     }
 
     /// Creates a new organic-subset atom written without brackets.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    ///
+    /// let atom = Atom::new_organic_subset(AtomSymbol::Element(Element::C), true);
+    /// assert!(atom.is_organic_subset_atom());
+    /// assert!(atom.aromatic());
+    /// ```
     #[inline]
     #[must_use]
     pub fn new_organic_subset(symbol: AtomSymbol, aromatic: bool) -> Self {
@@ -147,6 +215,14 @@ impl Atom {
     }
 
     /// Returns the syntax category used to parse this atom.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::atom::{Atom, AtomSyntax};
+    ///
+    /// assert_eq!(Atom::builder().build().syntax(), AtomSyntax::Bracket);
+    /// ```
     #[inline]
     #[must_use]
     pub fn syntax(&self) -> AtomSyntax {
@@ -154,6 +230,14 @@ impl Atom {
     }
 
     /// Returns whether this atom was parsed from bracket syntax.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::atom::Atom;
+    ///
+    /// assert!(Atom::builder().build().is_bracket_atom());
+    /// ```
     #[inline]
     #[must_use]
     pub fn is_bracket_atom(&self) -> bool {
@@ -161,6 +245,16 @@ impl Atom {
     }
 
     /// Returns whether this atom was parsed as an organic-subset atom.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    ///
+    /// let atom = Atom::new_organic_subset(AtomSymbol::Element(Element::O), false);
+    /// assert!(atom.is_organic_subset_atom());
+    /// ```
     #[inline]
     #[must_use]
     pub fn is_organic_subset_atom(&self) -> bool {
@@ -168,6 +262,16 @@ impl Atom {
     }
 
     /// Returns the parsed atom symbol.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    ///
+    /// let atom = Atom::builder().with_symbol(AtomSymbol::Element(Element::Cl)).build();
+    /// assert_eq!(atom.symbol(), AtomSymbol::Element(Element::Cl));
+    /// ```
     #[inline]
     #[must_use]
     pub fn symbol(&self) -> AtomSymbol {
@@ -175,6 +279,16 @@ impl Atom {
     }
 
     /// Returns the parsed element, or `None` for `*`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    ///
+    /// let atom = Atom::builder().with_symbol(AtomSymbol::Element(Element::Br)).build();
+    /// assert_eq!(atom.element(), Some(Element::Br));
+    /// ```
     #[inline]
     #[must_use]
     pub fn element(&self) -> Option<Element> {
@@ -185,6 +299,17 @@ impl Atom {
     }
 
     /// Returns the parsed isotope mass number, if present.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    ///
+    /// let atom =
+    ///     Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).with_isotope(13).build();
+    /// assert_eq!(atom.isotope_mass_number(), Some(13));
+    /// ```
     #[inline]
     #[must_use]
     pub fn isotope_mass_number(&self) -> Option<u16> {
@@ -196,6 +321,20 @@ impl Atom {
     /// # Errors
     /// - Returns [`SmilesError::InvalidIsotope`] if no element is available.
     /// - Propagates `elements-rs` isotope lookup errors.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::{Element, Isotope};
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    ///
+    /// let atom =
+    ///     Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).with_isotope(13).build();
+    /// assert_eq!(
+    ///     atom.isotope().expect("valid isotope"),
+    ///     Isotope::try_from((Element::C, 13_u16)).expect("known carbon isotope"),
+    /// );
+    /// ```
     pub fn isotope(&self) -> Result<Isotope, SmilesError> {
         let element = self.element().ok_or(SmilesError::InvalidIsotope)?;
         let isotope = match self.isotope_mass_number {
@@ -206,6 +345,16 @@ impl Atom {
     }
 
     /// Returns whether the atom is aromatic.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    ///
+    /// let atom = Atom::new_organic_subset(AtomSymbol::Element(Element::C), true);
+    /// assert!(atom.aromatic());
+    /// ```
     #[inline]
     #[must_use]
     pub fn aromatic(&self) -> bool {
@@ -229,6 +378,17 @@ impl Atom {
     }
 
     /// Returns the explicit hydrogen count written on the atom.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    ///
+    /// let atom =
+    ///     Atom::builder().with_symbol(AtomSymbol::Element(Element::N)).with_hydrogens(2).build();
+    /// assert_eq!(atom.hydrogen_count(), 2);
+    /// ```
     #[inline]
     #[must_use]
     pub fn hydrogen_count(&self) -> u8 {
@@ -236,6 +396,19 @@ impl Atom {
     }
 
     /// Returns the formal charge.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol, bracketed::charge::Charge};
+    ///
+    /// let atom = Atom::builder()
+    ///     .with_symbol(AtomSymbol::Element(Element::N))
+    ///     .with_charge(Charge::try_new(1).expect("valid charge"))
+    ///     .build();
+    /// assert_eq!(atom.charge().get(), 1);
+    /// ```
     #[inline]
     #[must_use]
     pub fn charge(&self) -> Charge {
@@ -243,6 +416,19 @@ impl Atom {
     }
 
     /// Returns the formal charge as an `i8`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol, bracketed::charge::Charge};
+    ///
+    /// let atom = Atom::builder()
+    ///     .with_symbol(AtomSymbol::Element(Element::O))
+    ///     .with_charge(Charge::try_new(-1).expect("valid charge"))
+    ///     .build();
+    /// assert_eq!(atom.charge_value(), -1);
+    /// ```
     #[inline]
     #[must_use]
     pub fn charge_value(&self) -> i8 {
@@ -250,6 +436,16 @@ impl Atom {
     }
 
     /// Returns the atom class.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    ///
+    /// let atom = Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).with_class(7).build();
+    /// assert_eq!(atom.class(), 7);
+    /// ```
     #[inline]
     #[must_use]
     pub fn class(&self) -> u16 {
@@ -257,6 +453,19 @@ impl Atom {
     }
 
     /// Returns the chirality tag, if present.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol, bracketed::chirality::Chirality};
+    ///
+    /// let atom = Atom::builder()
+    ///     .with_symbol(AtomSymbol::Element(Element::C))
+    ///     .with_chirality(Chirality::At)
+    ///     .build();
+    /// assert_eq!(atom.chirality(), Some(Chirality::At));
+    /// ```
     #[inline]
     #[must_use]
     pub fn chirality(&self) -> Option<Chirality> {
@@ -383,6 +592,13 @@ pub struct AtomBuilder {
 
 impl AtomBuilder {
     /// Adds an isotope value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let atom = smiles_parser::atom::Atom::builder().with_isotope(13).build();
+    /// assert_eq!(atom.isotope_mass_number(), Some(13));
+    /// ```
     #[inline]
     #[must_use]
     pub fn with_isotope(mut self, iso: u16) -> Self {
@@ -391,6 +607,16 @@ impl AtomBuilder {
     }
 
     /// Adds the atom symbol.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    ///
+    /// let atom = Atom::builder().with_symbol(AtomSymbol::Element(Element::S)).build();
+    /// assert_eq!(atom.element(), Some(Element::S));
+    /// ```
     #[inline]
     #[must_use]
     pub fn with_symbol(mut self, symbol: AtomSymbol) -> Self {
@@ -399,6 +625,13 @@ impl AtomBuilder {
     }
 
     /// Adds aromaticity.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let atom = smiles_parser::atom::Atom::builder().with_aromatic(true).build();
+    /// assert!(atom.aromatic());
+    /// ```
     #[inline]
     #[must_use]
     pub fn with_aromatic(mut self, aromatic: bool) -> Self {
@@ -407,6 +640,13 @@ impl AtomBuilder {
     }
 
     /// Adds the explicit hydrogen count.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let atom = smiles_parser::atom::Atom::builder().with_hydrogens(3).build();
+    /// assert_eq!(atom.hydrogen_count(), 3);
+    /// ```
     #[inline]
     #[must_use]
     pub fn with_hydrogens(mut self, h_count: u8) -> Self {
@@ -415,6 +655,15 @@ impl AtomBuilder {
     }
 
     /// Adds a formal charge.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::atom::{Atom, bracketed::charge::Charge};
+    ///
+    /// let atom = Atom::builder().with_charge(Charge::try_new(-1).expect("valid charge")).build();
+    /// assert_eq!(atom.charge_value(), -1);
+    /// ```
     #[inline]
     #[must_use]
     pub fn with_charge(mut self, charge: Charge) -> Self {
@@ -423,6 +672,13 @@ impl AtomBuilder {
     }
 
     /// Adds an atom class.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let atom = smiles_parser::atom::Atom::builder().with_class(5).build();
+    /// assert_eq!(atom.class(), 5);
+    /// ```
     #[inline]
     #[must_use]
     pub fn with_class(mut self, class: u16) -> Self {
@@ -431,6 +687,15 @@ impl AtomBuilder {
     }
 
     /// Adds a chirality tag.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::atom::{Atom, bracketed::chirality::Chirality};
+    ///
+    /// let atom = Atom::builder().with_chirality(Chirality::AtAt).build();
+    /// assert_eq!(atom.chirality(), Some(Chirality::AtAt));
+    /// ```
     #[inline]
     #[must_use]
     pub fn with_chirality(mut self, chirality: Chirality) -> Self {
@@ -439,6 +704,16 @@ impl AtomBuilder {
     }
 
     /// Returns the parsed element, or `None` for `*`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    ///
+    /// let builder = Atom::builder().with_symbol(AtomSymbol::Element(Element::P));
+    /// assert_eq!(builder.element(), Some(Element::P));
+    /// ```
     #[inline]
     #[must_use]
     pub fn element(&self) -> Option<Element> {
@@ -446,6 +721,16 @@ impl AtomBuilder {
     }
 
     /// Returns the current symbol.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    ///
+    /// let builder = Atom::builder().with_symbol(AtomSymbol::Element(Element::F));
+    /// assert_eq!(builder.symbol(), AtomSymbol::Element(Element::F));
+    /// ```
     #[inline]
     #[must_use]
     pub fn symbol(&self) -> AtomSymbol {
@@ -453,6 +738,13 @@ impl AtomBuilder {
     }
 
     /// Consumes the builder and returns the completed atom.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let atom = smiles_parser::atom::Atom::builder().build();
+    /// assert!(atom.is_bracket_atom());
+    /// ```
     #[inline]
     #[must_use]
     pub fn build(self) -> Atom {
