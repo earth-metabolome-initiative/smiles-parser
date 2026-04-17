@@ -266,7 +266,7 @@ pub trait SmilesDatasetSource: DatasetSource {
 pub struct DatasetSmilesIter {
     dataset_id: &'static str,
     path: PathBuf,
-    reader: Box<dyn BufRead>,
+    reader: Box<dyn BufRead + Send>,
     parser: DatasetSmilesParser,
     line_number: usize,
     line_buffer: String,
@@ -495,7 +495,7 @@ fn tsv_field(line: &str, column_index: usize) -> Option<&str> {
     line.split('\t').nth(column_index)
 }
 
-fn open_text_reader(path: &Path) -> Result<Box<dyn BufRead>, DatasetError> {
+fn open_text_reader(path: &Path) -> Result<Box<dyn BufRead + Send>, DatasetError> {
     let file =
         File::open(path).map_err(|source| DatasetError::Io { path: path.to_path_buf(), source })?;
 
@@ -818,6 +818,13 @@ mod tests {
     fn pubchem_and_massspecgym_constants_are_usable_dataset_handles() {
         assert_eq!(PUBCHEM_SMILES.id(), "pubchem-smiles");
         assert_eq!(MASS_SPEC_GYM_SMILES.id(), "massspecgym-smiles");
+    }
+
+    #[test]
+    fn dataset_smiles_iterator_is_send() {
+        fn assert_send<T: Send>() {}
+
+        assert_send::<DatasetSmilesIter>();
     }
 
     #[test]
