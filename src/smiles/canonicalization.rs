@@ -11,7 +11,7 @@ use super::{
     implicit_hydrogens::implicit_hydrogens_if_written_unbracketed,
 };
 use crate::{
-    atom::{Atom, AtomSyntax, atom_symbol::AtomSymbol},
+    atom::{Atom, AtomSyntax, atom_symbol::AtomSymbol, can_write_unbracketed_aromatic},
     bond::Bond,
 };
 
@@ -464,7 +464,7 @@ fn maybe_collapse_atom_to_organic_subset(smiles: &Smiles, node_id: usize, atom: 
         || atom.class() != 0
         || atom.chirality().is_some()
         || (atom.aromatic()
-            && atom.element().is_none_or(|element| element.aromatic_smiles_symbol().is_none()))
+            && atom.element().is_none_or(|element| !can_write_unbracketed_aromatic(element)))
         || !canonicalization_valid_unbracketed(atom.symbol())
         || implicit_hydrogens_if_written_unbracketed(smiles, node_id, &atom)
             != atom.hydrogen_count()

@@ -6,7 +6,10 @@ use geometric_traits::traits::SparseValuedMatrixRef;
 use thiserror::Error;
 
 use super::{KekulizationError, KekulizationMode, Smiles};
-use crate::{atom::Atom, bond::Bond};
+use crate::{
+    atom::{Atom, can_write_unbracketed_aromatic},
+    bond::Bond,
+};
 
 mod rdkit_default;
 
@@ -685,5 +688,5 @@ fn should_use_bracket_aromatic_syntax(atom: Atom, explicit_hydrogens: u8) -> boo
         || explicit_hydrogens != 0
         || atom.class() != 0
         || atom.chirality().is_some()
-        || atom.element().is_none_or(|element| element.aromatic_smiles_symbol().is_none())
+        || atom.element().is_none_or(|element| !can_write_unbracketed_aromatic(element))
 }

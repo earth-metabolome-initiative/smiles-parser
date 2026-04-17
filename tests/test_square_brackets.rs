@@ -2,6 +2,7 @@
 
 use std::str::FromStr;
 
+use elements_rs::Element;
 use smiles_parser::{errors::SmilesError, smiles::Smiles};
 
 /// const for testing square brackets
@@ -11,6 +12,7 @@ const SMILES_WITH_BRACKETS: &[&str] = &[
     "[Ti+4]",
     "[Co+3]",
     "[Ga+]$[As-]",
+    "[te]1cccc1",
     "[Na+].[Cl-]",
     "N[C@@H](C)C(=O)O",
     "N[CH](C)C(=O)O",
@@ -79,6 +81,22 @@ fn test_smiles_tokens_water() {
     assert_eq!(atom.class(), 0);
     assert_eq!(atom.chirality(), None);
     assert_eq!(atom.isotope_mass_number(), None);
+}
+
+#[test]
+fn test_bracket_aromatic_tellurium_parses() {
+    let smiles =
+        Smiles::from_str("[te]1cccc1").unwrap_or_else(|_| panic!("Failed to parse [te]1cccc1"));
+
+    assert_eq!(smiles.nodes()[0].element(), Some(Element::Te));
+    assert!(smiles.nodes()[0].aromatic());
+    assert!(smiles.nodes()[0].is_bracket_atom());
+}
+
+#[test]
+fn test_aromatic_tellurium_requires_brackets() {
+    let err = Smiles::from_str("te1cccc1").unwrap_err();
+    assert_eq!(err.smiles_error(), SmilesError::InvalidAromaticElement(Element::Te));
 }
 
 #[test]

@@ -6,6 +6,7 @@ A parser that checks the validity of SMILES strings and converts them into molec
 
 ## Parsing Specification
 This parser was designed by following the [OpenSMILES specification](http://opensmiles.org/opensmiles.html) and [Wikipedia Article](https://en.wikipedia.org/wiki/Simplified_Molecular_Input_Line_Entry_System).
+It also accepts bracketed aromatic `te` as a compatibility extension.
 
 ## SMILES Parsing Rules:
 
@@ -13,7 +14,7 @@ This parser was designed by following the [OpenSMILES specification](http://open
 
 | Character | SMILES Purpose |
 | --------- | -------------- |
-| `A–Z, a–z` | **Atom symbols**. Unbracketed atoms are limited to the organic subset `B C N O P S F Cl Br I` plus aromatic forms `b c n o p s` and `*`. Inside brackets, atom symbols must match a valid element symbol (e.g., `Si`, `Na`, `se`, `as`) or `*`. Aromatic atoms are denoted by lowercase symbols. Multi-character element symbols use initial uppercase + lowercase (e.g., `Cl`, `Br`, `Si`), except bracketed aromatic symbols like `se`, `as`. | 
+| `A–Z, a–z` | **Atom symbols**. Unbracketed atoms are limited to the organic subset `B C N O P S F Cl Br I` plus aromatic forms `b c n o p s` and `*`. Inside brackets, atom symbols must match a valid element symbol (e.g., `Si`, `Na`) or a supported aromatic lowercase form (e.g., `se`, `as`, `te`) or `*`. Aromatic atoms are denoted by lowercase symbols. Multi-character element symbols use initial uppercase + lowercase (e.g., `Cl`, `Br`, `Si`), except bracketed aromatic symbols like `se`, `as`, `te`. | 
 | `[` `]` | **Bracket atoms**. Enter/exit bracket-atom grammar: `[` *isotope? symbol chiral? hcount? charge? class?* `]`. Brackets are required for non-organic-subset elements and whenever isotope, explicit hydrogen count, charge, chirality, or atom class are specified. |
 | `*` | **Wildcard atom**. May appear unbracketed (`*`) or bracketed (`[*]`), and in brackets may carry isotope/chirality/H-count/charge/class. |
 | `@` | **Chirality tag introducer** inside bracket atoms. Used as `@` / `@@` and extended forms like `@TH1`, `@AL1`, `@SP1`, `@TB1`, `@OH1` |

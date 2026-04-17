@@ -271,6 +271,12 @@ pub const AROMATIC_CASES: &[ImplicitHydrogenCase] = &[
         atoms: &[atom("[se]", 0), atom("c", 1), atom("c", 1), atom("c", 1), atom("c", 1)],
     },
     ImplicitHydrogenCase {
+        name: "tellurophene-bracketed",
+        smiles: "[te]1cccc1",
+        note: "Bracket aromatic tellurium is explicit H0 unless a hydrogen count is written in the bracket.",
+        atoms: &[atom("[te]", 0), atom("c", 1), atom("c", 1), atom("c", 1), atom("c", 1)],
+    },
+    ImplicitHydrogenCase {
         name: "thiophene",
         smiles: "s1cccc1",
         note: "Aromatic sulfur carries zero implicit hydrogens while each aromatic carbon contributes one.",

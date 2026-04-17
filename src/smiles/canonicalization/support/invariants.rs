@@ -1,14 +1,17 @@
 use alloc::vec::Vec;
 
+use geometric_traits::traits::SparseValuedMatrixRef;
+
 use super::{
-    super::*,
+    super::remap_parsed_stereo_neighbors_row,
     common::{permute_smiles, same_canonicalization_state},
 };
 use crate::{
     atom::bracketed::chirality::Chirality,
     smiles::{
-        AromaticityAssignmentApplicationError, AromaticityPolicy,
+        AromaticityAssignmentApplicationError, AromaticityPolicy, Smiles, StereoNeighbor,
         canonicalization::{
+            SmilesCanonicalLabeling,
             state::{
                 CanonicalStereoNeighborKey, canonical_chirality_key, canonical_stereo_neighbor_key,
             },

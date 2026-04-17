@@ -294,7 +294,7 @@ impl Atom {
     #[inline]
     #[must_use]
     pub(crate) fn rendered_len_hint_with_chirality(&self, chirality: Option<Chirality>) -> usize {
-        let mut len = rendered_symbol_len(self.symbol, self.aromatic);
+        let mut len = rendered_symbol_len(self.symbol, self.aromatic, self.syntax);
         if self.syntax == AtomSyntax::Bracket {
             len += 2;
             if let Some(isotope) = self.isotope_mass_number {
@@ -337,13 +337,15 @@ impl Atom {
         chirality: Option<Chirality>,
     ) -> fmt::Result {
         match self.syntax {
-            AtomSyntax::OrganicSubset => write_symbol(target, self.symbol, self.aromatic),
+            AtomSyntax::OrganicSubset => {
+                write_symbol(target, self.symbol, self.aromatic, self.syntax)
+            }
             AtomSyntax::Bracket => {
                 target.write_str("[")?;
                 if let Some(isotope) = self.isotope_mass_number {
                     write!(target, "{isotope}")?;
                 }
-                write_symbol(target, self.symbol, self.aromatic)?;
+                write_symbol(target, self.symbol, self.aromatic, self.syntax)?;
                 if let Some(chirality) = chirality {
                     write!(target, "{chirality}")?;
                 }
@@ -365,7 +367,9 @@ impl Atom {
     #[inline]
     fn rendered_static(&self) -> Option<&'static str> {
         match self.syntax {
-            AtomSyntax::OrganicSubset => rendered_symbol_static(self.symbol, self.aromatic),
+            AtomSyntax::OrganicSubset => {
+                rendered_symbol_static(self.symbol, self.aromatic, self.syntax)
+            }
             AtomSyntax::Bracket => None,
         }
     }
@@ -477,16 +481,21 @@ impl TypedNode for Atom {
 }
 
 #[inline]
-fn write_symbol<W: fmt::Write>(target: &mut W, symbol: AtomSymbol, aromatic: bool) -> fmt::Result {
-    match rendered_symbol_static(symbol, aromatic) {
+fn write_symbol<W: fmt::Write>(
+    target: &mut W,
+    symbol: AtomSymbol,
+    aromatic: bool,
+    syntax: AtomSyntax,
+) -> fmt::Result {
+    match rendered_symbol_static(symbol, aromatic, syntax) {
         Some(rendered) => target.write_str(rendered),
         None => write!(target, "{symbol}"),
     }
 }
 
 #[inline]
-fn rendered_symbol_len(symbol: AtomSymbol, aromatic: bool) -> usize {
-    match rendered_symbol_static(symbol, aromatic) {
+fn rendered_symbol_len(symbol: AtomSymbol, aromatic: bool, syntax: AtomSyntax) -> usize {
+    match rendered_symbol_static(symbol, aromatic, syntax) {
         Some(rendered) => rendered.len(),
         None => {
             match symbol {
@@ -498,11 +507,33 @@ fn rendered_symbol_len(symbol: AtomSymbol, aromatic: bool) -> usize {
 }
 
 #[inline]
-fn rendered_symbol_static(symbol: AtomSymbol, aromatic: bool) -> Option<&'static str> {
+pub(crate) fn can_write_unbracketed_aromatic(element: Element) -> bool {
+    matches!(element, Element::B | Element::C | Element::N | Element::O | Element::P | Element::S)
+}
+
+#[inline]
+fn bracket_aromatic_smiles_symbol(element: Element) -> Option<&'static str> {
+    match element {
+        Element::Te => Some("te"),
+        _ => element.aromatic_smiles_symbol(),
+    }
+}
+
+#[inline]
+fn rendered_symbol_static(
+    symbol: AtomSymbol,
+    aromatic: bool,
+    syntax: AtomSyntax,
+) -> Option<&'static str> {
     match (symbol, aromatic) {
         (AtomSymbol::WildCard, _) => Some("*"),
         (AtomSymbol::Element(element), false) => Some(element.symbol()),
-        (AtomSymbol::Element(element), true) => element.aromatic_smiles_symbol(),
+        (AtomSymbol::Element(element), true) => {
+            match syntax {
+                AtomSyntax::OrganicSubset => element.aromatic_smiles_symbol(),
+                AtomSyntax::Bracket => bracket_aromatic_smiles_symbol(element),
+            }
+        }
     }
 }
 
@@ -712,8 +743,12 @@ mod tests {
         assert_eq!(borrowed.rendered_cow(), Cow::Borrowed("C"));
         assert_eq!(owned.rendered_cow().as_ref(), "[13CH2-:7]");
 
-        assert_eq!(rendered_symbol_len(AtomSymbol::WildCard, false), 1);
-        assert_eq!(rendered_symbol_len(ac_symbol(), true), 2);
+        assert_eq!(rendered_symbol_len(AtomSymbol::WildCard, false, AtomSyntax::OrganicSubset), 1);
+        assert_eq!(rendered_symbol_len(ac_symbol(), true, AtomSyntax::OrganicSubset), 2);
+        assert_eq!(
+            rendered_symbol_len(AtomSymbol::Element(Element::Te), true, AtomSyntax::Bracket,),
+            2
+        );
 
         assert_eq!(decimal_len_u8(9), 1);
         assert_eq!(decimal_len_u8(10), 2);
@@ -739,7 +774,7 @@ mod tests {
         let mut symbol = String::new();
 
         bracket.write_smiles(&mut rendered).unwrap();
-        write_symbol(&mut symbol, ac_symbol(), true).unwrap();
+        write_symbol(&mut symbol, ac_symbol(), true, AtomSyntax::OrganicSubset).unwrap();
 
         assert_eq!(rendered, "[227AcH+2:7]");
         assert_eq!(symbol, "Ac");
@@ -757,7 +792,10 @@ mod tests {
 
     #[test]
     fn rendered_symbol_len_falls_back_to_element_symbol_length_for_non_aromatic_element() {
-        assert_eq!(rendered_symbol_len(AtomSymbol::Element(Element::Cl), true), 2);
+        assert_eq!(
+            rendered_symbol_len(AtomSymbol::Element(Element::Cl), true, AtomSyntax::OrganicSubset,),
+            2
+        );
     }
 
     #[test]
@@ -780,6 +818,13 @@ mod tests {
                     .with_aromatic(true)
                     .build(),
                 "[c]",
+            ),
+            (
+                Atom::builder()
+                    .with_symbol(AtomSymbol::Element(Element::Te))
+                    .with_aromatic(true)
+                    .build(),
+                "[te]",
             ),
             (
                 Atom::builder()

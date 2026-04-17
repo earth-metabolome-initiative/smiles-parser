@@ -13,6 +13,7 @@ const SMILES_STR: &[&str] = &[
     "CCO",
     "C#N",
     "[Ga+]$[As-]",
+    "[te]1cccc1",
     "[Na+].[Cl-]",
     "C1CCCC2C1CCCC2",
     "C0CCCCC0C0CCCCC0",

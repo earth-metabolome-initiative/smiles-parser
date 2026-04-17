@@ -210,6 +210,7 @@ fn aromatic_from_element(in_bracket: bool, element: Element) -> Result<bool, Smi
                 | Element::S
                 | Element::Se
                 | Element::As
+                | Element::Te
         )
     } else {
         matches!(
@@ -748,10 +749,15 @@ mod tests {
     fn aromatic_from_element_branches() {
         assert_eq!(aromatic_from_element(false, Element::C), Ok(true));
         assert_eq!(aromatic_from_element(true, Element::Se), Ok(true));
+        assert_eq!(aromatic_from_element(true, Element::Te), Ok(true));
 
         assert_eq!(
             aromatic_from_element(false, Element::Se),
             Err(SmilesError::InvalidAromaticElement(Element::Se))
+        );
+        assert_eq!(
+            aromatic_from_element(false, Element::Te),
+            Err(SmilesError::InvalidAromaticElement(Element::Te))
         );
 
         assert_eq!(
@@ -782,6 +788,13 @@ mod tests {
         assert_eq!(
             try_element_from_first(&mut stream, b's'),
             Ok((AtomSymbol::Element(Element::Se), true))
+        );
+
+        let mut stream = TokenIter::from("e");
+        stream.in_bracket = true;
+        assert_eq!(
+            try_element_from_first(&mut stream, b't'),
+            Ok((AtomSymbol::Element(Element::Te), true))
         );
 
         let mut stream = TokenIter::from("");
