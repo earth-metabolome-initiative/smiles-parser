@@ -35,6 +35,16 @@ use crate::{
 };
 
 impl Smiles {
+    #[inline]
+    #[must_use]
+    pub(crate) fn recompute_implicit_hydrogen_counts(&self) -> Vec<u8> {
+        self.nodes()
+            .iter()
+            .enumerate()
+            .map(|(node_id, node)| implicit_hydrogens_for_node(self, node_id, node))
+            .collect()
+    }
+
     /// Returns the per-atom implicit hydrogen counts in node order.
     ///
     /// This method is deliberately narrow: it answers the question "how many
@@ -57,28 +67,26 @@ impl Smiles {
     /// `UpdatePropertyCache(strict=False)`).
     #[inline]
     #[must_use]
-    pub fn implicit_hydrogen_counts(&self) -> Vec<u8> {
-        if let Some(cached) = &self.implicit_hydrogen_cache {
-            return cached.clone();
-        }
-        self.nodes()
-            .iter()
-            .enumerate()
-            .map(|(node_id, node)| implicit_hydrogens_for_node(self, node_id, node))
-            .collect()
+    pub fn implicit_hydrogen_counts(&self) -> &[u8] {
+        &self.implicit_hydrogen_cache
     }
 
-    /// Returns the implicit hydrogen count for a node id, if present.
+    /// Returns the implicit hydrogen count for the provided node id.
     ///
     /// This uses the same raw parsed-graph semantics as
     /// [`Smiles::implicit_hydrogen_counts`].
+    ///
+    /// # Panics
+    /// Panics if `id` is not a valid atom index in this graph.
     #[inline]
     #[must_use]
-    pub fn implicit_hydrogen_count(&self, id: usize) -> Option<u8> {
-        if let Some(cached) = &self.implicit_hydrogen_cache {
-            return cached.get(id).copied();
-        }
-        self.node_by_id(id).map(|node| implicit_hydrogens_for_node(self, id, node))
+    pub fn implicit_hydrogen_count(&self, id: usize) -> u8 {
+        assert!(
+            id < self.implicit_hydrogen_cache.len(),
+            "invalid atom index {id} for graph with {} atoms",
+            self.implicit_hydrogen_cache.len()
+        );
+        self.implicit_hydrogen_cache[id]
     }
 }
 
@@ -221,19 +229,19 @@ mod tests {
     #[test]
     fn bracket_atoms_never_gain_implicit_hydrogens() {
         let smiles = Smiles::from_str("[CH3][OH-][NH4+]").unwrap();
-        assert_eq!(smiles.implicit_hydrogen_counts(), vec![0, 0, 0]);
+        assert_eq!(smiles.implicit_hydrogen_counts(), &[0, 0, 0]);
     }
 
     #[test]
     fn unbracketed_halogens_stop_at_valence_one() {
         let smiles = Smiles::from_str("FClF").unwrap();
-        assert_eq!(smiles.implicit_hydrogen_counts(), vec![0, 0, 0]);
+        assert_eq!(smiles.implicit_hydrogen_counts(), &[0, 0, 0]);
     }
 
     #[test]
     fn wildcard_atoms_never_gain_implicit_hydrogens() {
         let smiles = Smiles::from_str("*").unwrap();
-        assert_eq!(smiles.implicit_hydrogen_counts(), vec![0]);
+        assert_eq!(smiles.implicit_hydrogen_counts(), &[0]);
     }
 
     #[test]
@@ -246,18 +254,24 @@ mod tests {
     #[test]
     fn aromatic_defaults_match_current_policy() {
         let smiles = Smiles::from_str("c1ccccc1").unwrap();
-        assert_eq!(smiles.implicit_hydrogen_counts(), vec![1, 1, 1, 1, 1, 1]);
+        assert_eq!(smiles.implicit_hydrogen_counts(), &[1, 1, 1, 1, 1, 1]);
 
         let pyridine = Smiles::from_str("n1ccccc1").unwrap();
-        assert_eq!(pyridine.implicit_hydrogen_counts(), vec![0, 1, 1, 1, 1, 1]);
+        assert_eq!(pyridine.implicit_hydrogen_counts(), &[0, 1, 1, 1, 1, 1]);
     }
 
     #[test]
     fn implicit_hydrogen_count_accesses_node_by_id() {
         let smiles = Smiles::from_str("CO").unwrap();
-        assert_eq!(smiles.implicit_hydrogen_count(0), Some(3));
-        assert_eq!(smiles.implicit_hydrogen_count(1), Some(1));
-        assert_eq!(smiles.implicit_hydrogen_count(99), None);
+        assert_eq!(smiles.implicit_hydrogen_count(0), 3);
+        assert_eq!(smiles.implicit_hydrogen_count(1), 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid atom index 99")]
+    fn implicit_hydrogen_count_panics_for_invalid_atom_id() {
+        let smiles = Smiles::from_str("CO").unwrap();
+        let _ = smiles.implicit_hydrogen_count(99);
     }
 
     #[test]
@@ -265,7 +279,7 @@ mod tests {
         let smiles = Smiles::from_str("C$C").unwrap();
         assert_eq!(explicit_valence(&smiles, 0), 4);
         assert_eq!(explicit_valence(&smiles, 1), 4);
-        assert_eq!(smiles.implicit_hydrogen_counts(), vec![0, 0]);
+        assert_eq!(smiles.implicit_hydrogen_counts(), &[0, 0]);
     }
 
     #[test]

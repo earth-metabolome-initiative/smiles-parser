@@ -87,14 +87,15 @@ fn canonicalize_remaps_implicit_hydrogen_cache_and_clears_provenance() {
     let labeling = aromaticized.canonical_labeling();
     let expected_cache = aromaticized
         .implicit_hydrogen_counts()
-        .into_iter()
+        .iter()
+        .copied()
         .enumerate()
         .map(|(old_node, count)| (labeling.new_index_of_old_node()[old_node], count))
         .collect::<Vec<_>>();
 
     let canonicalized = aromaticized.canonicalize();
     let actual_cache =
-        canonicalized.implicit_hydrogen_counts().into_iter().enumerate().collect::<Vec<_>>();
+        canonicalized.implicit_hydrogen_counts().iter().copied().enumerate().collect::<Vec<_>>();
 
     let mut expected_cache = expected_cache;
     expected_cache.sort_unstable_by_key(|&(new_node, _)| new_node);

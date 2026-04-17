@@ -32,7 +32,7 @@ pub(super) struct CanonicalizationStateKey {
     atom_labels: Vec<CanonicalAtomLabel>,
     bond_edges: Vec<(usize, usize, CanonicalBondLabel)>,
     parsed_stereo_neighbors: Vec<Vec<CanonicalStereoNeighborKey>>,
-    implicit_hydrogen_cache: Option<Vec<u8>>,
+    implicit_hydrogen_cache: Vec<u8>,
 }
 
 pub(super) fn canonical_atom_label(atom: Atom) -> CanonicalAtomLabel {

@@ -159,7 +159,7 @@ pub struct Smiles {
     atom_nodes: Vec<Atom>,
     bond_matrix: BondMatrix,
     parsed_stereo_neighbors: Vec<Vec<StereoNeighbor>>,
-    implicit_hydrogen_cache: Option<Vec<u8>>,
+    implicit_hydrogen_cache: Vec<u8>,
     kekulization_source: Option<Box<Self>>,
 }
 
@@ -172,7 +172,7 @@ impl Smiles {
             atom_nodes: Vec::new(),
             bond_matrix: BondMatrix::default(),
             parsed_stereo_neighbors: Vec::new(),
-            implicit_hydrogen_cache: None,
+            implicit_hydrogen_cache: Vec::new(),
             kekulization_source: None,
         }
     }

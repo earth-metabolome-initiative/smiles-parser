@@ -84,10 +84,11 @@ impl Smiles {
                 remap_parsed_stereo_neighbors_row(self, old_node, &new_index_of_old_node)
             })
             .collect::<Vec<_>>();
-        let implicit_hydrogen_cache = self
-            .implicit_hydrogen_cache
-            .as_ref()
-            .map(|cache| old_nodes.iter().copied().map(|old_node| cache[old_node]).collect());
+        let implicit_hydrogen_cache = old_nodes
+            .iter()
+            .copied()
+            .map(|old_node| self.implicit_hydrogen_cache[old_node])
+            .collect();
 
         Self::from_bond_matrix_parts_with_sidecars(
             atom_nodes,

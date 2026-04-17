@@ -95,12 +95,10 @@ impl Smiles {
                 .unwrap_or_else(|_| unreachable!("stereo normalization preserves a simple graph"));
         }
 
-        Self::from_bond_matrix_parts_with_sidecars(
+        Self::from_bond_matrix_parts_with_parsed_stereo(
             atom_nodes,
             builder.finish(self.nodes().len()),
             parsed_stereo_neighbors,
-            None,
-            None,
         )
     }
 

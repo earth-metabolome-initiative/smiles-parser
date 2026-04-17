@@ -375,22 +375,19 @@ fn assert_core_rewrite_invariants(
     let expected_hydrogen_counts: Vec<_> = order
         .iter()
         .copied()
-        .map(|old_node| {
-            normalized
-                .implicit_hydrogen_count(old_node)
-                .unwrap_or_else(|| panic!("missing node {old_node} while remapping implicit H"))
-        })
+        .map(|old_node| normalized.implicit_hydrogen_count(old_node))
         .collect();
     assert_eq!(
         canonicalized.implicit_hydrogen_counts(),
-        expected_hydrogen_counts,
+        expected_hydrogen_counts.as_slice(),
         "implicit hydrogen counts were not remapped correctly",
     );
 
-    let expected_cache = normalized
-        .implicit_hydrogen_cache
-        .as_ref()
-        .map(|cache| order.iter().copied().map(|old_node| cache[old_node]).collect::<Vec<_>>());
+    let expected_cache = order
+        .iter()
+        .copied()
+        .map(|old_node| normalized.implicit_hydrogen_cache[old_node])
+        .collect::<Vec<_>>();
     assert_eq!(
         canonicalized.implicit_hydrogen_cache, expected_cache,
         "implicit hydrogen cache was not remapped correctly",
