@@ -153,6 +153,46 @@ impl RingMembership {
     }
 }
 
+/// Atom-only ring-membership summary for a [`Smiles`] graph.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RingAtomMembership {
+    atom_flags: Vec<bool>,
+}
+
+impl RingAtomMembership {
+    /// Returns a flag slice indicating which atom ids belong to at least one
+    /// ring.
+    #[inline]
+    #[must_use]
+    pub fn atom_flags(&self) -> &[bool] {
+        &self.atom_flags
+    }
+
+    /// Returns whether the given atom id belongs to at least one ring.
+    ///
+    /// # Panics
+    /// Panics if `atom_id` is not a valid atom index in this summary.
+    #[inline]
+    #[must_use]
+    pub fn contains_atom(&self, atom_id: usize) -> bool {
+        assert!(
+            atom_id < self.atom_flags.len(),
+            "invalid atom index {atom_id} for ring-atom summary with {} atoms",
+            self.atom_flags.len()
+        );
+        self.atom_flags[atom_id]
+    }
+}
+
+/// Reusable scratch storage for atom-only ring membership.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RingAtomMembershipScratch {
+    discovery_order_u32: Vec<u32>,
+    lowlink_u32: Vec<u32>,
+    discovery_order: Vec<usize>,
+    lowlink: Vec<usize>,
+}
+
 /// Represents a parsed SMILES graph.
 #[derive(Debug, Clone)]
 pub struct Smiles {
@@ -321,6 +361,79 @@ impl Smiles {
             .collect();
 
         RingMembership { atom_ids, bond_edges }
+    }
+
+    /// Returns atom-only ring membership for the graph.
+    ///
+    /// This is derived from the same cyclic biconnected components as
+    /// [`Self::ring_membership()`], but it only materializes per-atom boolean
+    /// flags and skips ring-bond collection.
+    #[must_use]
+    pub fn ring_atom_membership(&self) -> RingAtomMembership {
+        let mut ring_atom_membership = RingAtomMembership::default();
+        let mut scratch = RingAtomMembershipScratch::default();
+        self.write_ring_atom_membership(&mut ring_atom_membership, &mut scratch);
+        ring_atom_membership
+    }
+
+    /// Writes atom-only ring membership into caller-provided output and scratch
+    /// buffers.
+    ///
+    /// This computes the same result as [`Self::ring_atom_membership()`], but
+    /// it allows callers processing many molecules to reuse allocations across
+    /// calls.
+    pub fn write_ring_atom_membership(
+        &self,
+        ring_atom_membership: &mut RingAtomMembership,
+        scratch: &mut RingAtomMembershipScratch,
+    ) {
+        let atom_count = self.atom_nodes.len();
+        ring_atom_membership.atom_flags.resize(atom_count, false);
+        ring_atom_membership.atom_flags.fill(false);
+
+        let bond_count = self.number_of_bonds();
+        if atom_count < 3 || bond_count < 3 {
+            return;
+        }
+        if u32::try_from(atom_count).is_ok() {
+            scratch.discovery_order_u32.resize(atom_count, 0);
+            scratch.discovery_order_u32.fill(0);
+            scratch.lowlink_u32.resize(atom_count, 0);
+            scratch.lowlink_u32.fill(0);
+            let mut time = 0_u32;
+
+            for start_atom_id in 0..atom_count {
+                if scratch.discovery_order_u32[start_atom_id] == 0 {
+                    self.mark_ring_atom_flags_depth_first_u32(
+                        start_atom_id,
+                        None,
+                        &mut time,
+                        &mut scratch.discovery_order_u32,
+                        &mut scratch.lowlink_u32,
+                        &mut ring_atom_membership.atom_flags,
+                    );
+                }
+            }
+        } else {
+            scratch.discovery_order.resize(atom_count, 0);
+            scratch.discovery_order.fill(0);
+            scratch.lowlink.resize(atom_count, 0);
+            scratch.lowlink.fill(0);
+            let mut time = 0_usize;
+
+            for start_atom_id in 0..atom_count {
+                if scratch.discovery_order[start_atom_id] == 0 {
+                    self.mark_ring_atom_flags_depth_first(
+                        start_atom_id,
+                        None,
+                        &mut time,
+                        &mut scratch.discovery_order,
+                        &mut scratch.lowlink,
+                        &mut ring_atom_membership.atom_flags,
+                    );
+                }
+            }
+        }
     }
 
     /// Returns the canonicalized symmetric-SSSR-style cycle set together with
@@ -583,6 +696,84 @@ impl Smiles {
             }
         }
     }
+
+    fn mark_ring_atom_flags_depth_first(
+        &self,
+        atom_id: usize,
+        parent_atom_id: Option<usize>,
+        time: &mut usize,
+        discovery_order: &mut [usize],
+        lowlink: &mut [usize],
+        atom_flags: &mut [bool],
+    ) {
+        *time += 1;
+        discovery_order[atom_id] = *time;
+        lowlink[atom_id] = *time;
+
+        for neighbor_atom_id in self.bond_matrix.sparse_row(atom_id) {
+            if discovery_order[neighbor_atom_id] == 0 {
+                self.mark_ring_atom_flags_depth_first(
+                    neighbor_atom_id,
+                    Some(atom_id),
+                    time,
+                    discovery_order,
+                    lowlink,
+                    atom_flags,
+                );
+                lowlink[atom_id] = lowlink[atom_id].min(lowlink[neighbor_atom_id]);
+                if lowlink[neighbor_atom_id] <= discovery_order[atom_id] {
+                    atom_flags[atom_id] = true;
+                    atom_flags[neighbor_atom_id] = true;
+                }
+            } else if parent_atom_id != Some(neighbor_atom_id) {
+                let neighbor_discovery_order = discovery_order[neighbor_atom_id];
+                lowlink[atom_id] = lowlink[atom_id].min(neighbor_discovery_order);
+                if neighbor_discovery_order < discovery_order[atom_id] {
+                    atom_flags[atom_id] = true;
+                    atom_flags[neighbor_atom_id] = true;
+                }
+            }
+        }
+    }
+
+    fn mark_ring_atom_flags_depth_first_u32(
+        &self,
+        atom_id: usize,
+        parent_atom_id: Option<usize>,
+        time: &mut u32,
+        discovery_order: &mut [u32],
+        lowlink: &mut [u32],
+        atom_flags: &mut [bool],
+    ) {
+        *time += 1;
+        discovery_order[atom_id] = *time;
+        lowlink[atom_id] = *time;
+
+        for neighbor_atom_id in self.bond_matrix.sparse_row(atom_id) {
+            if discovery_order[neighbor_atom_id] == 0 {
+                self.mark_ring_atom_flags_depth_first_u32(
+                    neighbor_atom_id,
+                    Some(atom_id),
+                    time,
+                    discovery_order,
+                    lowlink,
+                    atom_flags,
+                );
+                lowlink[atom_id] = lowlink[atom_id].min(lowlink[neighbor_atom_id]);
+                if lowlink[neighbor_atom_id] <= discovery_order[atom_id] {
+                    atom_flags[atom_id] = true;
+                    atom_flags[neighbor_atom_id] = true;
+                }
+            } else if parent_atom_id != Some(neighbor_atom_id) {
+                let neighbor_discovery_order = discovery_order[neighbor_atom_id];
+                lowlink[atom_id] = lowlink[atom_id].min(neighbor_discovery_order);
+                if neighbor_discovery_order < discovery_order[atom_id] {
+                    atom_flags[atom_id] = true;
+                    atom_flags[neighbor_atom_id] = true;
+                }
+            }
+        }
+    }
 }
 
 fn canonicalize_cycle(cycle: &[usize]) -> Vec<usize> {
@@ -662,7 +853,8 @@ mod tests {
     use super::{
         AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
         AromaticityModel, AromaticityPolicy, AromaticityStatus, BondMatrixBuilder,
-        RdkitMdlAromaticity, RdkitSimpleAromaticity, RingMembership, Smiles,
+        RdkitMdlAromaticity, RdkitSimpleAromaticity, RingAtomMembership, RingAtomMembershipScratch,
+        RingMembership, Smiles,
     };
     use crate::{
         atom::{Atom, atom_symbol::AtomSymbol},
@@ -801,6 +993,75 @@ mod tests {
         );
         assert!(!ring_membership.contains_atom(0));
         assert!(!ring_membership.contains_edge(0, 1));
+    }
+
+    #[test]
+    fn ring_atom_membership_is_empty_for_acyclic_graphs() {
+        let smiles: Smiles = "CCO".parse().unwrap();
+        let ring_atom_membership = smiles.ring_atom_membership();
+
+        assert_eq!(
+            ring_atom_membership,
+            RingAtomMembership { atom_flags: vec![false, false, false] }
+        );
+        assert!(!ring_atom_membership.contains_atom(0));
+        assert!(!ring_atom_membership.contains_atom(1));
+        assert!(!ring_atom_membership.contains_atom(2));
+    }
+
+    #[test]
+    fn ring_atom_membership_captures_only_ring_atoms() {
+        let smiles: Smiles = "CC1CCCCC1".parse().unwrap();
+        let ring_atom_membership = smiles.ring_atom_membership();
+
+        assert_eq!(ring_atom_membership.atom_flags(), &[false, true, true, true, true, true, true]);
+        assert!(!ring_atom_membership.contains_atom(0));
+        assert!(ring_atom_membership.contains_atom(4));
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid atom index 99")]
+    fn ring_atom_membership_panics_for_invalid_atom_id() {
+        let smiles: Smiles = "C1CCCCC1".parse().unwrap();
+        let ring_atom_membership = smiles.ring_atom_membership();
+
+        let _ = ring_atom_membership.contains_atom(99);
+    }
+
+    #[test]
+    fn ring_atom_membership_matches_ring_membership_on_representative_cases() {
+        let cases = [
+            "CCO",
+            "CC1CCCCC1",
+            "C1CCCCC1CC2CCCCC2",
+            "c1cccc2ccccc12",
+            "C12C3C4C1C5C2C3C45",
+            "CC1=C2CC3=C(C4=C5C=C3[C@@H]6C2=CC7=C1CC8=C(C9=C1C=C8[C@@H]7CCC[C@@H]2C3=C7CC8=C2C=C2C%10CCCC%11C%12=CC%13=C%14CC(=C7C)C(=C3)[C@@H]%13CCC[C@H]3C7=C%13CC%15=C3C=C3C(CCCC%16C%17=CC(=C(C4)C(=C%17CC4=C%16C=C%16[C@H](CCC6)C(=C7)C(=C%13C)CC%16=C4C)C)C5CCCC1C1=CC%10=C(CC2=C8C)C(=C1C9)C)C1=CC%11=C(CC%12=C%14C)C(=C1CC3=C%15C)C)C)C",
+        ];
+
+        for source in cases {
+            let smiles: Smiles = source.parse().unwrap();
+            let ring_atom_membership = smiles.ring_atom_membership();
+            let ring_membership = smiles.ring_membership();
+            let mut expected_flags = vec![false; smiles.nodes().len()];
+            for &atom_id in ring_membership.atom_ids() {
+                expected_flags[atom_id] = true;
+            }
+            assert_eq!(ring_atom_membership.atom_flags(), expected_flags, "{source}");
+        }
+    }
+
+    #[test]
+    fn write_ring_atom_membership_matches_one_shot_api_across_reused_buffers() {
+        let cases = ["CCO", "CC1CCCCC1", "c1cccc2ccccc12", "C12C3C4C1C5C2C3C45"];
+        let mut ring_atom_membership = RingAtomMembership::default();
+        let mut scratch = RingAtomMembershipScratch::default();
+
+        for source in cases {
+            let smiles: Smiles = source.parse().unwrap();
+            smiles.write_ring_atom_membership(&mut ring_atom_membership, &mut scratch);
+            assert_eq!(ring_atom_membership, smiles.ring_atom_membership(), "{source}");
+        }
     }
 
     #[test]
