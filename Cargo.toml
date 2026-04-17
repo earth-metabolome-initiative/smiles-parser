@@ -14,7 +14,7 @@ fuzzing = []
 datasets = ["dep:flate2", "dep:indicatif", "dep:reqwest"]
 
 [dependencies]
-elements_rs = "0.2.2"
+elements_rs = "0.2.3"
 flate2 = { version = "1.1.9", optional = true, default-features = false, features = ["rust_backend"] }
 geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", branch = "main", default-features = false, features = ["alloc"] }
 hashbrown = { version = "0.16.1", default-features = false, features = ["alloc", "default-hasher", "inline-more"] }
