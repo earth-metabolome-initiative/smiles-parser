@@ -57,7 +57,12 @@ pedantic = { level = "deny", priority = -1 }
 lto = "thin"
 codegen-units = 1
 [dev-dependencies]
+criterion = { version = "0.8.2", default-features = false, features = ["cargo_bench_support"] }
 flate2 = "1.1.9"
 rayon = "1.11.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
+
+[[bench]]
+name = "explicit_hydrogens"
+harness = false

@@ -25,13 +25,14 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::fmt;
 
+use elements_rs::Element;
 use geometric_traits::traits::{
     SizedSparseMatrix2D, SizedSparseValuedMatrixRef, SparseMatrix2D, SparseValuedMatrix2DRef,
     SparseValuedMatrixRef,
 };
 
 use crate::{
-    atom::{Atom, bracketed::chirality::Chirality},
+    atom::{Atom, atom_symbol::AtomSymbol, bracketed::chirality::Chirality},
     bond::bond_edge::BondEdge,
 };
 
@@ -68,7 +69,10 @@ pub use self::{
     geometric_traits_impl::{BondEntry, BondMatrix},
     kekulization::{KekulizationError, KekulizationMode},
 };
-pub(crate) use self::{geometric_traits_impl::BondMatrixBuilder, stereo::StereoNeighbor};
+pub(crate) use self::{
+    geometric_traits_impl::{BondMatrixBuilder, build_bond_matrix_from_known_simple_edges},
+    stereo::StereoNeighbor,
+};
 
 /// Error raised while deriving ring membership from a [`Smiles`] graph.
 /// Status flags describing whether symmetrized SSSR completed exactly or
@@ -887,6 +891,110 @@ impl Smiles {
         }
     }
 
+    /// Returns a variant of the graph with all currently implied hydrogens
+    /// materialized as terminal `[H]` atoms.
+    ///
+    /// This mirrors the structural effect of `RDKit`'s `AddHs`: bracket-
+    /// explicit hydrogens and current implicit hydrogens are turned into real
+    /// hydrogen nodes connected by single bonds, and the parent atom's local
+    /// hydrogen count is cleared.
+    ///
+    /// Existing heavy-atom bonds, charges, classes, and chirality tags are
+    /// preserved. Stereo-neighbor rows are rewritten so chiral `[XH]` centers
+    /// point at the new hydrogen nodes instead of keeping an
+    /// `ExplicitHydrogen` placeholder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "CO".parse()?;
+    /// let explicit = smiles.with_explicit_hydrogens();
+    ///
+    /// assert_eq!(explicit.nodes().len(), 6);
+    /// assert_eq!(explicit.implicit_hydrogen_counts(), &[0, 0, 0, 0, 0, 0]);
+    /// assert_eq!(
+    ///     explicit.nodes().iter().filter(|atom| atom.element() == Some(Element::H)).count(),
+    ///     4
+    /// );
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
+    #[must_use]
+    pub fn with_explicit_hydrogens(&self) -> Self {
+        let original_atom_count = self.atom_nodes.len();
+        let mut added_hydrogen_counts = Vec::with_capacity(original_atom_count);
+        let mut hydrogen_start_by_parent = Vec::with_capacity(original_atom_count);
+        let mut total_added_hydrogens = 0_usize;
+        for (atom_id, atom) in self.atom_nodes.iter().enumerate() {
+            hydrogen_start_by_parent.push(original_atom_count + total_added_hydrogens);
+            let hydrogen_count = usize::from(atom.hydrogen_count())
+                + usize::from(self.implicit_hydrogen_count(atom_id));
+            added_hydrogen_counts.push(hydrogen_count);
+            total_added_hydrogens += hydrogen_count;
+        }
+        if total_added_hydrogens == 0 {
+            return self.clone();
+        }
+
+        let mut atom_nodes = self
+            .atom_nodes
+            .iter()
+            .copied()
+            .map(atom_without_explicit_hydrogen_count)
+            .collect::<Vec<_>>();
+        atom_nodes.reserve(total_added_hydrogens);
+        atom_nodes.extend((0..total_added_hydrogens).map(|_| explicit_hydrogen_atom()));
+
+        let mut parsed_stereo_neighbors = self.parsed_stereo_neighbors.clone();
+        for atom_id in 0..original_atom_count {
+            if added_hydrogen_counts[atom_id] == 0 {
+                continue;
+            }
+            let hydrogen_start = hydrogen_start_by_parent[atom_id];
+            let mut next_explicit_hydrogen = 0_usize;
+            for neighbor in &mut parsed_stereo_neighbors[atom_id] {
+                if matches!(*neighbor, StereoNeighbor::ExplicitHydrogen) {
+                    let hydrogen_id = hydrogen_start + next_explicit_hydrogen;
+                    *neighbor = StereoNeighbor::Atom(hydrogen_id);
+                    next_explicit_hydrogen += 1;
+                }
+            }
+        }
+        parsed_stereo_neighbors.extend((0..total_added_hydrogens).map(|_| Vec::new()));
+
+        let bond_matrix = build_bond_matrix_from_known_simple_edges(
+            original_atom_count + total_added_hydrogens,
+            (0..original_atom_count).flat_map(|parent_atom_id| {
+                let hydrogen_start = hydrogen_start_by_parent[parent_atom_id];
+                let hydrogen_count = added_hydrogen_counts[parent_atom_id];
+                self.bond_matrix
+                    .sparse_row(parent_atom_id)
+                    .zip(self.bond_matrix.sparse_row_values_ref(parent_atom_id))
+                    .filter_map(move |(neighbor_atom_id, entry)| {
+                        (parent_atom_id < neighbor_atom_id).then_some((
+                            parent_atom_id,
+                            neighbor_atom_id,
+                            entry.bond(),
+                            entry.ring_num(),
+                        ))
+                    })
+                    .chain((0..hydrogen_count).map(move |offset| {
+                        (parent_atom_id, hydrogen_start + offset, crate::bond::Bond::Single, None)
+                    }))
+            }),
+        );
+
+        Self::from_bond_matrix_parts_with_sidecars(
+            atom_nodes,
+            bond_matrix,
+            parsed_stereo_neighbors,
+            vec![0; original_atom_count + total_added_hydrogens],
+            None,
+        )
+    }
+
     #[inline]
     #[must_use]
     pub(crate) fn clone_without_kekulization_source(&self) -> Self {
@@ -1195,6 +1303,30 @@ impl Smiles {
     }
 }
 
+fn explicit_hydrogen_atom() -> Atom {
+    Atom::builder().with_symbol(AtomSymbol::Element(Element::H)).build()
+}
+
+fn atom_without_explicit_hydrogen_count(atom: Atom) -> Atom {
+    if atom.hydrogen_count() == 0 {
+        return atom;
+    }
+
+    let mut builder = Atom::builder()
+        .with_symbol(atom.symbol())
+        .with_aromatic(atom.aromatic())
+        .with_hydrogens(0)
+        .with_charge(atom.charge())
+        .with_class(atom.class());
+    if let Some(isotope) = atom.isotope_mass_number() {
+        builder = builder.with_isotope(isotope);
+    }
+    if let Some(chirality) = atom.chirality() {
+        builder = builder.with_chirality(chirality);
+    }
+    builder.build()
+}
+
 fn canonicalize_cycle(cycle: &[usize]) -> Vec<usize> {
     let smallest_atom_id =
         *cycle.iter().min().unwrap_or_else(|| unreachable!("Johnson only yields non-empty cycles"));
@@ -1273,10 +1405,10 @@ mod tests {
         AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
         AromaticityModel, AromaticityPolicy, AromaticityStatus, BondMatrixBuilder,
         DoubleBondStereoConfig, RdkitMdlAromaticity, RdkitSimpleAromaticity, RingAtomMembership,
-        RingAtomMembershipScratch, RingMembership, Smiles,
+        RingAtomMembershipScratch, RingMembership, Smiles, StereoNeighbor,
     };
     use crate::{
-        atom::{Atom, atom_symbol::AtomSymbol, bracketed::chirality::Chirality},
+        atom::{Atom, AtomSyntax, atom_symbol::AtomSymbol, bracketed::chirality::Chirality},
         bond::{
             Bond,
             bond_edge::{BondEdge, bond_edge},
@@ -1298,6 +1430,16 @@ mod tests {
         }
         let number_of_nodes = atom_nodes.len();
         Smiles::from_bond_matrix_parts(atom_nodes, builder.finish(number_of_nodes))
+    }
+
+    fn hydrogen_neighbors(smiles: &Smiles, atom_id: usize) -> Vec<usize> {
+        smiles
+            .edges_for_node(atom_id)
+            .filter_map(|edge| {
+                let neighbor = if edge.0 == atom_id { edge.1 } else { edge.0 };
+                (smiles.nodes()[neighbor].element() == Some(Element::H)).then_some(neighbor)
+            })
+            .collect()
     }
 
     #[test]
@@ -1452,6 +1594,148 @@ mod tests {
         let smiles: Smiles = "C".parse().expect("valid SMILES");
         let aromaticity = smiles.aromaticity_assignment_for(AromaticityPolicy::RdkitDefault);
         let _ = smiles.smarts_total_valence(99, &aromaticity);
+    }
+
+    #[test]
+    fn with_explicit_hydrogens_materializes_implicit_hydrogens_as_terminal_hydrogen_atoms() {
+        let smiles: Smiles = "CO".parse().expect("valid SMILES");
+        let explicit = smiles.with_explicit_hydrogens();
+
+        assert_eq!(explicit.nodes().len(), 6);
+        assert_eq!(explicit.number_of_bonds(), 5);
+        assert_eq!(explicit.implicit_hydrogen_counts(), &[0, 0, 0, 0, 0, 0]);
+        assert_eq!(explicit.nodes()[0].hydrogen_count(), 0);
+        assert_eq!(explicit.nodes()[1].hydrogen_count(), 0);
+        assert_eq!(explicit.edge_count_for_node(0), 4);
+        assert_eq!(explicit.edge_count_for_node(1), 2);
+        assert_eq!(
+            explicit.nodes().iter().filter(|atom| atom.element() == Some(Element::H)).count(),
+            4
+        );
+    }
+
+    #[test]
+    fn with_explicit_hydrogens_rewrites_bracket_explicit_hydrogens_into_terminal_hydrogen_atoms() {
+        let ammonium: Smiles = "[NH4+]".parse().expect("valid ammonium");
+        let explicit = ammonium.with_explicit_hydrogens();
+
+        assert_eq!(explicit.nodes().len(), 5);
+        assert_eq!(explicit.number_of_bonds(), 4);
+        assert_eq!(explicit.nodes()[0].charge_value(), 1);
+        assert_eq!(explicit.nodes()[0].hydrogen_count(), 0);
+        assert_eq!(explicit.edge_count_for_node(0), 4);
+        assert_eq!(explicit.implicit_hydrogen_counts(), &[0, 0, 0, 0, 0]);
+        assert!(explicit.nodes()[1..].iter().all(|atom| atom.element() == Some(Element::H)));
+    }
+
+    #[test]
+    fn with_explicit_hydrogens_preserves_semantic_tetrahedral_chirality() {
+        let smiles: Smiles = "F[C@H](Cl)Br".parse().expect("valid SMILES");
+        let before = smiles.smarts_tetrahedral_chirality(1);
+        let explicit = smiles.with_explicit_hydrogens();
+
+        assert_eq!(explicit.nodes().len(), 5);
+        assert_eq!(explicit.edge_for_node_pair((1, 4)).unwrap().2, Bond::Single);
+        assert_eq!(explicit.smarts_tetrahedral_chirality(1), before);
+    }
+
+    #[test]
+    fn with_explicit_hydrogens_rewrites_parsed_stereo_neighbors_for_chiral_h_centers() {
+        let smiles: Smiles = "F[C@H](Cl)Br".parse().expect("valid SMILES");
+        let explicit = smiles.with_explicit_hydrogens();
+
+        assert_eq!(
+            explicit.parsed_stereo_neighbors_row(1),
+            &[
+                StereoNeighbor::Atom(0),
+                StereoNeighbor::Atom(4),
+                StereoNeighbor::Atom(2),
+                StereoNeighbor::Atom(3),
+            ]
+        );
+    }
+
+    #[test]
+    fn with_explicit_hydrogens_is_noop_when_no_hydrogens_are_present() {
+        let smiles: Smiles = "[Na+]".parse().expect("valid sodium cation");
+        assert_eq!(smiles.with_explicit_hydrogens(), smiles);
+    }
+
+    #[test]
+    fn with_explicit_hydrogens_is_idempotent_after_materialization() {
+        let once = "CO".parse::<Smiles>().expect("valid SMILES").with_explicit_hydrogens();
+        let twice = once.with_explicit_hydrogens();
+        assert_eq!(twice, once);
+    }
+
+    #[test]
+    fn with_explicit_hydrogens_produces_terminal_bracket_hydrogen_atoms() {
+        let smiles: Smiles = "CO".parse().expect("valid SMILES");
+        let explicit = smiles.with_explicit_hydrogens();
+
+        for atom_id in 2..explicit.nodes().len() {
+            let atom = explicit.nodes()[atom_id];
+            assert_eq!(atom.element(), Some(Element::H));
+            assert_eq!(atom.syntax(), AtomSyntax::Bracket);
+            assert_eq!(atom.hydrogen_count(), 0);
+            assert_eq!(atom.charge_value(), 0);
+            assert_eq!(atom.class(), 0);
+            assert_eq!(atom.chirality(), None);
+            assert_eq!(explicit.edge_count_for_node(atom_id), 1);
+            assert_eq!(explicit.implicit_hydrogen_count(atom_id), 0);
+        }
+    }
+
+    #[test]
+    fn with_explicit_hydrogens_preserves_ring_membership_on_the_heavy_atom_subgraph() {
+        let smiles: Smiles = "C1CCCCC1".parse().expect("valid cyclohexane");
+        let explicit = smiles.with_explicit_hydrogens();
+
+        assert_eq!(explicit.nodes().len(), 18);
+        assert_eq!(explicit.number_of_bonds(), 18);
+        assert_eq!(explicit.ring_membership().atom_ids(), &[0, 1, 2, 3, 4, 5]);
+        for atom_id in 0..6 {
+            assert_eq!(explicit.nodes()[atom_id].element(), Some(Element::C));
+            assert_eq!(explicit.edge_count_for_node(atom_id), 4);
+            assert_eq!(hydrogen_neighbors(&explicit, atom_id).len(), 2);
+        }
+        for atom_id in 6..18 {
+            assert!(!explicit.ring_membership().contains_atom(atom_id));
+        }
+    }
+
+    #[test]
+    fn with_explicit_hydrogens_preserves_aromatic_heavy_atoms() {
+        let smiles: Smiles = "c1ccccc1".parse().expect("valid benzene");
+        let explicit = smiles.with_explicit_hydrogens();
+
+        assert_eq!(explicit.nodes().len(), 12);
+        assert_eq!(explicit.number_of_bonds(), 12);
+        assert_eq!(explicit.ring_membership().atom_ids(), &[0, 1, 2, 3, 4, 5]);
+        assert_eq!(explicit.implicit_hydrogen_counts(), &[0; 12]);
+        for atom_id in 0..6 {
+            assert!(explicit.nodes()[atom_id].aromatic());
+            assert_eq!(explicit.nodes()[atom_id].hydrogen_count(), 0);
+            assert_eq!(hydrogen_neighbors(&explicit, atom_id).len(), 1);
+        }
+    }
+
+    #[test]
+    fn with_explicit_hydrogens_preserves_bracket_atom_metadata_while_clearing_h_count() {
+        let smiles: Smiles = "[13CH-:7]".parse().expect("valid bracket atom");
+        let explicit = smiles.with_explicit_hydrogens();
+        let atom = explicit.nodes()[0];
+
+        assert_eq!(explicit.nodes().len(), 2);
+        assert_eq!(explicit.number_of_bonds(), 1);
+        assert_eq!(atom.element(), Some(Element::C));
+        assert_eq!(atom.isotope_mass_number(), Some(13));
+        assert_eq!(atom.charge_value(), -1);
+        assert_eq!(atom.class(), 7);
+        assert_eq!(atom.syntax(), AtomSyntax::Bracket);
+        assert_eq!(atom.hydrogen_count(), 0);
+        assert_eq!(explicit.nodes()[1].element(), Some(Element::H));
+        assert_eq!(explicit.edge_count_for_node(0), 1);
     }
 
     #[test]

@@ -224,6 +224,23 @@ fn build_bond_matrix(number_of_nodes: usize, mut entries: Vec<PendingBond>) -> B
 }
 
 #[inline]
+#[must_use]
+pub(crate) fn build_bond_matrix_from_known_simple_edges(
+    number_of_nodes: usize,
+    edges: impl IntoIterator<Item = (usize, usize, Bond, Option<RingNum>)>,
+) -> BondMatrix {
+    let entries = edges
+        .into_iter()
+        .enumerate()
+        .map(|(order, (row, column, bond, ring_num))| {
+            debug_assert!(row < column, "known-simple edges must be upper triangular");
+            PendingBond::new(row, column, BondEntry::new(bond, ring_num, order))
+        })
+        .collect();
+    build_bond_matrix(number_of_nodes, entries)
+}
+
+#[inline]
 fn reassign_rdkit_bond_orders(entries: &mut [PendingBond]) {
     let mut reordered = entries.iter_mut().collect::<Vec<_>>();
     reordered.sort_unstable_by_key(|pending| {
