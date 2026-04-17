@@ -4,7 +4,7 @@ use geometric_traits::traits::SparseValuedMatrixRef;
 
 use super::{Smiles, maybe_collapse_atom_to_organic_subset};
 use crate::{
-    atom::Atom,
+    atom::{Atom, bracketed::chirality::Chirality},
     bond::Bond,
     smiles::{BondMatrixBuilder, StereoNeighbor},
 };
@@ -19,6 +19,34 @@ use self::{
 };
 
 impl Smiles {
+    pub(crate) fn semantic_tetrahedral_chirality(&self, node_id: usize) -> Option<Chirality> {
+        let chirality = self.node_by_id(node_id)?.chirality()?;
+        let parsed_neighbors = self.parsed_stereo_neighbors_row(node_id);
+        let preparation = self.stereo_normalization_preparation();
+        let normalized_neighbors = canonical_stereo_neighbors_row(
+            self,
+            node_id,
+            Some(chirality),
+            parsed_neighbors,
+            &preparation.new_index_of_old_node,
+            &preparation.rooted_classes,
+            &preparation.refined_classes,
+        );
+
+        match normalized_stereo_chirality(
+            self,
+            node_id,
+            Some(chirality),
+            parsed_neighbors,
+            &normalized_neighbors,
+            &preparation.rooted_classes,
+            &preparation.refined_classes,
+        ) {
+            Some(chirality @ (Chirality::TH(_) | Chirality::AL(_))) => Some(chirality),
+            _ => None,
+        }
+    }
+
     pub(super) fn stereo_normal_form(&self) -> Self {
         if self.nodes().is_empty() {
             return self.clone();

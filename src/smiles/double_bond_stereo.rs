@@ -8,9 +8,12 @@ use geometric_traits::traits::{
 use super::{Smiles, invariants::AtomInvariant};
 use crate::bond::{Bond, bond_edge::BondEdge};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) enum DoubleBondStereoConfig {
+/// Semantic double-bond stereo configuration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum DoubleBondStereoConfig {
+    /// Opposite-side alkene geometry.
     E,
+    /// Same-side alkene geometry.
     Z,
 }
 
@@ -77,7 +80,6 @@ struct DoubleBondStereoCandidate {
 }
 
 impl Smiles {
-    #[cfg(any(test, feature = "fuzzing"))]
     #[must_use]
     pub(super) fn double_bond_stereo_records(&self) -> Vec<DoubleBondStereoRecord> {
         let candidates = self.double_bond_stereo_candidates();
@@ -89,6 +91,19 @@ impl Smiles {
         let rooted_classes = self.stereo_neutral_rooted_classes(&refined_classes);
 
         self.double_bond_stereo_records_from_classes(candidates, &rooted_classes, &refined_classes)
+    }
+
+    #[must_use]
+    pub(crate) fn semantic_double_bond_stereo_config(
+        &self,
+        node_a: usize,
+        node_b: usize,
+    ) -> Option<DoubleBondStereoConfig> {
+        let edge_key = Smiles::edge_key(node_a, node_b);
+        self.double_bond_stereo_records().into_iter().find_map(|record| {
+            (Smiles::edge_key(record.double_bond.0, record.double_bond.1) == edge_key)
+                .then_some(record.config())
+        })
     }
 
     #[must_use]

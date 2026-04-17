@@ -30,7 +30,10 @@ use geometric_traits::traits::{
     SparseValuedMatrixRef,
 };
 
-use crate::{atom::Atom, bond::bond_edge::BondEdge};
+use crate::{
+    atom::{Atom, bracketed::chirality::Chirality},
+    bond::bond_edge::BondEdge,
+};
 
 mod aromaticity;
 mod branches;
@@ -61,6 +64,7 @@ pub use self::{
     },
     canonicalization::SmilesCanonicalLabeling,
     connected_components::SmilesComponents,
+    double_bond_stereo::DoubleBondStereoConfig,
     geometric_traits_impl::{BondEntry, BondMatrix},
     kekulization::{KekulizationError, KekulizationMode},
 };
@@ -569,6 +573,71 @@ impl Smiles {
             .sparse_row(id)
             .zip(self.bond_matrix.sparse_row_values_ref(id))
             .map(move |(other, entry)| entry.to_bond_edge(id, other))
+    }
+
+    /// Returns semantic tetrahedral or allene-like chirality for SMARTS-style
+    /// matching.
+    ///
+    /// This normalizes parsed `@` / `@@` / `@TH` / `@AL` markup through the
+    /// crate's existing stereo-normalization logic, including implicit-
+    /// hydrogen handling and stereogenicity checks. Only tetrahedral and
+    /// allene-like semantic chirality is exposed here; other parsed stereo
+    /// families return `None`.
+    ///
+    /// # Panics
+    /// Panics if `atom_id` is not a valid atom index in this graph.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{atom::bracketed::chirality::Chirality, prelude::Smiles};
+    ///
+    /// let left: Smiles = "F[C@H](Cl)Br".parse()?;
+    /// let right: Smiles = "F[C@@H](Cl)Br".parse()?;
+    ///
+    /// assert!(matches!(left.smarts_tetrahedral_chirality(1), Some(Chirality::TH(_))));
+    /// assert!(matches!(right.smarts_tetrahedral_chirality(1), Some(Chirality::TH(_))));
+    /// assert_ne!(left.smarts_tetrahedral_chirality(1), right.smarts_tetrahedral_chirality(1));
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn smarts_tetrahedral_chirality(&self, atom_id: usize) -> Option<Chirality> {
+        assert!(
+            atom_id < self.atom_nodes.len(),
+            "invalid atom index {atom_id} for graph with {} atoms",
+            self.atom_nodes.len()
+        );
+        self.semantic_tetrahedral_chirality(atom_id)
+    }
+
+    /// Returns semantic `E`/`Z` stereo for the requested double bond, if any.
+    ///
+    /// This is the chemistry-facing stereo classification derived from parsed
+    /// directional single-bond tokens. It returns `None` when the edge is not
+    /// a double bond, when stereo was not specified, or when the surrounding
+    /// environment does not support a semantic alkene-stereo assignment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{DoubleBondStereoConfig, prelude::Smiles};
+    ///
+    /// let trans: Smiles = "F/C=C/F".parse()?;
+    /// let plain: Smiles = "CC=CC".parse()?;
+    ///
+    /// assert_eq!(trans.double_bond_stereo_config(1, 2), Some(DoubleBondStereoConfig::E));
+    /// assert_eq!(plain.double_bond_stereo_config(1, 2), None);
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn double_bond_stereo_config(
+        &self,
+        node_a: usize,
+        node_b: usize,
+    ) -> Option<DoubleBondStereoConfig> {
+        self.semantic_double_bond_stereo_config(node_a, node_b)
     }
 
     /// Returns the atoms and bonds that belong to at least one ring.
@@ -1203,11 +1272,11 @@ mod tests {
     use super::{
         AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
         AromaticityModel, AromaticityPolicy, AromaticityStatus, BondMatrixBuilder,
-        RdkitMdlAromaticity, RdkitSimpleAromaticity, RingAtomMembership, RingAtomMembershipScratch,
-        RingMembership, Smiles,
+        DoubleBondStereoConfig, RdkitMdlAromaticity, RdkitSimpleAromaticity, RingAtomMembership,
+        RingAtomMembershipScratch, RingMembership, Smiles,
     };
     use crate::{
-        atom::{Atom, atom_symbol::AtomSymbol},
+        atom::{Atom, atom_symbol::AtomSymbol, bracketed::chirality::Chirality},
         bond::{
             Bond,
             bond_edge::{BondEdge, bond_edge},
@@ -1383,6 +1452,49 @@ mod tests {
         let smiles: Smiles = "C".parse().expect("valid SMILES");
         let aromaticity = smiles.aromaticity_assignment_for(AromaticityPolicy::RdkitDefault);
         let _ = smiles.smarts_total_valence(99, &aromaticity);
+    }
+
+    #[test]
+    fn smarts_tetrahedral_chirality_exposes_semantic_tetrahedral_forms() {
+        let left: Smiles = "F[C@H](Cl)Br".parse().expect("valid SMILES");
+        let right: Smiles = "F[C@@H](Cl)Br".parse().expect("valid SMILES");
+        let achiral: Smiles = "CC(O)N".parse().expect("valid SMILES");
+
+        assert!(matches!(left.smarts_tetrahedral_chirality(1), Some(Chirality::TH(_))));
+        assert!(matches!(right.smarts_tetrahedral_chirality(1), Some(Chirality::TH(_))));
+        assert_ne!(left.smarts_tetrahedral_chirality(1), right.smarts_tetrahedral_chirality(1));
+        assert_eq!(achiral.smarts_tetrahedral_chirality(1), None);
+    }
+
+    #[test]
+    fn smarts_tetrahedral_chirality_exposes_allene_like_forms() {
+        let left: Smiles = "OC(Cl)=[C@]=C(C)F".parse().expect("valid SMILES");
+        let right: Smiles = "OC(Cl)=[C@@]=C(C)F".parse().expect("valid SMILES");
+
+        assert!(matches!(left.smarts_tetrahedral_chirality(3), Some(Chirality::AL(_))));
+        assert!(matches!(right.smarts_tetrahedral_chirality(3), Some(Chirality::AL(_))));
+        assert_ne!(left.smarts_tetrahedral_chirality(3), right.smarts_tetrahedral_chirality(3));
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid atom index 99 for graph with 4 atoms")]
+    fn smarts_tetrahedral_chirality_panics_for_invalid_atom_id() {
+        let smiles: Smiles = "F[C@H](Cl)Br".parse().expect("valid SMILES");
+        let _ = smiles.smarts_tetrahedral_chirality(99);
+    }
+
+    #[test]
+    fn double_bond_stereo_config_reports_semantic_e_z_and_absence() {
+        let trans: Smiles = "F/C=C/F".parse().expect("valid SMILES");
+        let cis: Smiles = "F/C=C\\F".parse().expect("valid SMILES");
+        let plain: Smiles = "CC=CC".parse().expect("valid SMILES");
+        let ring: Smiles = "C1CC/C=C/CC1".parse().expect("valid SMILES");
+
+        assert_eq!(trans.double_bond_stereo_config(1, 2), Some(DoubleBondStereoConfig::E));
+        assert_eq!(cis.double_bond_stereo_config(1, 2), Some(DoubleBondStereoConfig::Z));
+        assert_eq!(plain.double_bond_stereo_config(1, 2), None);
+        assert_eq!(ring.double_bond_stereo_config(3, 4), None);
+        assert_eq!(plain.double_bond_stereo_config(9, 10), None);
     }
 
     #[test]
