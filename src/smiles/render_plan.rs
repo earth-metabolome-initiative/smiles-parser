@@ -346,10 +346,10 @@ impl Smiles {
             let emitted_stereo_neighbors =
                 emitted_stereo_neighbors(self, node_id, parent, &closures, &ordered_children);
             let normalized_chirality = atom.chirality().and_then(|chirality| {
-                let parsed_stereo_neighbors = self.parsed_stereo_neighbors(node_id);
+                let parsed_stereo_neighbors = self.parsed_stereo_neighbors_row(node_id);
                 normalized_tetrahedral_chirality(
                     Some(chirality),
-                    &parsed_stereo_neighbors,
+                    parsed_stereo_neighbors,
                     &emitted_stereo_neighbors,
                 )
             });

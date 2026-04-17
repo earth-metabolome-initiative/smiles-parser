@@ -465,7 +465,7 @@ impl<'a> RingSearchState<'a> {
             // real molecules, such as CID 58882885, that trigger this path in
             // RDKit itself.
             let all_atoms = (0..self.smiles.nodes().len()).collect::<Vec<_>>();
-            let mut fast_rings = fast_find_rings(self.smiles, &all_atoms);
+            let mut fast_rings = fast_find_rings(&self.ordered_incident_bonds, &all_atoms);
             fast_rings.sort_unstable();
             return Some(fast_rings);
         }
@@ -1319,7 +1319,7 @@ fn connected_fragments(smiles: &Smiles) -> Vec<Vec<usize>> {
 
         while let Some(node) = stack.pop() {
             fragment.push(node);
-            for edge in RdkitIncidentBondOrdering::for_node(smiles, node) {
+            for edge in smiles.edges_for_node(node) {
                 let Some(other) = bond_edge_other(edge, node) else {
                     continue;
                 };
@@ -1340,22 +1340,25 @@ fn find_common_neighbor(left: &[usize], right: &[usize], neighbors: &[usize]) ->
     neighbors.iter().copied().find(|neighbor| left.contains(neighbor) && right.contains(neighbor))
 }
 
-fn fast_find_rings(smiles: &Smiles, fragment: &[usize]) -> Vec<Vec<usize>> {
+fn fast_find_rings(
+    ordered_incident_bonds: &[Vec<BondEdge>],
+    fragment: &[usize],
+) -> Vec<Vec<usize>> {
     let mut seen = HashSet::<Vec<usize>>::new();
     let mut rings = Vec::<Vec<usize>>::new();
-    let mut colors = vec![0_u8; smiles.nodes().len()];
+    let mut colors = vec![0_u8; ordered_incident_bonds.len()];
 
     for &start in fragment {
         if colors[start] != WHITE {
             continue;
         }
-        if RdkitIncidentBondOrdering::for_node(smiles, start).len() < 2 {
+        if ordered_incident_bonds[start].len() < 2 {
             colors[start] = BLACK;
             continue;
         }
         let mut traversal = Vec::<usize>::new();
         dfs_fast_find_rings(
-            smiles,
+            ordered_incident_bonds,
             start,
             None,
             &mut colors,
@@ -1369,7 +1372,7 @@ fn fast_find_rings(smiles: &Smiles, fragment: &[usize]) -> Vec<Vec<usize>> {
 }
 
 fn dfs_fast_find_rings(
-    smiles: &Smiles,
+    ordered_incident_bonds: &[Vec<BondEdge>],
     atom: usize,
     from_atom: Option<usize>,
     colors: &mut [u8],
@@ -1380,15 +1383,23 @@ fn dfs_fast_find_rings(
     colors[atom] = GRAY;
     traversal.push(atom);
 
-    for edge in RdkitIncidentBondOrdering::for_node(smiles, atom) {
+    for &edge in &ordered_incident_bonds[atom] {
         let Some(nbr) = bond_edge_other(edge, atom) else {
             continue;
         };
         if colors[nbr] == WHITE {
-            if RdkitIncidentBondOrdering::for_node(smiles, nbr).len() < 2 {
+            if ordered_incident_bonds[nbr].len() < 2 {
                 colors[nbr] = BLACK;
             } else {
-                dfs_fast_find_rings(smiles, nbr, Some(atom), colors, traversal, rings, seen);
+                dfs_fast_find_rings(
+                    ordered_incident_bonds,
+                    nbr,
+                    Some(atom),
+                    colors,
+                    traversal,
+                    rings,
+                    seen,
+                );
             }
         } else if colors[nbr] == GRAY
             && from_atom != Some(nbr)

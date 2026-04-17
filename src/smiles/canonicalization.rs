@@ -345,8 +345,9 @@ impl Smiles {
             .iter()
             .copied()
             .map(|old_node| {
-                self.parsed_stereo_neighbors(old_node)
-                    .into_iter()
+                self.parsed_stereo_neighbors_row(old_node)
+                    .iter()
+                    .copied()
                     .filter_map(|neighbor| {
                         match neighbor {
                             StereoNeighbor::ExplicitHydrogen => {

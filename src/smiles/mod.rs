@@ -31,7 +31,7 @@ use geometric_traits::traits::{
 };
 use hashbrown::HashSet;
 
-use crate::{atom::Atom, bond::bond_edge::BondEdge, errors::SmilesError};
+use crate::{atom::Atom, bond::bond_edge::BondEdge};
 
 mod aromaticity;
 mod branches;
@@ -392,13 +392,9 @@ impl Smiles {
     ///
     /// [`fmt::Display`] uses this exact pipeline by delegating to `render()`
     /// and then writing the finished string into the formatter.
-    ///
-    /// # Errors
-    ///
-    /// This currently returns `Ok` for every in-memory graph produced by the
-    /// crate and reserves `Err` for future render-time validation failures.
-    pub fn render(&self) -> Result<String, SmilesError> {
-        Ok(self::emitter::emit(self))
+    #[must_use]
+    pub fn render(&self) -> String {
+        self::emitter::emit(self)
     }
 
     fn find_bridge_edges_depth_first(
@@ -503,8 +499,7 @@ impl fmt::Display for Smiles {
     /// See [`Smiles::render`] for the full algorithm stack and the rationale
     /// behind the split between planning and emission.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let rendered = self.render().map_err(|_| fmt::Error)?;
-        f.write_str(&rendered)
+        f.write_str(&self.render())
     }
 }
 
@@ -627,7 +622,7 @@ mod tests {
             &[bond_edge(0, 1, Bond::Double, None)],
         );
 
-        let rendered = smiles.render().expect("simple graph should render");
+        let rendered = smiles.render();
         assert_eq!(rendered, "C=O");
         assert_eq!(format!("{smiles}"), "C=O");
     }
@@ -1380,7 +1375,7 @@ mod tests {
     #[test]
     fn render_smoke_from_parsed_smiles() {
         let smiles = Smiles::from_str("CC").expect("should parse");
-        let rendered = smiles.render().expect("should render");
+        let rendered = smiles.render();
         assert_eq!(rendered, "CC");
         assert_eq!(format!("{smiles}"), "CC");
     }
