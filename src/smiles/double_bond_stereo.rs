@@ -317,7 +317,7 @@ impl Smiles {
             self.atom_invariants().into_iter().map(StereoNeutralAtomInvariantKey::from).collect();
         self.wl_coloring_with_seed_and_edge_colors(&seed_colors, |node, neighbor| {
             let edge = self.edge_for_node_pair((node, neighbor)).unwrap_or_else(|| unreachable!());
-            stereo_neutral_bond_kind_index(edge.bond())
+            stereo_neutral_bond_kind_index(edge.2)
         })
     }
 
@@ -460,7 +460,7 @@ fn substituent_priority_key(
     let atom = smiles.node_by_id(neighbor).unwrap_or_else(|| unreachable!());
     let atomic_number = atom.element().map_or(0, u8::from);
     let bond_order_to_endpoint = bond_priority(
-        smiles.edge_for_node_pair((endpoint, neighbor)).unwrap_or_else(|| unreachable!()).bond(),
+        smiles.edge_for_node_pair((endpoint, neighbor)).unwrap_or_else(|| unreachable!()).2,
     );
 
     SubstituentPriorityKey {

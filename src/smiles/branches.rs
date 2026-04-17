@@ -258,7 +258,10 @@ mod tests {
     };
     use crate::{
         atom::{Atom, AtomSyntax, atom_symbol::AtomSymbol, bracketed::chirality::Chirality},
-        bond::{Bond, bond_edge::BondEdge},
+        bond::{
+            Bond,
+            bond_edge::{BondEdge, bond_edge},
+        },
         smiles::{
             BondMatrixBuilder,
             invariants::{AtomInvariant, BondKindHistogram},
@@ -272,7 +275,7 @@ mod tests {
     fn smiles_from_edges(atom_nodes: Vec<Atom>, bond_edges: &[BondEdge]) -> Smiles {
         let mut builder = BondMatrixBuilder::with_capacity(bond_edges.len());
         for edge in bond_edges {
-            builder.push_edge(edge.node_a(), edge.node_b(), edge.bond(), edge.ring_num()).unwrap();
+            builder.push_edge(edge.0, edge.1, edge.2, edge.3).unwrap();
         }
         let number_of_nodes = atom_nodes.len();
         Smiles::from_bond_matrix_parts(atom_nodes, builder.finish(number_of_nodes))
@@ -310,10 +313,10 @@ mod tests {
                 atom(Element::C),
             ],
             &[
-                BondEdge::new(0, 1, Bond::Single, None),
-                BondEdge::new(0, 2, Bond::Single, None),
-                BondEdge::new(0, 3, Bond::Single, None),
-                BondEdge::new(3, 4, Bond::Single, None),
+                bond_edge(0, 1, Bond::Single, None),
+                bond_edge(0, 2, Bond::Single, None),
+                bond_edge(0, 3, Bond::Single, None),
+                bond_edge(3, 4, Bond::Single, None),
             ],
         );
         let plan = smiles.branch_plan();
@@ -328,9 +331,9 @@ mod tests {
         let smiles = smiles_from_edges(
             vec![atom(Element::B), atom(Element::C), atom(Element::C), atom(Element::C)],
             &[
-                BondEdge::new(0, 1, Bond::Single, None),
-                BondEdge::new(0, 2, Bond::Single, None),
-                BondEdge::new(0, 3, Bond::Single, None),
+                bond_edge(0, 1, Bond::Single, None),
+                bond_edge(0, 2, Bond::Single, None),
+                bond_edge(0, 3, Bond::Single, None),
             ],
         );
         let plan = smiles.branch_plan();
@@ -345,9 +348,9 @@ mod tests {
         let smiles = smiles_from_edges(
             vec![atom(Element::N), atom(Element::B), atom(Element::C), atom(Element::C)],
             &[
-                BondEdge::new(0, 1, Bond::Single, None),
-                BondEdge::new(0, 2, Bond::Single, None),
-                BondEdge::new(0, 3, Bond::Double, None),
+                bond_edge(0, 1, Bond::Single, None),
+                bond_edge(0, 2, Bond::Single, None),
+                bond_edge(0, 3, Bond::Double, None),
             ],
         );
         let plan = smiles.branch_plan();
@@ -400,7 +403,7 @@ mod tests {
                 atom(Element::C),
                 atom(Element::N),
             ],
-            &[BondEdge::new(0, 1, Bond::Single, None), BondEdge::new(0, 2, Bond::Single, None)],
+            &[bond_edge(0, 1, Bond::Single, None), bond_edge(0, 2, Bond::Single, None)],
         );
         let plan = smiles.branch_plan();
         assert!(plan.subtree_signature(0).is_some());

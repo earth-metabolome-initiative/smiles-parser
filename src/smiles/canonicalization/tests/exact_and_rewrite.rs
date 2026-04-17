@@ -71,7 +71,7 @@ fn canonicalize_remaps_parsed_stereo_neighbors() {
         .collect();
 
     let actual = (0..canonicalized.nodes().len())
-        .map(|node_id| canonicalized.parsed_stereo_neighbors(node_id))
+        .map(|node_id| canonicalized.parsed_stereo_neighbors_row(node_id).to_vec())
         .collect::<Vec<_>>();
 
     assert_eq!(actual, expected);

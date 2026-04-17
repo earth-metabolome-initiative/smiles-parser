@@ -21,8 +21,8 @@ pub use crate::{
         AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
         AromaticityModel, AromaticityPerception, AromaticityPolicy, AromaticityRingFamilyKind,
         AromaticityStatus, KekulizationError, KekulizationMode, RdkitDefaultAromaticity,
-        RdkitMdlAromaticity, RdkitSimpleAromaticity, RingMembership, RingMembershipError, Smiles,
-        SmilesComponents, SymmSssrResult, SymmSssrStatus,
+        RdkitMdlAromaticity, RdkitSimpleAromaticity, RingMembership, Smiles, SmilesComponents,
+        SymmSssrResult, SymmSssrStatus,
     },
 };
 
@@ -32,7 +32,7 @@ pub mod prelude {
         AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
         AromaticityModel, AromaticityPerception, AromaticityPolicy, AromaticityRingFamilyKind,
         AromaticityStatus, KekulizationError, KekulizationMode, RdkitDefaultAromaticity,
-        RdkitMdlAromaticity, RdkitSimpleAromaticity, RingMembership, RingMembershipError, Smiles,
-        SmilesComponents, SmilesError, SmilesErrorWithSpan, SymmSssrResult, SymmSssrStatus,
+        RdkitMdlAromaticity, RdkitSimpleAromaticity, RingMembership, Smiles, SmilesComponents,
+        SmilesError, SmilesErrorWithSpan, SymmSssrResult, SymmSssrStatus,
     };
 }

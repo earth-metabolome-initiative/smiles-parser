@@ -118,14 +118,17 @@ mod tests {
             atom_symbol::AtomSymbol,
             bracketed::{charge::Charge, chirality::Chirality},
         },
-        bond::{Bond, bond_edge::BondEdge},
+        bond::{
+            Bond,
+            bond_edge::{BondEdge, bond_edge},
+        },
         smiles::BondMatrixBuilder,
     };
 
     fn smiles_from_edges(atom_nodes: Vec<Atom>, bond_edges: &[BondEdge]) -> Smiles {
         let mut builder = BondMatrixBuilder::with_capacity(bond_edges.len());
         for edge in bond_edges {
-            builder.push_edge(edge.node_a(), edge.node_b(), edge.bond(), edge.ring_num()).unwrap();
+            builder.push_edge(edge.0, edge.1, edge.2, edge.3).unwrap();
         }
         let number_of_nodes = atom_nodes.len();
         Smiles::from_bond_matrix_parts(atom_nodes, builder.finish(number_of_nodes))
@@ -192,9 +195,9 @@ mod tests {
                 Atom::new_organic_subset(AtomSymbol::Element(Element::S), true),
             ],
             &[
-                BondEdge::new(0, 1, Bond::Single, None),
-                BondEdge::new(0, 2, Bond::Double, None),
-                BondEdge::new(0, 3, Bond::Aromatic, None),
+                bond_edge(0, 1, Bond::Single, None),
+                bond_edge(0, 2, Bond::Double, None),
+                bond_edge(0, 3, Bond::Aromatic, None),
             ],
         );
 
@@ -213,7 +216,7 @@ mod tests {
                 Atom::new_organic_subset(AtomSymbol::Element(Element::O), false),
                 Atom::new_organic_subset(AtomSymbol::Element(Element::N), false),
             ],
-            &[BondEdge::new(0, 1, Bond::Single, None), BondEdge::new(0, 2, Bond::Single, None)],
+            &[bond_edge(0, 1, Bond::Single, None), bond_edge(0, 2, Bond::Single, None)],
         );
         let single_double = smiles_from_edges(
             vec![
@@ -221,7 +224,7 @@ mod tests {
                 Atom::new_organic_subset(AtomSymbol::Element(Element::O), false),
                 Atom::new_organic_subset(AtomSymbol::Element(Element::N), false),
             ],
-            &[BondEdge::new(0, 1, Bond::Single, None), BondEdge::new(0, 2, Bond::Double, None)],
+            &[bond_edge(0, 1, Bond::Single, None), bond_edge(0, 2, Bond::Double, None)],
         );
 
         assert_ne!(single_single.atom_invariant(0), single_double.atom_invariant(0));
@@ -235,7 +238,7 @@ mod tests {
                 Atom::new_organic_subset(AtomSymbol::Element(Element::O), false),
                 Atom::new_organic_subset(AtomSymbol::Element(Element::N), false),
             ],
-            &[BondEdge::new(0, 1, Bond::Up, None), BondEdge::new(0, 2, Bond::Down, None)],
+            &[bond_edge(0, 1, Bond::Up, None), bond_edge(0, 2, Bond::Down, None)],
         );
 
         let invariant = smiles.atom_invariant(0).unwrap();

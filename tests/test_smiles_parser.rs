@@ -88,12 +88,12 @@ fn test_parse_tribenzo_annulene_variant() {
     assert!(has_edge(&smiles, 13, 14, Bond::Single));
 
     let degrees: Vec<usize> =
-        (0..smiles.nodes().len()).map(|node_id| smiles.edges_for_node(node_id).len()).collect();
+        (0..smiles.nodes().len()).map(|node_id| smiles.edge_count_for_node(node_id)).collect();
 
     assert_eq!(degrees.iter().filter(|&&d| d == 3).count(), 6);
     assert_eq!(degrees.iter().filter(|&&d| d == 2).count(), 14);
 }
 
 fn has_edge(smiles: &Smiles, a: usize, b: usize, bond: Bond) -> bool {
-    smiles.edge_for_node_pair((a, b)).is_some_and(|edge| edge.bond() == bond)
+    smiles.edge_for_node_pair((a, b)).is_some_and(|edge| edge.2 == bond)
 }

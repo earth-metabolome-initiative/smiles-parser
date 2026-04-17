@@ -27,7 +27,7 @@ fn canonicalized_parsed_stereo_neighbor_rows(
                 smiles,
                 node_id,
                 atom.chirality(),
-                &smiles.parsed_stereo_neighbors(node_id),
+                smiles.parsed_stereo_neighbors_row(node_id),
                 labeling.new_index_of_old_node(),
                 &rooted_classes,
                 &refined_classes,

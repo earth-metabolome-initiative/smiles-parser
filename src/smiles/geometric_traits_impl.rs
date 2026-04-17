@@ -10,7 +10,11 @@ use hashbrown::HashSet;
 use super::Smiles;
 use crate::{
     atom::Atom,
-    bond::{Bond, bond_edge::BondEdge, ring_num::RingNum},
+    bond::{
+        Bond,
+        bond_edge::{BondEdge, bond_edge},
+        ring_num::RingNum,
+    },
     errors::SmilesError,
 };
 
@@ -56,7 +60,7 @@ impl BondEntry {
     #[inline]
     #[must_use]
     pub(crate) fn to_bond_edge(self, node_a: usize, node_b: usize) -> BondEdge {
-        BondEdge::new(node_a, node_b, self.bond, self.ring_num)
+        bond_edge(node_a, node_b, self.bond, self.ring_num)
     }
 
     #[inline]

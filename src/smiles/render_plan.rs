@@ -334,7 +334,7 @@ impl Smiles {
                         bond: planned_bond_for_emit(
                             self,
                             &ordering.directional_overrides,
-                            edge.bond(),
+                            edge.2,
                             node_id,
                             child,
                             false,
@@ -346,10 +346,10 @@ impl Smiles {
             let emitted_stereo_neighbors =
                 emitted_stereo_neighbors(self, node_id, parent, &closures, &ordered_children);
             let normalized_chirality = atom.chirality().and_then(|chirality| {
-                let parsed_stereo_neighbors = self.parsed_stereo_neighbors(node_id);
+                let parsed_stereo_neighbors = self.parsed_stereo_neighbors_row(node_id);
                 normalized_tetrahedral_chirality(
                     Some(chirality),
-                    &parsed_stereo_neighbors,
+                    parsed_stereo_neighbors,
                     &emitted_stereo_neighbors,
                 )
             });
@@ -505,7 +505,7 @@ fn build_labeled_closures_impl(
     let node_count = smiles.nodes().len();
     let mut drafts_by_node = vec![Vec::new(); node_count];
     for (closure_id, &edge) in forest.closure_edges().iter().enumerate() {
-        let (node_a, node_b) = edge.vertices();
+        let (node_a, node_b) = (edge.0, edge.1);
         drafts_by_node[node_a].push(ClosureDraft { closure_id, edge, partner: node_b });
         drafts_by_node[node_b].push(ClosureDraft { closure_id, edge, partner: node_a });
     }
@@ -539,7 +539,7 @@ fn build_labeled_closures_impl(
                 bond: planned_bond_for_emit(
                     smiles,
                     directional_overrides,
-                    draft.edge.bond(),
+                    draft.edge.2,
                     node_id,
                     draft.partner,
                     true,
@@ -584,7 +584,7 @@ fn compare_closure_drafts_for_node(
             }
         })
         .then_with(|| left.partner.cmp(&right.partner))
-        .then_with(|| left.edge.vertices().cmp(&right.edge.vertices()))
+        .then_with(|| (left.edge.0, left.edge.1).cmp(&(right.edge.0, right.edge.1)))
 }
 
 /// Returns the ordering key for a closure opening endpoint.
@@ -657,9 +657,9 @@ fn preserve_raw_directional_single(
 ) -> bool {
     [from, to].into_iter().any(|node_id| {
         !directional_overrides.has_semantic_endpoint(node_id)
-            && smiles.edges_for_node(node_id).into_iter().any(|edge| {
-                edge.bond() == Bond::Double
-                    && !double_bond_supports_semantic_stereo(smiles, edge.node_a(), edge.node_b())
+            && smiles.edges_for_node(node_id).any(|edge| {
+                edge.2 == Bond::Double
+                    && !double_bond_supports_semantic_stereo(smiles, edge.0, edge.1)
             })
     })
 }

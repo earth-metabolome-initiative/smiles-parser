@@ -10,7 +10,7 @@ use hashbrown::{HashMap, HashSet};
 use super::{
     RingMembership, Smiles, SymmSssrResult, SymmSssrStatus, canonicalize_cycle, cycle_edges,
 };
-use crate::bond::bond_edge::BondEdge;
+use crate::bond::bond_edge::{BondEdge, bond_edge_other};
 
 const WHITE: u8 = 0;
 const GRAY: u8 = 1;
@@ -306,10 +306,10 @@ impl<'a> RingSearchState<'a> {
 
         for incident_bonds in ordered_incident_bonds.iter().take(atom_count) {
             for edge in incident_bonds {
-                let key = edge_key(edge.node_a(), edge.node_b());
+                let key = edge_key(edge.0, edge.1);
                 if active_edges.insert(key) {
-                    atom_degrees[edge.node_a()] += 1;
-                    atom_degrees[edge.node_b()] += 1;
+                    atom_degrees[edge.0] += 1;
+                    atom_degrees[edge.1] += 1;
                 }
             }
         }
@@ -436,7 +436,7 @@ impl<'a> RingSearchState<'a> {
         let bond_count = fragment
             .iter()
             .flat_map(|&atom_id| self.ordered_incident_bonds[atom_id].iter())
-            .map(|edge| edge_key(edge.node_a(), edge.node_b()))
+            .map(|edge| edge_key(edge.0, edge.1))
             .collect::<HashSet<_>>()
             .len();
         let expected_rings = cyclomatic_ring_count(bond_count, fragment.len());
@@ -465,7 +465,7 @@ impl<'a> RingSearchState<'a> {
             // real molecules, such as CID 58882885, that trigger this path in
             // RDKit itself.
             let all_atoms = (0..self.smiles.nodes().len()).collect::<Vec<_>>();
-            let mut fast_rings = fast_find_rings(self.smiles, &all_atoms);
+            let mut fast_rings = fast_find_rings(&self.ordered_incident_bonds, &all_atoms);
             fast_rings.sort_unstable();
             return Some(fast_rings);
         }
@@ -483,11 +483,11 @@ impl<'a> RingSearchState<'a> {
     }
     fn trim_bonds(&mut self, cand: usize, changed: &mut VecDeque<usize>) {
         for edge in &self.ordered_incident_bonds[cand] {
-            let key = edge_key(edge.node_a(), edge.node_b());
+            let key = edge_key(edge.0, edge.1);
             if !self.active_edges.remove(&key) {
                 continue;
             }
-            if let Some(other) = edge.other(cand) {
+            if let Some(other) = bond_edge_other(*edge, cand) {
                 if self.atom_degrees[other] <= 2 {
                     changed.push_back(other);
                 }
@@ -516,11 +516,11 @@ impl<'a> RingSearchState<'a> {
         active_edges: &HashSet<[usize; 2]>,
     ) {
         for edge in &ordered_incident_bonds[root] {
-            let key = edge_key(edge.node_a(), edge.node_b());
+            let key = edge_key(edge.0, edge.1);
             if !active_edges.contains(&key) {
                 continue;
             }
-            let Some(other) = edge.other(root) else {
+            let Some(other) = bond_edge_other(*edge, root) else {
                 continue;
             };
             if forb[other] != generation && atom_degrees[other] == 2 {
@@ -652,11 +652,11 @@ impl<'a> RingSearchState<'a> {
         active_edges: &mut HashSet<[usize; 2]>,
     ) {
         for edge in &self.ordered_incident_bonds[cand] {
-            let key = edge_key(edge.node_a(), edge.node_b());
+            let key = edge_key(edge.0, edge.1);
             if !active_edges.remove(&key) {
                 continue;
             }
-            if let Some(other) = edge.other(cand) {
+            if let Some(other) = bond_edge_other(*edge, cand) {
                 if atom_degrees[other] <= 2 {
                     changed.push_back(other);
                 }
@@ -730,8 +730,8 @@ impl<'a> RingSearchState<'a> {
             .iter()
             .copied()
             .filter_map(|edge| {
-                let key = edge_key(edge.node_a(), edge.node_b());
-                self.active_edges.contains(&key).then(|| edge.other(atom_id)).flatten()
+                let key = edge_key(edge.0, edge.1);
+                self.active_edges.contains(&key).then(|| bond_edge_other(edge, atom_id)).flatten()
             })
             .collect()
     }
@@ -763,7 +763,7 @@ impl<'a> RingSearchState<'a> {
             }
             let curr = *path.last().unwrap_or(&start);
             for edge in &self.ordered_incident_bonds[curr] {
-                let Some(nbr) = edge.other(curr) else {
+                let Some(nbr) = bond_edge_other(*edge, curr) else {
                     continue;
                 };
                 if nbr == end {
@@ -858,11 +858,11 @@ impl<'a> RingSearchState<'a> {
             }
 
             for edge in &ordered_incident_bonds[curr] {
-                let key = edge_key(edge.node_a(), edge.node_b());
+                let key = edge_key(edge.0, edge.1);
                 if !active_edges.contains(&key) {
                     continue;
                 }
-                let Some(nbr) = edge.other(curr) else {
+                let Some(nbr) = bond_edge_other(*edge, curr) else {
                     continue;
                 };
                 if done[nbr] == BLACK || parents[curr] == Some(nbr) {
@@ -1161,7 +1161,7 @@ impl RdkitIncidentBondOrdering {
             .map(|(other, entry)| (entry.order(), entry.to_bond_edge(atom_id, other)))
             .collect::<Vec<_>>();
         edges.sort_unstable_by_key(|(order_key, edge)| {
-            (*order_key, edge.other(atom_id).unwrap_or(atom_id))
+            (*order_key, bond_edge_other(*edge, atom_id).unwrap_or(atom_id))
         });
         edges.into_iter().map(|(_, edge)| edge).collect()
     }
@@ -1319,8 +1319,8 @@ fn connected_fragments(smiles: &Smiles) -> Vec<Vec<usize>> {
 
         while let Some(node) = stack.pop() {
             fragment.push(node);
-            for edge in RdkitIncidentBondOrdering::for_node(smiles, node) {
-                let Some(other) = edge.other(node) else {
+            for edge in smiles.edges_for_node(node) {
+                let Some(other) = bond_edge_other(edge, node) else {
                     continue;
                 };
                 if !seen[other] {
@@ -1340,22 +1340,25 @@ fn find_common_neighbor(left: &[usize], right: &[usize], neighbors: &[usize]) ->
     neighbors.iter().copied().find(|neighbor| left.contains(neighbor) && right.contains(neighbor))
 }
 
-fn fast_find_rings(smiles: &Smiles, fragment: &[usize]) -> Vec<Vec<usize>> {
+fn fast_find_rings(
+    ordered_incident_bonds: &[Vec<BondEdge>],
+    fragment: &[usize],
+) -> Vec<Vec<usize>> {
     let mut seen = HashSet::<Vec<usize>>::new();
     let mut rings = Vec::<Vec<usize>>::new();
-    let mut colors = vec![0_u8; smiles.nodes().len()];
+    let mut colors = vec![0_u8; ordered_incident_bonds.len()];
 
     for &start in fragment {
         if colors[start] != WHITE {
             continue;
         }
-        if RdkitIncidentBondOrdering::for_node(smiles, start).len() < 2 {
+        if ordered_incident_bonds[start].len() < 2 {
             colors[start] = BLACK;
             continue;
         }
         let mut traversal = Vec::<usize>::new();
         dfs_fast_find_rings(
-            smiles,
+            ordered_incident_bonds,
             start,
             None,
             &mut colors,
@@ -1369,7 +1372,7 @@ fn fast_find_rings(smiles: &Smiles, fragment: &[usize]) -> Vec<Vec<usize>> {
 }
 
 fn dfs_fast_find_rings(
-    smiles: &Smiles,
+    ordered_incident_bonds: &[Vec<BondEdge>],
     atom: usize,
     from_atom: Option<usize>,
     colors: &mut [u8],
@@ -1380,15 +1383,23 @@ fn dfs_fast_find_rings(
     colors[atom] = GRAY;
     traversal.push(atom);
 
-    for edge in RdkitIncidentBondOrdering::for_node(smiles, atom) {
-        let Some(nbr) = edge.other(atom) else {
+    for &edge in &ordered_incident_bonds[atom] {
+        let Some(nbr) = bond_edge_other(edge, atom) else {
             continue;
         };
         if colors[nbr] == WHITE {
-            if RdkitIncidentBondOrdering::for_node(smiles, nbr).len() < 2 {
+            if ordered_incident_bonds[nbr].len() < 2 {
                 colors[nbr] = BLACK;
             } else {
-                dfs_fast_find_rings(smiles, nbr, Some(atom), colors, traversal, rings, seen);
+                dfs_fast_find_rings(
+                    ordered_incident_bonds,
+                    nbr,
+                    Some(atom),
+                    colors,
+                    traversal,
+                    rings,
+                    seen,
+                );
             }
         } else if colors[nbr] == GRAY
             && from_atom != Some(nbr)
@@ -1673,7 +1684,7 @@ mod tests {
         let bond_count = fragment
             .iter()
             .flat_map(|&atom_id| super::ordered_edges_for_node(smiles, atom_id))
-            .map(|edge| super::edge_key(edge.node_a(), edge.node_b()))
+            .map(|edge| super::edge_key(edge.0, edge.1))
             .collect::<HashSet<_>>()
             .len();
         let expected_rings = cyclomatic_ring_count(bond_count, fragment.len());
@@ -1747,7 +1758,7 @@ mod tests {
         let bond_count = fragment
             .iter()
             .flat_map(|&atom_id| super::ordered_edges_for_node(smiles, atom_id))
-            .map(|edge| super::edge_key(edge.node_a(), edge.node_b()))
+            .map(|edge| super::edge_key(edge.0, edge.1))
             .collect::<HashSet<_>>()
             .len();
         let expected_rings = cyclomatic_ring_count(bond_count, fragment.len());

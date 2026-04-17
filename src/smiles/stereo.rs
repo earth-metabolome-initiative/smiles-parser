@@ -64,11 +64,6 @@ impl Smiles {
         self.parsed_stereo_neighbors.get(node_id).map_or(&[], Vec::as_slice)
     }
 
-    #[must_use]
-    pub(crate) fn parsed_stereo_neighbors(&self, node_id: usize) -> Vec<StereoNeighbor> {
-        self.parsed_stereo_neighbors_row(node_id).to_vec()
-    }
-
     #[cfg(test)]
     #[must_use]
     pub(crate) fn projected_directional_bond_overrides(
@@ -348,8 +343,8 @@ mod tests {
     fn parsed_stereo_neighbors_follow_bond_insertion_order_and_explicit_hydrogen() {
         let smiles: Smiles = "N[C@@H](C)O".parse().unwrap();
         assert_eq!(
-            smiles.parsed_stereo_neighbors(1),
-            vec![
+            smiles.parsed_stereo_neighbors_row(1),
+            &[
                 StereoNeighbor::Atom(0),
                 StereoNeighbor::ExplicitHydrogen,
                 StereoNeighbor::Atom(2),
@@ -362,8 +357,8 @@ mod tests {
     fn parsed_stereo_neighbors_place_ring_digit_where_it_appears_in_source() {
         let smiles: Smiles = "C[C@H]1CCCCN1N=O".parse().unwrap();
         assert_eq!(
-            smiles.parsed_stereo_neighbors(1),
-            vec![
+            smiles.parsed_stereo_neighbors_row(1),
+            &[
                 StereoNeighbor::Atom(0),
                 StereoNeighbor::ExplicitHydrogen,
                 StereoNeighbor::Atom(6),

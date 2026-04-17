@@ -345,8 +345,9 @@ impl Smiles {
             .iter()
             .copied()
             .map(|old_node| {
-                self.parsed_stereo_neighbors(old_node)
-                    .into_iter()
+                self.parsed_stereo_neighbors_row(old_node)
+                    .iter()
+                    .copied()
                     .filter_map(|neighbor| {
                         match neighbor {
                             StereoNeighbor::ExplicitHydrogen => {
@@ -396,7 +397,7 @@ impl Smiles {
             return None;
         }
 
-        let bond = self.edge_for_node_pair((node_id, parent))?.bond();
+        let bond = self.edge_for_node_pair((node_id, parent))?.2;
         if !matches!(bond, Bond::Single | Bond::Up | Bond::Down) {
             return None;
         }

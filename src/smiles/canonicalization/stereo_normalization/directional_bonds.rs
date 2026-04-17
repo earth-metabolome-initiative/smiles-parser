@@ -234,23 +234,16 @@ impl Smiles {
         opposite_endpoint: usize,
     ) -> bool {
         let atom = self.nodes()[endpoint];
+        let parsed_neighbors = self.parsed_stereo_neighbors_row(endpoint);
         matches!(
-            stereo_chirality_normal_form(
-                self,
-                endpoint,
-                atom.chirality(),
-                &self.parsed_stereo_neighbors(endpoint),
-            ),
+            stereo_chirality_normal_form(self, endpoint, atom.chirality(), parsed_neighbors),
             Some(Chirality::At | Chirality::AtAt | Chirality::TH(1 | 2))
-        ) && self
-            .parsed_stereo_neighbors(endpoint)
+        ) && parsed_neighbors
             .iter()
             .filter(|neighbor| **neighbor != StereoNeighbor::Atom(opposite_endpoint))
             .count()
             == 2
-            && self
-                .parsed_stereo_neighbors(endpoint)
-                .contains(&StereoNeighbor::Atom(opposite_endpoint))
+            && parsed_neighbors.contains(&StereoNeighbor::Atom(opposite_endpoint))
     }
 
     fn atom_based_double_bond_sides(
@@ -282,10 +275,10 @@ impl Smiles {
         rooted_classes: &[usize],
         refined_classes: &[usize],
     ) -> Option<AtomBasedDoubleBondSide> {
-        let parsed_neighbors = self.parsed_stereo_neighbors(endpoint);
+        let parsed_neighbors = self.parsed_stereo_neighbors_row(endpoint);
         let atom = self.nodes()[endpoint];
         let chirality =
-            stereo_chirality_normal_form(self, endpoint, atom.chirality(), &parsed_neighbors)?;
+            stereo_chirality_normal_form(self, endpoint, atom.chirality(), parsed_neighbors)?;
         if !matches!(chirality, Chirality::At | Chirality::AtAt | Chirality::TH(1 | 2)) {
             return None;
         }
@@ -296,11 +289,11 @@ impl Smiles {
             refined_classes,
         )?;
         let target_neighbors = atom_based_double_bond_target_neighbors(
-            &parsed_neighbors,
+            parsed_neighbors,
             opposite_endpoint,
             reference_atom,
         )?;
-        let permutation = atom_based_permutation_from(&parsed_neighbors, &target_neighbors)?;
+        let permutation = atom_based_permutation_from(parsed_neighbors, &target_neighbors)?;
         let reference_bond_is_up = atom_based_chirality_is_clockwise(chirality)
             ^ atom_based_permutation_is_odd(&permutation);
         Some(AtomBasedDoubleBondSide { endpoint, reference_atom, reference_bond_is_up })
@@ -313,18 +306,14 @@ impl Smiles {
         rooted_classes: &[usize],
         refined_classes: &[usize],
     ) -> Option<usize> {
-        let neighbors = self
-            .parsed_stereo_neighbors(endpoint)
-            .into_iter()
-            .filter_map(|neighbor| {
+        let mut neighbors =
+            self.parsed_stereo_neighbors_row(endpoint).iter().filter_map(|&neighbor| {
                 match neighbor {
                     StereoNeighbor::Atom(node_id) if node_id != opposite_endpoint => Some(node_id),
                     _ => None,
                 }
-            })
-            .collect::<Vec<_>>();
-        let (&first, rest) = neighbors.split_first()?;
-        let mut best = first;
+            });
+        let mut best = neighbors.next()?;
         let mut best_key = atom_based_substituent_priority_key(
             self,
             endpoint,
@@ -333,7 +322,7 @@ impl Smiles {
             refined_classes,
         );
         let mut unique_best = true;
-        for &candidate in rest {
+        for candidate in neighbors {
             let candidate_key = atom_based_substituent_priority_key(
                 self,
                 endpoint,
@@ -364,16 +353,13 @@ pub(super) fn atom_based_substituent_priority_key(
 ) -> AtomBasedSubstituentPriorityKey {
     let atom = smiles.node_by_id(neighbor).unwrap_or_else(|| unreachable!());
     let atomic_number = atom.element().map_or(0, u8::from);
-    let bond_order_to_endpoint = match smiles
-        .edge_for_node_pair((endpoint, neighbor))
-        .unwrap_or_else(|| unreachable!())
-        .bond()
-    {
-        Bond::Single | Bond::Up | Bond::Down | Bond::Aromatic => 1,
-        Bond::Double => 2,
-        Bond::Triple => 3,
-        Bond::Quadruple => 4,
-    };
+    let bond_order_to_endpoint =
+        match smiles.edge_for_node_pair((endpoint, neighbor)).unwrap_or_else(|| unreachable!()).2 {
+            Bond::Single | Bond::Up | Bond::Down | Bond::Aromatic => 1,
+            Bond::Double => 2,
+            Bond::Triple => 3,
+            Bond::Quadruple => 4,
+        };
 
     AtomBasedSubstituentPriorityKey {
         atomic_number,

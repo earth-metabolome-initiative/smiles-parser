@@ -231,15 +231,15 @@ fn tetrahedral_stereo_signature(smiles: &Smiles) -> Vec<TetrahedralStereoSignatu
             if !supports_tetrahedral_stereo_normalization(atom.chirality()) {
                 return None;
             }
-            let parsed_neighbors = smiles.parsed_stereo_neighbors(node_id);
+            let parsed_neighbors = smiles.parsed_stereo_neighbors_row(node_id);
             let chirality =
-                stereo_chirality_normal_form(smiles, node_id, atom.chirality(), &parsed_neighbors)?;
+                stereo_chirality_normal_form(smiles, node_id, atom.chirality(), parsed_neighbors)?;
             if matches!(chirality, Chirality::At | Chirality::AtAt | Chirality::TH(_))
                 && !tetrahedral_like_is_stereogenic(
                     smiles,
                     node_id,
                     chirality,
-                    &parsed_neighbors,
+                    parsed_neighbors,
                     &rooted_classes,
                     &refined_classes,
                 )
@@ -250,7 +250,7 @@ fn tetrahedral_stereo_signature(smiles: &Smiles) -> Vec<TetrahedralStereoSignatu
                 smiles,
                 node_id,
                 atom.chirality(),
-                &parsed_neighbors,
+                parsed_neighbors,
                 labeling.new_index_of_old_node(),
                 &rooted_classes,
                 &refined_classes,
@@ -262,7 +262,7 @@ fn tetrahedral_stereo_signature(smiles: &Smiles) -> Vec<TetrahedralStereoSignatu
             Some((
                 canonical_chirality_key(normalized_tetrahedral_chirality(
                     Some(chirality),
-                    &parsed_neighbors,
+                    parsed_neighbors,
                     &canonical_neighbors,
                 )),
                 canonical_neighbors
@@ -353,14 +353,11 @@ fn assert_core_rewrite_invariants(
                 panic!("missing edge after canonicalization: {new_row}-{new_column}")
             });
         assert_eq!(
-            rewritten.bond(),
+            rewritten.2,
             entry.bond(),
             "bond kind changed during canonicalization for edge {row}-{column}",
         );
-        assert!(
-            rewritten.ring_num().is_none(),
-            "canonicalization should clear ring-number provenance",
-        );
+        assert!(rewritten.3.is_none(), "canonicalization should clear ring-number provenance");
     }
 
     let expected_neighbors: Vec<Vec<StereoNeighbor>> = order
