@@ -14,11 +14,12 @@ fuzzing = []
 datasets = ["dep:flate2", "dep:indicatif", "dep:reqwest"]
 
 [dependencies]
-elements_rs = "0.2.3"
+elements_rs = "0.2.5"
 flate2 = { version = "1.1.9", optional = true, default-features = false, features = ["rust_backend"] }
 geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", branch = "main", default-features = false, features = ["alloc"] }
 hashbrown = { version = "0.16.1", default-features = false, features = ["alloc", "default-hasher", "inline-more"] }
 indicatif = { version = "0.18.4", optional = true }
+molecular-formulas = { version = "0.1.8", default-features = false }
 reqwest = { version = "0.12.12", optional = true, default-features = false, features = ["blocking", "rustls-tls"] }
 smallvec = { version = "1.15.1", default-features = false, features = ["union"] }
 thiserror = { version = "2.0.18", default-features = false }

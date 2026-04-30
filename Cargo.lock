@@ -277,9 +277,9 @@ checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
 name = "elements_rs"
-version = "0.2.3"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31d19502a92c5b52707f78efd0ceaf92a75171a8661d55ab5bfa01f6383c8d8d"
+checksum = "77820a480754a90361b7cc3258696817cbccab6457a80e509c21dad19d1c661c"
 dependencies = [
  "serde",
  "strum",
@@ -778,6 +778,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "molecular-formulas"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b39d1aee826891c888ec259896b77b21a08da2fc9961b618461c712fb1ed5c3e"
+dependencies = [
+ "elements_rs",
+ "num-traits",
+ "thiserror",
+]
+
+[[package]]
 name = "multi_ranged"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1244,6 +1255,7 @@ dependencies = [
  "geometric-traits",
  "hashbrown",
  "indicatif",
+ "molecular-formulas",
  "rayon",
  "reqwest",
  "serde",

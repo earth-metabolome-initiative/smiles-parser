@@ -47,6 +47,7 @@ mod geometric_traits_impl;
 mod implicit_hydrogens;
 mod invariants;
 mod kekulization;
+mod molecular_formula;
 mod neighbors;
 mod rdkit_symm_sssr;
 mod refinement;
@@ -68,6 +69,7 @@ pub use self::{
     double_bond_stereo::DoubleBondStereoConfig,
     geometric_traits_impl::{BondEntry, BondMatrix},
     kekulization::{KekulizationError, KekulizationMode},
+    molecular_formula::MolecularFormulaConversionError,
 };
 pub(crate) use self::{
     geometric_traits_impl::{BondMatrixBuilder, build_bond_matrix_from_known_simple_edges},
