@@ -4,7 +4,7 @@ use super::super::{
     Smiles, canonicalization_state_key,
     support::{assert_canonicalization_invariants, same_canonicalization_state},
 };
-use crate::{parser::smiles_parser::parse_wildcard_smiles, smiles::WildcardAtoms};
+use crate::{bond::Bond, parser::smiles_parser::parse_wildcard_smiles, smiles::WildcardAtoms};
 
 fn wildcard_smiles(source: &str) -> Smiles<WildcardAtoms> {
     parse_wildcard_smiles(source).unwrap()
@@ -23,11 +23,28 @@ fn hidden_bond_order_digest(smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy
     hasher.finish()
 }
 
+fn bond_count(smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>, bond: Bond) -> usize {
+    smiles
+        .bond_matrix()
+        .sparse_entries()
+        .filter(|((row, column), entry)| row < column && entry.bond() == bond)
+        .count()
+}
+
 #[test]
 fn canonicalize_handles_wildcard_quadruple_bond_regression() {
     let smiles = wildcard_smiles("*$*");
 
     assert_canonicalization_invariants(&smiles);
+}
+
+#[test]
+fn canonicalize_preserves_aromatic_triple_bond_order() {
+    let smiles = Smiles::from_str("C1=CC#CC=C1").unwrap();
+    let canonicalized = smiles.canonicalize();
+
+    assert_eq!(bond_count(&canonicalized, Bond::Triple), 1);
+    assert_canonicalization_invariants(&canonicalized);
 }
 
 #[test]
