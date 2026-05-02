@@ -181,7 +181,7 @@ pub(crate) fn explicit_valence(smiles: &Smiles<impl SmilesAtomPolicy>, node_id: 
 #[inline]
 pub(crate) fn bond_order(bond: Bond) -> u8 {
     match bond {
-        Bond::Single | Bond::Up | Bond::Down | Bond::Aromatic => 1,
+        Bond::Single | Bond::Up | Bond::Down => 1,
         Bond::Double => 2,
         Bond::Triple => 3,
         Bond::Quadruple => 4,

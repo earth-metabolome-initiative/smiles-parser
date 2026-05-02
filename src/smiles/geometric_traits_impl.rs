@@ -14,8 +14,8 @@ use super::{Smiles, WildcardSmiles};
 use crate::{
     atom::Atom,
     bond::{
-        Bond,
-        bond_edge::{BondEdge, bond_edge},
+        Bond, BondDescriptor,
+        bond_edge::{BondEdge, bond_edge_with_aromaticity},
         ring_num::RingNum,
     },
     errors::SmilesError,
@@ -29,6 +29,7 @@ pub type BondMatrix = SymmetricCSR2D<ValuedCSR2D<usize, usize, usize, BondEntry>
 pub struct BondEntry {
     bond: Bond,
     ring_num: Option<RingNum>,
+    aromatic: bool,
     order: usize,
 }
 
@@ -50,7 +51,18 @@ impl BondEntry {
     #[inline]
     #[must_use]
     pub const fn new(bond: Bond, ring_num: Option<RingNum>, order: usize) -> Self {
-        Self { bond, ring_num, order }
+        Self { bond, ring_num, aromatic: false, order }
+    }
+
+    /// Creates a new stored bond value from a parsed bond descriptor.
+    #[inline]
+    #[must_use]
+    pub const fn from_descriptor(
+        descriptor: BondDescriptor,
+        ring_num: Option<RingNum>,
+        order: usize,
+    ) -> Self {
+        Self { bond: descriptor.bond(), ring_num, aromatic: descriptor.is_aromatic(), order }
     }
 
     /// Returns the bond type stored for this adjacency entry.
@@ -89,6 +101,24 @@ impl BondEntry {
         self.ring_num
     }
 
+    /// Returns whether this bond is aromatic.
+    #[inline]
+    #[must_use]
+    pub const fn aromatic(self) -> bool {
+        self.aromatic
+    }
+
+    /// Returns this entry's bond order and aromaticity as a descriptor.
+    #[inline]
+    #[must_use]
+    pub const fn descriptor(self) -> BondDescriptor {
+        if self.aromatic {
+            BondDescriptor::aromatic(self.bond)
+        } else {
+            BondDescriptor::new(self.bond)
+        }
+    }
+
     #[inline]
     #[must_use]
     pub(crate) const fn order(self) -> usize {
@@ -98,13 +128,20 @@ impl BondEntry {
     #[inline]
     #[must_use]
     pub(crate) fn to_bond_edge(self, node_a: usize, node_b: usize) -> BondEdge {
-        bond_edge(node_a, node_b, self.bond, self.ring_num)
+        bond_edge_with_aromaticity(node_a, node_b, self.bond, self.ring_num, self.aromatic)
     }
 
     #[inline]
     #[must_use]
     pub(crate) const fn with_bond(mut self, bond: Bond) -> Self {
         self.bond = bond;
+        self
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) const fn with_aromatic(mut self, aromatic: bool) -> Self {
+        self.aromatic = aromatic;
         self
     }
 
@@ -119,7 +156,7 @@ impl BondEntry {
 impl PartialEq for BondEntry {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.bond == other.bond
+        self.bond == other.bond && self.aromatic == other.aromatic
     }
 }
 
@@ -129,6 +166,7 @@ impl Hash for BondEntry {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.bond.hash(state);
+        self.aromatic.hash(state);
     }
 }
 
@@ -156,11 +194,11 @@ impl BondMatrixBuilder {
     }
 
     #[inline]
-    pub(crate) fn push_edge(
+    pub(crate) fn push_edge_with_descriptor(
         &mut self,
         node_a: usize,
         node_b: usize,
-        bond: Bond,
+        descriptor: BondDescriptor,
         ring_num: Option<RingNum>,
     ) -> Result<(), SmilesError> {
         let (row, column) = crate::smiles::edge_key(node_a, node_b);
@@ -172,7 +210,11 @@ impl BondMatrixBuilder {
         }
 
         let order = self.entries.len();
-        self.entries.push(PendingBond::new(row, column, BondEntry::new(bond, ring_num, order)));
+        self.entries.push(PendingBond::new(
+            row,
+            column,
+            BondEntry::from_descriptor(descriptor, ring_num, order),
+        ));
         Ok(())
     }
 
@@ -230,14 +272,14 @@ fn build_bond_matrix(number_of_nodes: usize, mut entries: Vec<PendingBond>) -> B
 #[must_use]
 pub(crate) fn build_bond_matrix_from_known_simple_edges(
     number_of_nodes: usize,
-    edges: impl IntoIterator<Item = (usize, usize, Bond, Option<RingNum>)>,
+    edges: impl IntoIterator<Item = (usize, usize, BondDescriptor, Option<RingNum>)>,
 ) -> BondMatrix {
     let entries = edges
         .into_iter()
         .enumerate()
-        .map(|(order, (row, column, bond, ring_num))| {
+        .map(|(order, (row, column, descriptor, ring_num))| {
             debug_assert!(row < column, "known-simple edges must be upper triangular");
-            PendingBond::new(row, column, BondEntry::new(bond, ring_num, order))
+            PendingBond::new(row, column, BondEntry::from_descriptor(descriptor, ring_num, order))
         })
         .collect();
     build_bond_matrix(number_of_nodes, entries)
@@ -459,36 +501,50 @@ mod tests {
     }
 
     #[test]
-    fn bond_entry_equality_ignores_ring_digits_and_uses_bond_kind() {
+    fn bond_entry_equality_ignores_ring_digits_and_uses_bond_descriptor() {
         let first = BondEntry::new(Bond::Double, Some(RingNum::try_new(1).unwrap()), 0);
         let second = BondEntry::new(Bond::Double, Some(RingNum::try_new(9).unwrap()), 17);
         let third = BondEntry::new(Bond::Double, None, 99);
         let fourth = BondEntry::new(Bond::Single, Some(RingNum::try_new(1).unwrap()), 0);
+        let aromatic = BondEntry::from_descriptor(
+            BondDescriptor::aromatic(Bond::Double),
+            Some(RingNum::try_new(1).unwrap()),
+            0,
+        );
 
         assert_eq!(first, second);
         assert_eq!(first, third);
         assert_ne!(first, fourth);
+        assert_ne!(first, aromatic);
     }
 
     #[test]
-    fn bond_entry_hash_ignores_ring_digits_like_equality() {
+    fn bond_entry_hash_ignores_ring_digits_and_includes_aromaticity_like_equality() {
         let first = BondEntry::new(Bond::Double, Some(RingNum::try_new(1).unwrap()), 0);
         let second = BondEntry::new(Bond::Double, Some(RingNum::try_new(9).unwrap()), 17);
+        let aromatic = BondEntry::from_descriptor(
+            BondDescriptor::aromatic(Bond::Double),
+            Some(RingNum::try_new(1).unwrap()),
+            0,
+        );
         let mut first_hasher = DefaultHasher::new();
         let mut second_hasher = DefaultHasher::new();
+        let mut aromatic_hasher = DefaultHasher::new();
 
         first.hash(&mut first_hasher);
         second.hash(&mut second_hasher);
+        aromatic.hash(&mut aromatic_hasher);
 
         assert_eq!(first_hasher.finish(), second_hasher.finish());
+        assert_ne!(first_hasher.finish(), aromatic_hasher.finish());
     }
 
     #[test]
     fn bond_matrix_builder_rejects_duplicate_edges() {
         let mut builder = BondMatrixBuilder::with_capacity(2);
 
-        builder.push_edge(0, 1, Bond::Single, None).unwrap();
-        let error = builder.push_edge(1, 0, Bond::Double, None).unwrap_err();
+        builder.push_edge_with_descriptor(0, 1, Bond::Single.into(), None).unwrap();
+        let error = builder.push_edge_with_descriptor(1, 0, Bond::Double.into(), None).unwrap_err();
 
         assert_eq!(error, SmilesError::DuplicateEdge(0, 1));
     }

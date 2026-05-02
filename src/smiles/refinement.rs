@@ -5,7 +5,7 @@ use smallvec::SmallVec;
 
 use super::{
     Smiles,
-    invariants::{AtomInvariant, bond_kind_code, planning_chirality_key},
+    invariants::{AtomInvariant, bond_entry_code, planning_chirality_key},
 };
 use crate::{atom::AtomSyntax, bond::Bond};
 
@@ -113,7 +113,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
                 .bond_matrix
                 .sparse_row(node_id)
                 .zip(self.bond_matrix.sparse_row_values_ref(node_id))
-                .map(|(neighbor_id, entry)| (neighbor_id, bond_kind_code(entry.bond())))
+                .map(|(neighbor_id, entry)| (neighbor_id, bond_entry_code(*entry)))
                 .collect();
             adjacency.push(neighbors);
         }
@@ -149,7 +149,7 @@ impl From<super::invariants::AtomInvariant> for AtomInvariantKey {
                 value.bond_kind_histogram.count(Bond::Double),
                 value.bond_kind_histogram.count(Bond::Triple),
                 value.bond_kind_histogram.count(Bond::Quadruple),
-                value.bond_kind_histogram.count(Bond::Aromatic),
+                value.bond_kind_histogram.aromatic_count(),
             ],
         }
     }

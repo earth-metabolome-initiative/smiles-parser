@@ -13,7 +13,7 @@ use super::{
 };
 use crate::{
     atom::bracketed::chirality::Chirality,
-    bond::{Bond, bond_edge::BondEdge},
+    bond::{Bond, BondDescriptor, bond_edge::BondEdge},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,7 +100,7 @@ impl ComponentRenderPlan {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ChildRenderPlan {
     child: usize,
-    bond: Bond,
+    bond: BondDescriptor,
 }
 
 impl ChildRenderPlan {
@@ -113,7 +113,7 @@ impl ChildRenderPlan {
     /// Returns the bond token that should be emitted before descending into the
     /// child.
     #[must_use]
-    pub(crate) fn bond(&self) -> Bond {
+    pub(crate) fn bond(&self) -> BondDescriptor {
         self.bond
     }
 }
@@ -123,7 +123,7 @@ pub(crate) struct ClosureRenderPlan {
     edge: BondEdge,
     partner: usize,
     label: u16,
-    bond: Bond,
+    bond: BondDescriptor,
     emit_bond_symbol: bool,
 }
 
@@ -149,7 +149,7 @@ impl ClosureRenderPlan {
     /// Returns the already-normalized bond token to print if this endpoint is
     /// the closing side of the closure.
     #[must_use]
-    pub(crate) fn bond(self) -> Bond {
+    pub(crate) fn bond(self) -> BondDescriptor {
         self.bond
     }
 
@@ -167,7 +167,7 @@ impl ClosureRenderPlan {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NodeRenderPlan {
     parent: Option<usize>,
-    parent_bond: Option<Bond>,
+    parent_bond: Option<BondDescriptor>,
     ordered_children: Vec<ChildRenderPlan>,
     closures: Vec<ClosureRenderPlan>,
     emitted_stereo_neighbors: Vec<StereoNeighbor>,
@@ -183,7 +183,7 @@ impl NodeRenderPlan {
 
     #[cfg(test)]
     #[must_use]
-    pub(crate) fn parent_bond(&self) -> Option<Bond> {
+    pub(crate) fn parent_bond(&self) -> Option<BondDescriptor> {
         self.parent_bond
     }
 
@@ -337,7 +337,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
                         bond: planned_bond_for_emit(
                             self,
                             &ordering.directional_overrides,
-                            edge.2,
+                            if edge.4 { BondDescriptor::aromatic(edge.2) } else { edge.2.into() },
                             node_id,
                             child,
                             false,
@@ -542,7 +542,11 @@ fn build_labeled_closures_impl<AtomPolicy: SmilesAtomPolicy>(
                 bond: planned_bond_for_emit(
                     smiles,
                     directional_overrides,
-                    draft.edge.2,
+                    if draft.edge.4 {
+                        BondDescriptor::aromatic(draft.edge.2)
+                    } else {
+                        draft.edge.2.into()
+                    },
                     node_id,
                     draft.partner,
                     true,
@@ -625,19 +629,19 @@ fn lowest_free_label(used_labels: &[bool]) -> u16 {
 fn planned_bond_for_emit<AtomPolicy: SmilesAtomPolicy>(
     smiles: &Smiles<AtomPolicy>,
     directional_overrides: &DirectionalBondOverrides,
-    bond: Bond,
+    descriptor: BondDescriptor,
     from: usize,
     to: usize,
     is_closure: bool,
-) -> Bond {
-    let normalized = normalized_bond_for_emit(bond, from, to);
+) -> BondDescriptor {
+    let normalized = normalized_bond_for_emit(descriptor.bond(), from, to);
     if matches!(normalized, Bond::Single | Bond::Up | Bond::Down)
         && let Some(override_bond) = directional_overrides.get(from, to)
     {
-        return override_bond;
+        return descriptor.with_bond(override_bond);
     }
 
-    match normalized {
+    let bond = match normalized {
         Bond::Up | Bond::Down
             if !is_closure
                 && preserve_raw_directional_single(smiles, directional_overrides, from, to) =>
@@ -646,7 +650,8 @@ fn planned_bond_for_emit<AtomPolicy: SmilesAtomPolicy>(
         }
         Bond::Up | Bond::Down => Bond::Single,
         other => other,
-    }
+    };
+    descriptor.with_bond(bond)
 }
 
 /// Returns whether a raw directional single bond must be preserved because the
@@ -662,6 +667,7 @@ fn preserve_raw_directional_single<AtomPolicy: SmilesAtomPolicy>(
         !directional_overrides.has_semantic_endpoint(node_id)
             && smiles.edges_for_node(node_id).any(|edge| {
                 edge.2 == Bond::Double
+                    && !edge.4
                     && !double_bond_supports_semantic_stereo(smiles, edge.0, edge.1)
             })
     })
@@ -689,7 +695,9 @@ fn non_single_family_bond_count<AtomPolicy: SmilesAtomPolicy>(
     smiles
         .bond_matrix()
         .sparse_row_values_ref(node_id)
-        .filter(|entry| !matches!(entry.bond(), Bond::Single | Bond::Up | Bond::Down))
+        .filter(|entry| {
+            entry.aromatic() || !matches!(entry.bond(), Bond::Single | Bond::Up | Bond::Down)
+        })
         .count()
 }
 
@@ -756,16 +764,16 @@ fn rendered_bond_text_len<AtomPolicy: SmilesAtomPolicy>(
     smiles: &Smiles<AtomPolicy>,
     from: usize,
     to: usize,
-    bond: Bond,
+    descriptor: BondDescriptor,
 ) -> usize {
     let from_aromatic = smiles.node_by_id(from).unwrap_or_else(|| unreachable!()).aromatic();
     let to_aromatic = smiles.node_by_id(to).unwrap_or_else(|| unreachable!()).aromatic();
-    match bond {
-        Bond::Single if from_aromatic && to_aromatic => 1,
-        Bond::Single => 0,
-        Bond::Aromatic if from_aromatic && to_aromatic => 0,
-        Bond::Aromatic | Bond::Double | Bond::Triple | Bond::Quadruple | Bond::Up | Bond::Down => 1,
-    }
+    let both_aromatic = from_aromatic && to_aromatic;
+    let elided = (descriptor.is_aromatic()
+        && both_aromatic
+        && matches!(descriptor.bond(), Bond::Single | Bond::Double))
+        || (descriptor.bond() == Bond::Single && !descriptor.is_aromatic() && !both_aromatic);
+    usize::from(!elided)
 }
 
 #[cfg(test)]
@@ -802,7 +810,7 @@ mod tests {
 
         let node_2 = plan.node(2).unwrap();
         assert_eq!(node_2.parent(), Some(1));
-        assert_eq!(node_2.parent_bond(), Some(crate::bond::Bond::Single));
+        assert_eq!(node_2.parent_bond(), Some(crate::bond::Bond::Single.into()));
         assert_eq!(node_2.continuation_child().map(|child| child.child()), Some(3));
         assert!(node_2.branch_children().is_empty());
         assert_eq!(

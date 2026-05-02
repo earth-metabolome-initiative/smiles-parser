@@ -119,7 +119,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
             }
 
             builder
-                .push_edge(row, column, bond, None)
+                .push_edge_with_descriptor(row, column, entry.descriptor().with_bond(bond), None)
                 .unwrap_or_else(|_| unreachable!("stereo normalization preserves a simple graph"));
         }
 

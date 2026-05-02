@@ -66,10 +66,10 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
                 continue;
             }
             builder
-                .push_edge(
+                .push_edge_with_descriptor(
                     new_index_of_old_node[row],
                     new_index_of_old_node[column],
-                    entry.bond(),
+                    entry.descriptor(),
                     None,
                 )
                 .unwrap_or_else(|_| {

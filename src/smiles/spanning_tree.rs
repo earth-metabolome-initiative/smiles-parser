@@ -4,7 +4,7 @@ use geometric_traits::traits::{SparseMatrix2D, SparseValuedMatrix2DRef};
 
 use super::{Smiles, SmilesAtomPolicy, invariants::AtomInvariant};
 use crate::bond::{
-    Bond,
+    BondDescriptor,
     bond_edge::{BondEdge, bond_edge_other},
 };
 
@@ -12,9 +12,9 @@ use crate::bond::{
 pub(crate) struct SpanningForest {
     roots: Vec<usize>,
     parents: Vec<Option<usize>>,
-    parent_bonds: Vec<Option<Bond>>,
+    parent_bonds: Vec<Option<BondDescriptor>>,
     children: Vec<Vec<usize>>,
-    child_bonds: Vec<Vec<Bond>>,
+    child_bonds: Vec<Vec<BondDescriptor>>,
     closure_edges: Vec<BondEdge>,
 }
 
@@ -30,7 +30,7 @@ impl SpanningForest {
     }
 
     #[must_use]
-    pub(crate) fn parent_bond_of(&self, node_id: usize) -> Option<Bond> {
+    pub(crate) fn parent_bond_of(&self, node_id: usize) -> Option<BondDescriptor> {
         self.parent_bonds.get(node_id).copied().flatten()
     }
 
@@ -45,7 +45,7 @@ impl SpanningForest {
     }
 
     #[must_use]
-    pub(crate) fn child_bonds_of(&self, node_id: usize) -> &[Bond] {
+    pub(crate) fn child_bonds_of(&self, node_id: usize) -> &[BondDescriptor] {
         self.child_bonds.get(node_id).map_or(&[], Vec::as_slice)
     }
 
@@ -58,9 +58,9 @@ impl SpanningForest {
 struct ForestBuildState {
     visited: Vec<bool>,
     parents: Vec<Option<usize>>,
-    parent_bonds: Vec<Option<Bond>>,
+    parent_bonds: Vec<Option<BondDescriptor>>,
     children: Vec<Vec<usize>>,
-    child_bonds: Vec<Vec<Bond>>,
+    child_bonds: Vec<Vec<BondDescriptor>>,
     closure_pairs: Vec<(usize, usize)>,
 }
 
@@ -194,9 +194,9 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
         } else {
             state.visited[neighbor_id] = true;
             state.parents[neighbor_id] = Some(node_id);
-            state.parent_bonds[neighbor_id] = Some(edge.2);
+            state.parent_bonds[neighbor_id] = Some(edge_descriptor(edge));
             state.children[node_id].push(neighbor_id);
-            state.child_bonds[node_id].push(edge.2);
+            state.child_bonds[node_id].push(edge_descriptor(edge));
             self.build_spanning_tree_from(neighbor_id, ordered_neighbors, state);
         }
     }
@@ -232,13 +232,19 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
             } else {
                 state.visited[neighbor_id] = true;
                 state.parents[neighbor_id] = Some(node_id);
-                state.parent_bonds[neighbor_id] = Some(edge.2);
+                state.parent_bonds[neighbor_id] = Some(edge_descriptor(edge));
                 state.children[node_id].push(neighbor_id);
-                state.child_bonds[node_id].push(edge.2);
+                state.child_bonds[node_id].push(edge_descriptor(edge));
                 self.build_spanning_tree_from_parser_neighbor_order(neighbor_id, state);
             }
         }
     }
+}
+
+#[inline]
+#[must_use]
+fn edge_descriptor(edge: BondEdge) -> BondDescriptor {
+    if edge.4 { BondDescriptor::aromatic(edge.2) } else { edge.2.into() }
 }
 
 #[cfg(test)]
@@ -327,8 +333,8 @@ mod tests {
         assert_eq!(forest.parent_of(2), Some(1));
         assert_eq!(forest.parent_of(3), None);
         assert_eq!(forest.parent_of(4), Some(3));
-        assert_eq!(forest.parent_bond_of(1), Some(Bond::Single));
-        assert_eq!(forest.child_bonds_of(0), &[Bond::Single]);
+        assert_eq!(forest.parent_bond_of(1), Some(Bond::Single.into()));
+        assert_eq!(forest.child_bonds_of(0), &[Bond::Single.into()]);
         assert_eq!(forest.children(), &[vec![1], vec![2], vec![], vec![4], vec![]]);
     }
 
@@ -338,7 +344,7 @@ mod tests {
         let forest = smiles.spanning_forest_with_parser_neighbor_order(&[0]);
 
         assert_eq!(forest.children_of(0), &[1, 2]);
-        assert_eq!(forest.child_bonds_of(0), &[Bond::Single, Bond::Single]);
+        assert_eq!(forest.child_bonds_of(0), &[Bond::Single.into(), Bond::Single.into()]);
         assert_eq!(forest.closure_edges(), &[smiles.edge_for_node_pair((0, 3)).unwrap()]);
     }
 }

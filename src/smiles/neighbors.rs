@@ -6,7 +6,7 @@ use super::Smiles;
 use crate::{
     atom::AtomSyntax,
     bond::bond_edge::BondEdge,
-    smiles::invariants::{AtomInvariant, planning_chirality_key},
+    smiles::invariants::{AtomInvariant, bond_entry_code, planning_chirality_key},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -108,7 +108,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
                     invariants[neighbor_id],
                     refined_classes[neighbor_id],
                     rooted_classes[neighbor_id],
-                    crate::smiles::invariants::bond_kind_index(entry.bond()),
+                    usize::from(bond_entry_code(*entry)),
                 );
                 (key, entry.order(), neighbor_id, entry.to_bond_edge(node_id, neighbor_id))
             })
@@ -167,7 +167,7 @@ mod tests {
     use crate::{
         atom::{Atom, atom_symbol::AtomSymbol},
         bond::{
-            Bond,
+            Bond, BondDescriptor,
             bond_edge::{BondEdge, bond_edge},
         },
         smiles::BondMatrixBuilder,
@@ -180,7 +180,9 @@ mod tests {
     fn smiles_from_edges(atom_nodes: Vec<Atom>, bond_edges: &[BondEdge]) -> Smiles {
         let mut builder = BondMatrixBuilder::with_capacity(bond_edges.len());
         for edge in bond_edges {
-            builder.push_edge(edge.0, edge.1, edge.2, edge.3).unwrap();
+            let descriptor =
+                if edge.4 { BondDescriptor::aromatic(edge.2) } else { BondDescriptor::new(edge.2) };
+            builder.push_edge_with_descriptor(edge.0, edge.1, descriptor, edge.3).unwrap();
         }
         let number_of_nodes = atom_nodes.len();
         Smiles::from_bond_matrix_parts(atom_nodes, builder.finish(number_of_nodes))

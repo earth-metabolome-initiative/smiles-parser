@@ -4,8 +4,7 @@ use geometric_traits::traits::SparseValuedMatrixRef;
 
 use crate::{
     atom::{Atom, AtomSyntax, atom_symbol::AtomSymbol, bracketed::chirality::Chirality},
-    bond::Bond,
-    smiles::{Smiles, SmilesAtomPolicy, StereoNeighbor},
+    smiles::{BondEntry, Smiles, SmilesAtomPolicy, StereoNeighbor},
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -69,7 +68,7 @@ pub(super) fn canonicalization_state_key<AtomPolicy: SmilesAtomPolicy>(
         .bond_matrix()
         .sparse_entries()
         .filter(|((row, column), _)| row < column)
-        .map(|((row, column), entry)| (row, column, canonical_bond_label(entry.bond())))
+        .map(|((row, column), entry)| (row, column, canonical_bond_label(*entry)))
         .collect();
     let parsed_stereo_neighbors = smiles
         .parsed_stereo_neighbors
@@ -85,16 +84,16 @@ pub(super) fn canonicalization_state_key<AtomPolicy: SmilesAtomPolicy>(
     }
 }
 
-pub(super) const fn canonical_bond_label(bond: Bond) -> CanonicalBondLabel {
-    CanonicalBondLabel(match bond {
-        Bond::Single => 0,
-        Bond::Double => 1,
-        Bond::Triple => 2,
-        Bond::Quadruple => 3,
-        Bond::Aromatic => 4,
-        Bond::Up => 5,
-        Bond::Down => 6,
-    })
+pub(super) const fn canonical_bond_label(entry: BondEntry) -> CanonicalBondLabel {
+    let bond_code = match entry.bond() {
+        crate::bond::Bond::Single => 0,
+        crate::bond::Bond::Double => 1,
+        crate::bond::Bond::Triple => 2,
+        crate::bond::Bond::Quadruple => 3,
+        crate::bond::Bond::Up => 4,
+        crate::bond::Bond::Down => 5,
+    };
+    CanonicalBondLabel(bond_code + if entry.aromatic() { 8 } else { 0 })
 }
 
 pub(crate) const fn canonical_chirality_key(chirality: Option<Chirality>) -> (u8, u8) {

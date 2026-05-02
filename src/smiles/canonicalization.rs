@@ -92,22 +92,22 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     }
 
     fn stereo_neutral_canonical_labeling_whole_graph(&self) -> SmilesCanonicalLabeling {
-        self.canonical_labeling_whole_graph(stereo_neutral_canonical_atom_label, |bond| {
-            canonical_bond_label(bond.without_direction())
+        self.canonical_labeling_whole_graph(stereo_neutral_canonical_atom_label, |entry| {
+            canonical_bond_label(entry.with_bond(entry.bond().without_direction()))
         })
     }
 
     fn canonical_labeling_whole_graph(
         &self,
         atom_label: impl Fn(Atom) -> CanonicalAtomLabel,
-        bond_label: impl Fn(Bond) -> CanonicalBondLabel,
+        bond_label: impl Fn(super::BondEntry) -> CanonicalBondLabel,
     ) -> SmilesCanonicalLabeling {
         let result = CanonicalLabeling::canonical_labeling(
             self,
             |node_id| atom_label(self.nodes()[node_id]),
             |node_a, node_b| {
                 bond_label(
-                    self.bond_for_node_pair((node_a, node_b))
+                    self.bond_entry_for_node_pair((node_a, node_b))
                         .unwrap_or_else(|| unreachable!("canonizer only queries existing edges")),
                 )
             },
@@ -135,14 +135,18 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
             let new_row = new_index_of_old_node[row];
             let new_column = new_index_of_old_node[column];
             let (new_row, new_column) = crate::smiles::edge_key(new_row, new_column);
-            canonical_edges.push((new_row, new_column, entry.bond()));
+            canonical_edges.push((new_row, new_column, entry.descriptor()));
         }
-        canonical_edges.sort_unstable_by_key(|(row, column, _bond)| (*row, *column));
+        canonical_edges.sort_unstable_by_key(|(row, column, _descriptor)| (*row, *column));
         let bond_matrix = BondMatrix::from_sorted_upper_triangular_entries(
             atom_nodes.len(),
             canonical_edges.into_iter().enumerate().map(
-                |(canonical_order, (row, column, bond))| {
-                    (row, column, super::BondEntry::new(bond, None, canonical_order))
+                |(canonical_order, (row, column, descriptor))| {
+                    (
+                        row,
+                        column,
+                        super::BondEntry::from_descriptor(descriptor, None, canonical_order),
+                    )
                 },
             ),
         )
@@ -192,7 +196,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
         let has_aromatic_bonds = canonicalized
             .bond_matrix()
             .sparse_entries()
-            .any(|((_row, _column), entry)| entry.bond() == Bond::Aromatic);
+            .any(|((_row, _column), entry)| entry.aromatic());
         if !has_aromatic_bonds {
             return canonicalized;
         }
@@ -378,10 +382,10 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
                 continue;
             }
             builder
-                .push_edge(
+                .push_edge_with_descriptor(
                     new_index_of_old_node[row],
                     new_index_of_old_node[column],
-                    entry.bond(),
+                    entry.descriptor(),
                     None,
                 )
                 .unwrap_or_else(|_| {

@@ -360,7 +360,7 @@ impl RdkitAtomAromContext {
         for edge in edges {
             let bond = edge.2.without_direction();
             explicit_valence += bond_valence_contribution(bond);
-            if matches!(bond, Bond::Double | Bond::Triple | Bond::Quadruple | Bond::Aromatic) {
+            if edge.4 || matches!(bond, Bond::Double | Bond::Triple | Bond::Quadruple) {
                 incident_multiple_bond = true;
                 if ring_membership.contains_edge(atom_id, edge.1) {
                     incident_cyclic_multiple_bond = true;
@@ -581,7 +581,7 @@ impl RdkitDefaultElectronModel {
             let mut multiple_bond_count = 0_usize;
             for bond_kind in &context.multiple_bond_kinds {
                 match bond_kind {
-                    Bond::Single | Bond::Up | Bond::Down | Bond::Aromatic => {}
+                    Bond::Single | Bond::Up | Bond::Down => {}
                     Bond::Double | Bond::Quadruple => multiple_bond_count += 1,
                     Bond::Triple => {
                         if !candidate_rules.allow_triple_bonds {
@@ -1545,7 +1545,7 @@ pub(crate) fn rdkit_smarts_total_valence(
 
 fn bond_valence_contribution(bond: Bond) -> usize {
     match bond {
-        Bond::Single | Bond::Up | Bond::Down | Bond::Aromatic => 1,
+        Bond::Single | Bond::Up | Bond::Down => 1,
         Bond::Double => 2,
         Bond::Triple => 3,
         Bond::Quadruple => 4,

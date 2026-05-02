@@ -64,6 +64,14 @@ fn single_family_count(smiles: &Smiles) -> usize {
     bond_count(smiles, Bond::Single) + bond_count(smiles, Bond::Up) + bond_count(smiles, Bond::Down)
 }
 
+fn aromatic_bond_count(smiles: &Smiles) -> usize {
+    smiles
+        .bond_matrix()
+        .sparse_entries()
+        .filter(|((row, column), entry)| row < column && entry.aromatic())
+        .count()
+}
+
 fn assert_render_round_trip_preserves_invariants(original: &str) {
     let parsed = parse_or_panic(original);
     let rendered = parsed.to_string();
@@ -106,13 +114,19 @@ fn assert_render_round_trip_preserves_invariants(original: &str) {
         "Single-bond family count changed after render round trip.\nOriginal:\n{original}\nRendered:\n{rendered}"
     );
 
-    for bond in [Bond::Double, Bond::Triple, Bond::Quadruple, Bond::Aromatic] {
+    for bond in [Bond::Double, Bond::Triple, Bond::Quadruple] {
         assert_eq!(
             bond_count(&parsed, bond),
             bond_count(&reparsed, bond),
             "Bond count for {bond:?} changed after render round trip.\nOriginal:\n{original}\nRendered:\n{rendered}"
         );
     }
+
+    assert_eq!(
+        aromatic_bond_count(&parsed),
+        aromatic_bond_count(&reparsed),
+        "Aromatic-bond count changed after render round trip.\nOriginal:\n{original}\nRendered:\n{rendered}"
+    );
 }
 
 #[test]

@@ -370,6 +370,11 @@ fn assert_core_rewrite_invariants(
             entry.bond(),
             "bond kind changed during canonicalization for edge {row}-{column}",
         );
+        assert_eq!(
+            rewritten.4,
+            entry.aromatic(),
+            "bond aromaticity changed during canonicalization for edge {row}-{column}",
+        );
         assert!(rewritten.3.is_none(), "canonicalization should clear ring-number provenance");
     }
 

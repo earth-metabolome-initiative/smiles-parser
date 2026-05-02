@@ -6,7 +6,10 @@ use core::{fmt, num::TryFromIntError, ops::Range};
 use elements_rs::Element;
 use thiserror::Error;
 
-use crate::{atom::atom_symbol::AtomSymbol, bond::Bond};
+use crate::{
+    atom::atom_symbol::AtomSymbol,
+    bond::{Bond, BondDescriptor},
+};
 
 /// The errors that could occur during SMILES parsing.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Error)]
@@ -34,7 +37,7 @@ pub enum SmilesError {
     EmptyBranch,
     /// A bond was not able to bind two atoms
     #[error("Bond: {0} missing atom index(es)")]
-    IncompleteBond(Bond),
+    IncompleteBond(BondDescriptor),
     /// Element forbidden to be written as aromatic here
     #[error("Invalid aromatic element: {0}")]
     InvalidAromaticElement(Element),
@@ -273,7 +276,7 @@ mod tests {
 
     use crate::{
         atom::atom_symbol::AtomSymbol,
-        bond::Bond,
+        bond::{Bond, BondDescriptor},
         errors::{SmilesError, SmilesErrorWithSpan},
     };
 
@@ -283,8 +286,8 @@ mod tests {
 
         let cases = [
             (
-                SmilesError::BondInBracket(Bond::Aromatic),
-                format!("Bond in bracket: {}", Bond::Aromatic),
+                SmilesError::BondInBracket(Bond::Double),
+                format!("Bond in bracket: {}", Bond::Double),
             ),
             (SmilesError::ChargeOverflow(50), "Charge overflow: 50".to_string()),
             (SmilesError::ChargeUnderflow(-50), "Charge underflow: -50".to_string()),
@@ -294,8 +297,8 @@ mod tests {
                 format!("Error Parsing Element: {elements_rs_error}"),
             ),
             (
-                SmilesError::IncompleteBond(Bond::Aromatic),
-                format!("Bond: {} missing atom index(es)", Bond::Aromatic),
+                SmilesError::IncompleteBond(BondDescriptor::aromatic(Bond::Single)),
+                "Bond: : missing atom index(es)".to_string(),
             ),
             (
                 SmilesError::InvalidAromaticElement(Element::Ac),

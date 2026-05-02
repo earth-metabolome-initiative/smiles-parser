@@ -6,7 +6,7 @@ use smallvec::SmallVec;
 
 use super::{
     Smiles,
-    invariants::{AtomInvariant, bond_kind_index, planning_chirality_key},
+    invariants::{AtomInvariant, bond_descriptor_index, planning_chirality_key},
     spanning_tree::SpanningForest,
 };
 
@@ -153,7 +153,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
                 .iter()
                 .zip(forest.child_bonds_of(node_id).iter().copied())
             {
-                child_signatures.push((bond_kind_index(bond), subtree_signatures[child]));
+                child_signatures.push((bond_descriptor_index(bond), subtree_signatures[child]));
             }
             child_signatures.sort_unstable();
 
@@ -177,7 +177,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
             {
                 keyed_children.push((
                     ChildOrderKey {
-                        bond_kind: bond_kind_index(bond),
+                        bond_kind: bond_descriptor_index(bond),
                         subtree_signature: subtree_signatures[child],
                         rooted_class: rooted_classes[child],
                         refined_class: refined_classes[child],
@@ -259,7 +259,7 @@ mod tests {
     use crate::{
         atom::{Atom, AtomSyntax, atom_symbol::AtomSymbol, bracketed::chirality::Chirality},
         bond::{
-            Bond,
+            Bond, BondDescriptor,
             bond_edge::{BondEdge, bond_edge},
         },
         smiles::{
@@ -275,7 +275,9 @@ mod tests {
     fn smiles_from_edges(atom_nodes: Vec<Atom>, bond_edges: &[BondEdge]) -> Smiles {
         let mut builder = BondMatrixBuilder::with_capacity(bond_edges.len());
         for edge in bond_edges {
-            builder.push_edge(edge.0, edge.1, edge.2, edge.3).unwrap();
+            let descriptor =
+                if edge.4 { BondDescriptor::aromatic(edge.2) } else { BondDescriptor::new(edge.2) };
+            builder.push_edge_with_descriptor(edge.0, edge.1, descriptor, edge.3).unwrap();
         }
         let number_of_nodes = atom_nodes.len();
         Smiles::from_bond_matrix_parts(atom_nodes, builder.finish(number_of_nodes))

@@ -486,7 +486,7 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// use smiles_parser::{bond::Bond, prelude::Smiles};
     ///
     /// let smiles: Smiles = "C=O".parse()?;
-    /// assert_eq!(smiles.edge_for_node_pair((0, 1)), Some((0, 1, Bond::Double, None)));
+    /// assert_eq!(smiles.edge_for_node_pair((0, 1)), Some((0, 1, Bond::Double, None, false)));
     /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
@@ -504,6 +504,14 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
         let (row, column) = edge_key(nodes.0, nodes.1);
         let rank = self.bond_matrix.try_rank(row, column)?;
         Some(self.bond_matrix.select_value_ref(rank).bond())
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn bond_entry_for_node_pair(&self, nodes: (usize, usize)) -> Option<BondEntry> {
+        let (row, column) = edge_key(nodes.0, nodes.1);
+        let rank = self.bond_matrix.try_rank(row, column)?;
+        Some(*self.bond_matrix.select_value_ref(rank))
     }
 
     /// Returns the number of bonds incident to the provided node id.
@@ -641,8 +649,8 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// let smiles: Smiles = "CCO".parse()?;
     /// let edges = smiles.edges_for_node(1).collect::<Vec<_>>();
     ///
-    /// assert!(edges.contains(&(1, 0, Bond::Single, None)));
-    /// assert!(edges.contains(&(1, 2, Bond::Single, None)));
+    /// assert!(edges.contains(&(1, 0, Bond::Single, None, false)));
+    /// assert!(edges.contains(&(1, 2, Bond::Single, None, false)));
     /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
@@ -1056,12 +1064,17 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
                         (parent_atom_id < neighbor_atom_id).then_some((
                             parent_atom_id,
                             neighbor_atom_id,
-                            entry.bond(),
+                            entry.descriptor(),
                             entry.ring_num(),
                         ))
                     })
                     .chain((0..hydrogen_count).map(move |offset| {
-                        (parent_atom_id, hydrogen_start + offset, crate::bond::Bond::Single, None)
+                        (
+                            parent_atom_id,
+                            hydrogen_start + offset,
+                            crate::bond::Bond::Single.into(),
+                            None,
+                        )
                     }))
             }),
         );
@@ -1772,7 +1785,7 @@ mod tests {
     use crate::{
         atom::{Atom, AtomSyntax, atom_symbol::AtomSymbol, bracketed::chirality::Chirality},
         bond::{
-            Bond,
+            Bond, BondDescriptor,
             bond_edge::{BondEdge, bond_edge},
             ring_num::RingNum,
         },
@@ -1788,10 +1801,23 @@ mod tests {
     fn smiles_from_edges(atom_nodes: Vec<Atom>, bond_edges: &[BondEdge]) -> Smiles {
         let mut builder = BondMatrixBuilder::with_capacity(bond_edges.len());
         for edge in bond_edges {
-            builder.push_edge(edge.0, edge.1, edge.2, edge.3).unwrap();
+            let descriptor =
+                if edge.4 { BondDescriptor::aromatic(edge.2) } else { BondDescriptor::new(edge.2) };
+            builder.push_edge_with_descriptor(edge.0, edge.1, descriptor, edge.3).unwrap();
         }
         let number_of_nodes = atom_nodes.len();
         Smiles::from_bond_matrix_parts(atom_nodes, builder.finish(number_of_nodes))
+    }
+
+    fn assert_edge_descriptor<AtomPolicy: SmilesAtomPolicy>(
+        smiles: &Smiles<AtomPolicy>,
+        node_pair: (usize, usize),
+        bond: Bond,
+        aromatic: bool,
+    ) {
+        let edge = smiles.edge_for_node_pair(node_pair).expect("expected edge");
+        assert_eq!(edge.2, bond);
+        assert_eq!(edge.4, aromatic);
     }
 
     fn hydrogen_neighbors(smiles: &Smiles, atom_id: usize) -> Vec<usize> {
@@ -1807,7 +1833,9 @@ mod tests {
     #[test]
     fn bond_matrix_builder_rejects_self_loops() {
         let mut builder = BondMatrixBuilder::with_capacity(1);
-        let err = builder.push_edge(0, 0, Bond::Single, None).expect_err("self-loop should fail");
+        let err = builder
+            .push_edge_with_descriptor(0, 0, Bond::Single.into(), None)
+            .expect_err("self-loop should fail");
         assert_eq!(err, SmilesError::SelfLoopEdge(0));
     }
 
@@ -2069,6 +2097,10 @@ mod tests {
             assert_eq!(explicit.nodes()[atom_id].hydrogen_count(), 0);
             assert_eq!(hydrogen_neighbors(&explicit, atom_id).len(), 1);
         }
+        for [node_a, node_b] in explicit.aromaticity_assignment().bond_edges() {
+            let edge = explicit.edge_for_node_pair((*node_a, *node_b)).unwrap();
+            assert!(edge.4);
+        }
     }
 
     #[test]
@@ -2313,8 +2345,8 @@ mod tests {
         assert_eq!(assignment.atom_ids(), &[0, 1, 2, 3, 4, 5]);
         assert_eq!(assignment.bond_edges(), &[[0, 1], [0, 5], [1, 2], [2, 3], [3, 4], [4, 5]]);
         assert!(aromaticized.nodes().iter().all(Atom::aromatic));
-        assert_eq!(aromaticized.edge_for_node_pair((0, 1)).unwrap().2, Bond::Aromatic);
-        assert_eq!(aromaticized.edge_for_node_pair((4, 5)).unwrap().2, Bond::Aromatic);
+        assert_edge_descriptor(aromaticized, (0, 1), Bond::Double, true);
+        assert_edge_descriptor(aromaticized, (4, 5), Bond::Double, true);
     }
 
     #[test]
@@ -2338,7 +2370,7 @@ mod tests {
         assert_eq!(assignment.atom_ids(), &[0, 1]);
         assert_eq!(assignment.bond_edges(), &[[0, 1]]);
         assert!(aromaticized.nodes().iter().all(Atom::aromatic));
-        assert_eq!(aromaticized.edge_for_node_pair((0, 1)).unwrap().2, Bond::Aromatic);
+        assert_edge_descriptor(aromaticized, (0, 1), Bond::Single, true);
     }
 
     #[test]
@@ -2578,7 +2610,7 @@ mod tests {
         assert!(aromaticized.nodes()[0].aromatic());
         assert!(aromaticized.nodes()[1].aromatic());
         assert!(!aromaticized.nodes()[2].aromatic());
-        assert_eq!(aromaticized.edge_for_node_pair((0, 1)).unwrap().2, Bond::Aromatic);
+        assert_edge_descriptor(&aromaticized, (0, 1), Bond::Single, true);
         assert_eq!(aromaticized.edge_for_node_pair((1, 2)).unwrap().2, Bond::Single);
     }
 
@@ -2684,7 +2716,7 @@ mod tests {
 
         let aromaticized = smiles.try_with_aromaticity_assignment(&assignment).unwrap();
 
-        assert_eq!(aromaticized.edge_for_node_pair((0, 1)).unwrap().2, Bond::Aromatic);
+        assert_edge_descriptor(&aromaticized, (0, 1), Bond::Single, true);
         assert_eq!(aromaticized.edge_for_node_pair((1, 2)).unwrap().2, Bond::Single);
     }
 
@@ -2730,7 +2762,7 @@ mod tests {
         assert_eq!(perception.assignment().atom_ids(), &[0, 1]);
         assert_eq!(perception.assignment().bond_edges(), &[[0, 1]]);
         assert!(perception.aromaticized().nodes().iter().all(Atom::aromatic));
-        assert_eq!(perception.aromaticized().edge_for_node_pair((0, 1)).unwrap().2, Bond::Aromatic);
+        assert_edge_descriptor(perception.aromaticized(), (0, 1), Bond::Single, true);
     }
 
     #[test]
@@ -2751,6 +2783,143 @@ mod tests {
             .unwrap()
             .into_aromaticized();
         assert!(aromaticized.nodes().iter().all(Atom::aromatic));
+    }
+
+    #[test]
+    fn perception_exposes_source_bond_for_aromatic_triple_bond() {
+        let smiles: Smiles = "C1=CC#CC=C1".parse().unwrap();
+        let perception = smiles.perceive_aromaticity_for(AromaticityPolicy::RdkitDefault).unwrap();
+
+        assert!(perception.assignment().contains_edge(2, 3));
+        assert_eq!(perception.source_bond_for_node_pair((2, 3)), Some(Bond::Triple));
+        assert_eq!(perception.source_bond_for_node_pair((3, 2)), Some(Bond::Triple));
+        assert_edge_descriptor(perception.aromaticized(), (2, 3), Bond::Triple, true);
+    }
+
+    #[test]
+    fn wildcard_perception_exposes_source_bond_for_aromatic_triple_bond() {
+        let smiles: WildcardSmiles = "C1=CC#CC=C1".parse().unwrap();
+        let perception = smiles.perceive_aromaticity_for(AromaticityPolicy::RdkitDefault).unwrap();
+
+        assert!(perception.assignment().contains_edge(2, 3));
+        assert_eq!(perception.source_bond_for_node_pair((2, 3)), Some(Bond::Triple));
+        let edge = perception.aromaticized().edge_for_node_pair((2, 3)).expect("expected edge");
+        assert_eq!(edge.2, Bond::Triple);
+        assert!(edge.4);
+    }
+
+    #[test]
+    fn rdkit_documented_fused_system_keeps_aromatic_atom_bridge_bonds_non_aromatic() {
+        let smiles: Smiles = "C1=CC2=C(C=C1)C1=CC=CC=C21".parse().unwrap();
+        let perception = smiles.perceive_aromaticity_for(AromaticityPolicy::RdkitDefault).unwrap();
+        let assignment = perception.assignment();
+
+        assert_eq!(assignment.status(), AromaticityStatus::Complete);
+        assert_eq!(assignment.atom_ids(), &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+        assert_eq!(
+            assignment.bond_edges(),
+            &[
+                [0, 1],
+                [0, 5],
+                [1, 2],
+                [2, 3],
+                [3, 4],
+                [4, 5],
+                [6, 7],
+                [6, 11],
+                [7, 8],
+                [8, 9],
+                [9, 10],
+                [10, 11],
+            ]
+        );
+        assert!(!assignment.contains_edge(3, 6));
+        assert!(!assignment.contains_edge(2, 11));
+        assert_edge_descriptor(perception.aromaticized(), (3, 6), Bond::Single, false);
+        assert_edge_descriptor(perception.aromaticized(), (2, 11), Bond::Single, false);
+    }
+
+    #[test]
+    fn rdkit_documented_exocyclic_fused_system_keeps_aromatic_atom_double_bridge_non_aromatic() {
+        let smiles: Smiles = "O=C1C=CC(=O)C2=C1OC=CO2".parse().unwrap();
+        let perception = smiles.perceive_aromaticity_for(AromaticityPolicy::RdkitDefault).unwrap();
+        let assignment = perception.assignment();
+
+        assert_eq!(assignment.status(), AromaticityStatus::Complete);
+        assert_eq!(assignment.atom_ids(), &[1, 2, 3, 4, 6, 7, 8, 9, 10, 11]);
+        assert_eq!(
+            assignment.bond_edges(),
+            &[[1, 2], [1, 7], [2, 3], [3, 4], [4, 6], [6, 11], [7, 8], [8, 9], [9, 10], [10, 11],]
+        );
+        assert!(!assignment.contains_edge(6, 7));
+        assert_edge_descriptor(perception.aromaticized(), (6, 7), Bond::Double, false);
+    }
+
+    #[test]
+    fn rdkit_documented_radical_aromaticity_special_cases_match_default_model() {
+        let hetero_radical: Smiles = "C1=C[N]C=C1".parse().unwrap();
+        let hetero_radical_assignment =
+            hetero_radical.aromaticity_assignment_for(AromaticityPolicy::RdkitDefault);
+        assert_eq!(hetero_radical_assignment.status(), AromaticityStatus::Complete);
+        assert!(hetero_radical_assignment.atom_ids().is_empty());
+        assert!(hetero_radical_assignment.bond_edges().is_empty());
+
+        let charged_carbon_radical: Smiles = "C1=CC=CC=C[C+]1".parse().unwrap();
+        let charged_carbon_radical_assignment =
+            charged_carbon_radical.aromaticity_assignment_for(AromaticityPolicy::RdkitDefault);
+        assert_eq!(charged_carbon_radical_assignment.status(), AromaticityStatus::Complete);
+        assert!(charged_carbon_radical_assignment.atom_ids().is_empty());
+        assert!(charged_carbon_radical_assignment.bond_edges().is_empty());
+
+        let neutral_carbon_radical: Smiles = "C1=[C]NC=C1".parse().unwrap();
+        let perception = neutral_carbon_radical
+            .perceive_aromaticity_for(AromaticityPolicy::RdkitDefault)
+            .unwrap();
+        let neutral_carbon_radical_assignment = perception.assignment();
+        assert_eq!(neutral_carbon_radical_assignment.status(), AromaticityStatus::Complete);
+        assert_eq!(neutral_carbon_radical_assignment.atom_ids(), &[0, 1, 2, 3, 4]);
+        assert_eq!(
+            neutral_carbon_radical_assignment.bond_edges(),
+            &[[0, 1], [0, 4], [1, 2], [2, 3], [3, 4]]
+        );
+        assert_edge_descriptor(perception.aromaticized(), (0, 1), Bond::Double, true);
+    }
+
+    #[test]
+    fn rdkit_documented_tellurium_aromaticity_extension_matches_default_model() {
+        let smiles: Smiles = "OC(=O)c1[te]ccc1".parse().unwrap();
+        let assignment = smiles.aromaticity_assignment_for(AromaticityPolicy::RdkitDefault);
+
+        assert_eq!(assignment.status(), AromaticityStatus::Complete);
+        assert_eq!(assignment.atom_ids(), &[3, 4, 5, 6, 7]);
+        assert_eq!(assignment.bond_edges(), &[[3, 4], [3, 7], [4, 5], [5, 6], [6, 7]]);
+    }
+
+    #[test]
+    fn rdkit_documented_dummy_atom_aromaticity_matches_wildcard_model() {
+        let six_member: WildcardSmiles = "*1=CC=CC=C1".parse().unwrap();
+        let six_member_perception =
+            six_member.perceive_aromaticity_for(AromaticityPolicy::RdkitDefault).unwrap();
+        let six_member_assignment = six_member_perception.assignment();
+
+        assert_eq!(six_member_assignment.status(), AromaticityStatus::Complete);
+        assert_eq!(six_member_assignment.atom_ids(), &[0, 1, 2, 3, 4, 5]);
+        assert_eq!(
+            six_member_assignment.bond_edges(),
+            &[[0, 1], [0, 5], [1, 2], [2, 3], [3, 4], [4, 5]]
+        );
+        let wildcard_edge =
+            six_member_perception.aromaticized().edge_for_node_pair((0, 1)).unwrap();
+        assert_eq!(wildcard_edge.2, Bond::Double);
+        assert!(wildcard_edge.4);
+
+        let five_member: WildcardSmiles = "C1=C*C=C1".parse().unwrap();
+        let five_member_assignment =
+            five_member.aromaticity_assignment_for(AromaticityPolicy::RdkitDefault);
+
+        assert_eq!(five_member_assignment.status(), AromaticityStatus::Complete);
+        assert_eq!(five_member_assignment.atom_ids(), &[0, 1, 2, 3, 4]);
+        assert_eq!(five_member_assignment.bond_edges(), &[[0, 1], [0, 4], [1, 2], [2, 3], [3, 4]]);
     }
 
     #[test]
@@ -2933,7 +3102,7 @@ mod tests {
             ]
         );
         assert!(aromaticized.nodes().iter().all(Atom::aromatic));
-        assert_eq!(aromaticized.edge_for_node_pair((3, 8)).unwrap().2, Bond::Aromatic);
+        assert_edge_descriptor(aromaticized, (3, 8), Bond::Single, true);
     }
 
     #[test]
@@ -2964,7 +3133,7 @@ mod tests {
             &[[0, 1], [0, 8], [1, 2], [2, 3], [3, 4], [3, 7], [4, 5], [5, 6], [6, 7], [7, 8]]
         );
         assert!(aromaticized.nodes().iter().all(Atom::aromatic));
-        assert_eq!(aromaticized.edge_for_node_pair((3, 7)).unwrap().2, Bond::Aromatic);
+        assert_edge_descriptor(aromaticized, (3, 7), Bond::Single, true);
     }
 
     #[test]

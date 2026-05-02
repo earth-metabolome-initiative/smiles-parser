@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use geometric_traits::traits::{SparseMatrix2D, SparseValuedMatrix2DRef};
 use smallvec::SmallVec;
 
-use super::{Smiles, invariants::bond_kind_code};
+use super::{Smiles, invariants::bond_entry_code};
 
 type Neighborhood = SmallVec<[(u8, usize); 4]>;
 
@@ -146,7 +146,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
             let bond_kinds: Vec<u8> = self
                 .bond_matrix
                 .sparse_row_values_ref(from)
-                .map(|entry| bond_kind_code(entry.bond()))
+                .map(|entry| bond_entry_code(*entry))
                 .collect();
             neighbors_by_node.push(neighbors);
             bond_kinds_by_node.push(bond_kinds);

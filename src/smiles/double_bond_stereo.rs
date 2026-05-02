@@ -5,7 +5,10 @@ use geometric_traits::traits::{
     SparseMatrix2D, SparseValuedMatrix2DRef, SparseValuedMatrixRef, WeisfeilerLehmanColoring,
 };
 
-use super::{Smiles, invariants::AtomInvariant};
+use super::{
+    Smiles,
+    invariants::{AtomInvariant, bond_entry_code},
+};
 use crate::bond::{Bond, bond_edge::BondEdge};
 
 /// Semantic double-bond stereo configuration.
@@ -171,7 +174,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
         self.bond_matrix()
             .sparse_entries()
             .filter_map(|((row, column), entry)| {
-                (row < column && entry.bond() == Bond::Double).then_some((
+                (row < column && non_aromatic_double_bond(*entry)).then_some((
                     row,
                     column,
                     entry.to_bond_edge(row, column),
@@ -200,7 +203,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     fn has_double_bonds(&self) -> bool {
         self.bond_matrix()
             .sparse_entries()
-            .any(|((_row, _column), entry)| entry.bond() == Bond::Double)
+            .any(|((_row, _column), entry)| non_aromatic_double_bond(*entry))
     }
 
     fn double_bond_supports_semantic_stereo(&self, node_a: usize, node_b: usize) -> bool {
@@ -211,7 +214,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     fn non_single_family_bond_count(&self, node_id: usize) -> usize {
         self.bond_matrix()
             .sparse_row_values_ref(node_id)
-            .filter(|entry| !matches!(entry.bond(), Bond::Single | Bond::Up | Bond::Down))
+            .filter(|entry| non_single_family_bond(**entry))
             .count()
     }
 
@@ -331,8 +334,9 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
         let seed_colors: Vec<StereoNeutralAtomInvariantKey> =
             self.atom_invariants().into_iter().map(StereoNeutralAtomInvariantKey::from).collect();
         self.wl_coloring_with_seed_and_edge_colors(&seed_colors, |node, neighbor| {
-            let edge = self.edge_for_node_pair((node, neighbor)).unwrap_or_else(|| unreachable!());
-            stereo_neutral_bond_kind_index(edge.2)
+            let entry =
+                self.bond_entry_for_node_pair((node, neighbor)).unwrap_or_else(|| unreachable!());
+            usize::from(bond_entry_code(entry))
         })
     }
 
@@ -363,7 +367,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
                                 None
                             } else {
                                 Some((
-                                    stereo_neutral_bond_kind_index(entry.bond()),
+                                    usize::from(bond_entry_code(*entry)),
                                     edge_classes[*directed_edge_ids
                                         .get(&(edge.to, neighbor))
                                         .unwrap_or_else(|| unreachable!())],
@@ -394,7 +398,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
                     .zip(self.bond_matrix().sparse_row_values_ref(node_id))
                     .map(|(neighbor, entry)| {
                         (
-                            stereo_neutral_bond_kind_index(entry.bond()),
+                            usize::from(bond_entry_code(*entry)),
                             edge_classes[*directed_edge_ids
                                 .get(&(node_id, neighbor))
                                 .unwrap_or_else(|| unreachable!())],
@@ -474,9 +478,8 @@ fn substituent_priority_key(
 ) -> SubstituentPriorityKey {
     let atom = smiles.node_by_id(neighbor).unwrap_or_else(|| unreachable!());
     let atomic_number = atom.element().map_or(0, u8::from);
-    let bond_order_to_endpoint = bond_priority(
-        smiles.edge_for_node_pair((endpoint, neighbor)).unwrap_or_else(|| unreachable!()).2,
-    );
+    let edge = smiles.edge_for_node_pair((endpoint, neighbor)).unwrap_or_else(|| unreachable!());
+    let bond_order_to_endpoint = if edge.4 { 1 } else { bond_priority(edge.2) };
 
     SubstituentPriorityKey {
         atomic_number,
@@ -491,11 +494,21 @@ fn substituent_priority_key(
 
 fn bond_priority(bond: Bond) -> u8 {
     match bond {
-        Bond::Single | Bond::Up | Bond::Down | Bond::Aromatic => 1,
+        Bond::Single | Bond::Up | Bond::Down => 1,
         Bond::Double => 2,
         Bond::Triple => 3,
         Bond::Quadruple => 4,
     }
+}
+
+#[inline]
+fn non_aromatic_double_bond(entry: super::BondEntry) -> bool {
+    entry.bond() == Bond::Double && !entry.aromatic()
+}
+
+#[inline]
+fn non_single_family_bond(entry: super::BondEntry) -> bool {
+    entry.aromatic() || !matches!(entry.bond(), Bond::Single | Bond::Up | Bond::Down)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -553,7 +566,7 @@ impl From<AtomInvariant> for StereoNeutralAtomInvariantKey {
                 value.bond_kind_histogram.count(Bond::Double),
                 value.bond_kind_histogram.count(Bond::Triple),
                 value.bond_kind_histogram.count(Bond::Quadruple),
-                value.bond_kind_histogram.count(Bond::Aromatic),
+                value.bond_kind_histogram.aromatic_count(),
             ],
         }
     }
@@ -575,16 +588,6 @@ struct StereoNeutralDirectedEdgeKey {
 struct StereoNeutralRootedNodeKey {
     node_class: usize,
     neighborhood: Vec<(usize, usize)>,
-}
-
-fn stereo_neutral_bond_kind_index(bond: Bond) -> usize {
-    match bond {
-        Bond::Single | Bond::Up | Bond::Down => 0,
-        Bond::Double => 1,
-        Bond::Triple => 2,
-        Bond::Quadruple => 3,
-        Bond::Aromatic => 4,
-    }
 }
 
 fn dense_ranks<K>(keys: &[K]) -> Vec<usize>

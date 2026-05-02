@@ -7,7 +7,7 @@ use elements_rs::{Element, Isotope};
 
 use crate::{
     atom::Atom,
-    bond::{Bond, ring_num::RingNum},
+    bond::{Bond, BondDescriptor, ring_num::RingNum},
     errors::{SmilesError, SmilesErrorWithSpan},
     parser::token_iter::TokenIter,
     smiles::{BondMatrixBuilder, Smiles, SmilesAtomPolicy, StereoNeighbor, WildcardAtoms},
@@ -91,11 +91,11 @@ struct ParserState<AtomPolicy = crate::smiles::ConcreteAtoms> {
     /// The last seen atom if present  
     last_atom: Option<usize>,
     /// A pending bond that needs to be connected to a second atom
-    pending_bond: Option<Bond>,
+    pending_bond: Option<BondDescriptor>,
     /// The stack of branch anchor atoms
     branch_stack: Vec<usize>,
     /// Open ring closures indexed by ring label.
-    ring_open: [Option<(usize, Option<Bond>)>; 100],
+    ring_open: [Option<(usize, Option<BondDescriptor>)>; 100],
     /// Parsed lexical stereo neighbor order per atom, preserving ring-digit
     /// position.
     parsed_stereo_neighbors: Vec<Vec<PendingStereoNeighbor>>,
@@ -142,11 +142,11 @@ impl<AtomPolicy: SmilesAtomPolicy> ParserState<AtomPolicy> {
     }
     /// Returns the pending bond if present
     #[must_use]
-    fn pending_bond(&self) -> Option<Bond> {
+    fn pending_bond(&self) -> Option<BondDescriptor> {
         self.pending_bond
     }
     /// Updates the pending bond field.
-    fn update_pending_bond(&mut self, bond: Option<Bond>) {
+    fn update_pending_bond(&mut self, bond: Option<BondDescriptor>) {
         self.pending_bond = bond;
     }
     /// Pops a value off the the branch stack and returns it.
@@ -163,7 +163,7 @@ impl<AtomPolicy: SmilesAtomPolicy> ParserState<AtomPolicy> {
         self.branch_stack.is_empty()
     }
     /// Removes and returns the specified ring open field entry if present.
-    fn remove_ring_open(&mut self, ring_num: RingNum) -> Option<(usize, Option<Bond>)> {
+    fn remove_ring_open(&mut self, ring_num: RingNum) -> Option<(usize, Option<BondDescriptor>)> {
         self.ring_open[usize::from(ring_num.get())].take()
     }
     /// Checks if the ring open field is currently empty.
@@ -172,7 +172,7 @@ impl<AtomPolicy: SmilesAtomPolicy> ParserState<AtomPolicy> {
         self.ring_open.iter().all(Option::is_none)
     }
     /// Inserts the given ring into the ring open field
-    fn insert_ring(&mut self, ring_num: RingNum, pending: (usize, Option<Bond>)) {
+    fn insert_ring(&mut self, ring_num: RingNum, pending: (usize, Option<BondDescriptor>)) {
         self.ring_open[usize::from(ring_num.get())] = Some(pending);
     }
     #[must_use]
@@ -249,10 +249,10 @@ impl<AtomPolicy: SmilesAtomPolicy> ParserState<AtomPolicy> {
         &mut self,
         node_a: usize,
         node_b: usize,
-        bond: Bond,
+        bond: BondDescriptor,
         ring_num: Option<RingNum>,
     ) -> Result<(), SmilesError> {
-        self.bond_matrix.push_edge(node_a, node_b, bond, ring_num)
+        self.bond_matrix.push_edge_with_descriptor(node_a, node_b, bond, ring_num)
     }
     /// Adds an atom to the SMILES graph, either bracketed or unbracketed.
     ///
@@ -470,7 +470,7 @@ impl<AtomPolicy: SmilesAtomPolicy> ParserState<AtomPolicy> {
         &mut self,
         start: usize,
         end: usize,
-        bond: Bond,
+        bond: BondDescriptor,
         next_token: Option<TokenKind>,
     ) -> Result<(), SmilesErrorWithSpan> {
         if self.last_atom().is_none() {
@@ -550,10 +550,14 @@ impl ParserState {
 }
 
 #[inline]
-fn default_bond(nodes: &[Atom], id_a: usize, id_b: usize) -> Bond {
+fn default_bond(nodes: &[Atom], id_a: usize, id_b: usize) -> BondDescriptor {
     let node_a = &nodes[id_a];
     let node_b = &nodes[id_b];
-    if node_a.aromatic() && node_b.aromatic() { Bond::Aromatic } else { Bond::Single }
+    if node_a.aromatic() && node_b.aromatic() {
+        BondDescriptor::aromatic(Bond::Single)
+    } else {
+        Bond::Single.into()
+    }
 }
 
 #[cfg(test)]
@@ -564,7 +568,7 @@ mod tests {
     use crate::{
         Smiles, SmilesError,
         atom::{Atom, atom_symbol::AtomSymbol},
-        bond::{Bond, ring_num::RingNum},
+        bond::{Bond, BondDescriptor, ring_num::RingNum},
         parser::smiles_parser::{ParserState, default_bond},
         token::TokenKind,
     };
@@ -604,8 +608,8 @@ mod tests {
         state.update_last_atom(None);
         assert_eq!(state.last_atom(), None);
 
-        state.update_pending_bond(Some(Bond::Triple));
-        assert_eq!(state.pending_bond(), Some(Bond::Triple));
+        state.update_pending_bond(Some(Bond::Triple.into()));
+        assert_eq!(state.pending_bond(), Some(Bond::Triple.into()));
         state.update_pending_bond(None);
         assert_eq!(state.pending_bond(), None);
     }
@@ -636,9 +640,9 @@ mod tests {
         assert!(state.ring_open_empty());
         assert_eq!(state.remove_ring_open(ring), None);
 
-        state.insert_ring(ring, (9, Some(Bond::Double)));
+        state.insert_ring(ring, (9, Some(Bond::Double.into())));
         assert!(!state.ring_open_empty());
-        assert_eq!(state.remove_ring_open(ring), Some((9, Some(Bond::Double))));
+        assert_eq!(state.remove_ring_open(ring), Some((9, Some(Bond::Double.into()))));
         assert!(state.ring_open_empty());
     }
 
@@ -657,7 +661,7 @@ mod tests {
         let mut state = ParserState::new(0);
         state.push_node(atom(Element::C, false));
         state.push_node(atom(Element::O, false));
-        state.push_edge_verified(0, 1, Bond::Single, None).unwrap();
+        state.push_edge_verified(0, 1, Bond::Single.into(), None).unwrap();
 
         let smiles = state.into_smiles();
         assert_eq!(smiles.nodes().len(), 2);
@@ -686,7 +690,7 @@ mod tests {
         state
             .add_atom(Atom::new_organic_subset(AtomSymbol::Element(Element::C), false), 0, 1)
             .unwrap();
-        state.update_pending_bond(Some(Bond::Triple));
+        state.update_pending_bond(Some(Bond::Triple.into()));
         state
             .add_atom(Atom::new_organic_subset(AtomSymbol::Element(Element::N), false), 1, 2)
             .unwrap();
@@ -716,11 +720,11 @@ mod tests {
     fn parser_state_validate_all_closed_errors_for_incomplete_bond() {
         let mut state = ParserState::new(0);
         state.update_last_span((2, 3));
-        state.update_pending_bond(Some(Bond::Double));
+        state.update_pending_bond(Some(Bond::Double.into()));
 
         let err = state.validate_all_closed().expect_err("expected incomplete bond");
 
-        assert_eq!(err.smiles_error(), SmilesError::IncompleteBond(Bond::Double));
+        assert_eq!(err.smiles_error(), SmilesError::IncompleteBond(Bond::Double.into()));
         assert_eq!(err.start(), 2);
         assert_eq!(err.end(), 3);
     }
@@ -769,11 +773,11 @@ mod tests {
     fn parser_state_validate_component_boundary_rejects_incomplete_bond() {
         let mut state = ParserState::new(0);
         state.update_last_span((2, 3));
-        state.update_pending_bond(Some(Bond::Double));
+        state.update_pending_bond(Some(Bond::Double.into()));
 
         let err = state.validate_component_boundary().expect_err("expected incomplete bond");
 
-        assert_eq!(err.smiles_error(), SmilesError::IncompleteBond(Bond::Double));
+        assert_eq!(err.smiles_error(), SmilesError::IncompleteBond(Bond::Double.into()));
         assert_eq!(err.start(), 2);
         assert_eq!(err.end(), 3);
     }
@@ -832,9 +836,9 @@ mod tests {
         let mut state = ParserState::new(0);
         state.update_last_atom(Some(0));
 
-        state.validate_and_add_bond(1, 2, Bond::Aromatic, None).unwrap();
+        state.validate_and_add_bond(1, 2, BondDescriptor::aromatic(Bond::Single), None).unwrap();
 
-        assert_eq!(state.pending_bond(), Some(Bond::Aromatic));
+        assert_eq!(state.pending_bond(), Some(BondDescriptor::aromatic(Bond::Single)));
     }
 
     #[test]
@@ -842,10 +846,10 @@ mod tests {
         let mut state = ParserState::new(0);
 
         let err = state
-            .validate_and_add_bond(1, 2, Bond::Single, None)
+            .validate_and_add_bond(1, 2, Bond::Single.into(), None)
             .expect_err("expected incomplete bond");
 
-        assert_eq!(err.smiles_error(), SmilesError::IncompleteBond(Bond::Single));
+        assert_eq!(err.smiles_error(), SmilesError::IncompleteBond(Bond::Single.into()));
         assert_eq!(err.start(), 1);
         assert_eq!(err.end(), 2);
     }
@@ -857,12 +861,12 @@ mod tests {
 
         state.push_node(atom(Element::C, false));
         state.update_last_atom(Some(0));
-        state.update_pending_bond(Some(Bond::Double));
+        state.update_pending_bond(Some(Bond::Double.into()));
 
         state.validate_and_add_ring_num(1, 2, ring).unwrap();
 
         assert_eq!(state.pending_bond(), None);
-        assert_eq!(state.remove_ring_open(ring), Some((0, Some(Bond::Double))));
+        assert_eq!(state.remove_ring_open(ring), Some((0, Some(Bond::Double.into()))));
     }
 
     #[test]
@@ -872,7 +876,7 @@ mod tests {
 
         state.push_node(atom(Element::C, false));
         state.push_node(atom(Element::N, false));
-        state.insert_ring(ring, (0, Some(Bond::Triple)));
+        state.insert_ring(ring, (0, Some(Bond::Triple.into())));
         state.update_last_atom(Some(1));
 
         state.validate_and_add_ring_num(2, 3, ring).unwrap();
@@ -893,9 +897,9 @@ mod tests {
 
         state.push_node(atom(Element::C, false));
         state.push_node(atom(Element::O, false));
-        state.insert_ring(ring, (0, Some(Bond::Double)));
+        state.insert_ring(ring, (0, Some(Bond::Double.into())));
         state.update_last_atom(Some(1));
-        state.update_pending_bond(Some(Bond::Quadruple));
+        state.update_pending_bond(Some(Bond::Quadruple.into()));
 
         state.validate_and_add_ring_num(2, 3, ring).unwrap();
 
@@ -941,7 +945,7 @@ mod tests {
 
         state.push_node(atom(Element::C, false));
         state.push_node(atom(Element::O, false));
-        state.push_edge_verified(0, 1, Bond::Single, None).unwrap();
+        state.push_edge_verified(0, 1, Bond::Single.into(), None).unwrap();
         state.insert_ring(ring, (0, None));
         state.update_last_atom(Some(1));
 
@@ -969,13 +973,13 @@ mod tests {
     fn default_bond_is_aromatic_for_two_aromatic_atoms() {
         let nodes = vec![atom(Element::C, true), atom(Element::N, true)];
 
-        assert_eq!(default_bond(&nodes, 0, 1), Bond::Aromatic);
+        assert_eq!(default_bond(&nodes, 0, 1), BondDescriptor::aromatic(Bond::Single));
     }
 
     #[test]
     fn default_bond_is_single_when_atoms_are_not_both_aromatic() {
         let nodes = vec![atom(Element::C, true), atom(Element::O, false)];
 
-        assert_eq!(default_bond(&nodes, 0, 1), Bond::Single);
+        assert_eq!(default_bond(&nodes, 0, 1), Bond::Single.into());
     }
 }

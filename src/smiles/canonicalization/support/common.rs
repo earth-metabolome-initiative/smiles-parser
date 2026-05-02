@@ -55,10 +55,10 @@ pub(crate) fn permute_smiles<AtomPolicy: SmilesAtomPolicy>(
             continue;
         }
         builder
-            .push_edge(
+            .push_edge_with_descriptor(
                 labeling.new_index_of_old_node()[row],
                 labeling.new_index_of_old_node()[column],
-                entry.bond(),
+                entry.descriptor(),
                 None,
             )
             .unwrap_or_else(|_| unreachable!("permuting a simple graph stays simple"));

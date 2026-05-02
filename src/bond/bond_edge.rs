@@ -1,9 +1,9 @@
 //! Module for bonds stored as graph edge tuples.
 
-use crate::bond::{Bond, ring_num::RingNum};
+use crate::bond::{Bond, BondDescriptor, ring_num::RingNum};
 
 /// Contains the two atom indices connected via the [`Bond`].
-pub type BondEdge = (usize, usize, Bond, Option<RingNum>);
+pub type BondEdge = (usize, usize, Bond, Option<RingNum>, bool);
 
 /// Creates a new edge tuple.
 ///
@@ -13,7 +13,7 @@ pub type BondEdge = (usize, usize, Bond, Option<RingNum>);
 /// use smiles_parser::bond::{Bond, bond_edge::bond_edge};
 ///
 /// let edge = bond_edge(0, 1, Bond::Double, None);
-/// assert_eq!(edge, (0, 1, Bond::Double, None));
+/// assert_eq!(edge, (0, 1, Bond::Double, None, false));
 /// ```
 #[inline]
 #[must_use]
@@ -23,7 +23,38 @@ pub const fn bond_edge(
     bond: Bond,
     ring_num: Option<RingNum>,
 ) -> BondEdge {
-    (node_a, node_b, bond, ring_num)
+    bond_edge_with_aromaticity(node_a, node_b, bond, ring_num, false)
+}
+
+/// Creates a new edge tuple with explicit aromaticity.
+#[inline]
+#[must_use]
+pub const fn bond_edge_with_aromaticity(
+    node_a: usize,
+    node_b: usize,
+    bond: Bond,
+    ring_num: Option<RingNum>,
+    aromatic: bool,
+) -> BondEdge {
+    (node_a, node_b, bond, ring_num, aromatic)
+}
+
+/// Creates a new edge tuple from a bond descriptor.
+#[inline]
+#[must_use]
+pub const fn bond_edge_from_descriptor(
+    node_a: usize,
+    node_b: usize,
+    descriptor: BondDescriptor,
+    ring_num: Option<RingNum>,
+) -> BondEdge {
+    bond_edge_with_aromaticity(
+        node_a,
+        node_b,
+        descriptor.bond(),
+        ring_num,
+        descriptor.is_aromatic(),
+    )
 }
 
 /// Returns the other node id for the provided incident edge, if any.
@@ -76,8 +107,11 @@ pub fn bond_edge_ring_num_val(edge: BondEdge) -> Option<u8> {
 #[cfg(test)]
 mod tests {
     use crate::bond::{
-        Bond,
-        bond_edge::{BondEdge, bond_edge, bond_edge_other, bond_edge_ring_num_val},
+        Bond, BondDescriptor,
+        bond_edge::{
+            BondEdge, bond_edge, bond_edge_from_descriptor, bond_edge_other,
+            bond_edge_ring_num_val, bond_edge_with_aromaticity,
+        },
         ring_num::RingNum,
     };
 
@@ -90,6 +124,15 @@ mod tests {
         assert_eq!((edge.0, edge.1), (3, 7));
         assert_eq!(edge.2, Bond::Double);
         assert_eq!(edge.3, None);
+        assert!(!edge.4);
+
+        let aromatic = bond_edge_with_aromaticity(3, 7, Bond::Triple, None, true);
+        assert_eq!(aromatic.2, Bond::Triple);
+        assert!(aromatic.4);
+
+        let from_descriptor =
+            bond_edge_from_descriptor(3, 7, BondDescriptor::aromatic(Bond::Single), None);
+        assert_eq!(from_descriptor, bond_edge_with_aromaticity(3, 7, Bond::Single, None, true));
     }
 
     #[test]
@@ -105,7 +148,7 @@ mod tests {
         let ring_num = RingNum::try_new(2).unwrap();
         let edge = bond_edge(0, 1, Bond::Single, Some(ring_num));
         assert_eq!(bond_edge_ring_num_val(edge), Some(2));
-        assert_eq!(bond_edge_ring_num_val((0, 1, Bond::Single, None)), None);
+        assert_eq!(bond_edge_ring_num_val((0, 1, Bond::Single, None, false)), None);
     }
 
     #[test]

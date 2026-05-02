@@ -595,43 +595,43 @@ fn try_bond(byte: u8, bracket: bool) -> Result<Token, SmilesError> {
             if bracket {
                 return Err(SmilesError::UnexpectedDash);
             }
-            Token::Bond(Bond::Single)
+            Token::Bond(Bond::Single.into())
         }
         b'=' => {
             if bracket {
                 return Err(SmilesError::BondInBracket(Bond::Double));
             }
-            Token::Bond(Bond::Double)
+            Token::Bond(Bond::Double.into())
         }
         b'#' => {
             if bracket {
                 return Err(SmilesError::BondInBracket(Bond::Triple));
             }
-            Token::Bond(Bond::Triple)
+            Token::Bond(Bond::Triple.into())
         }
         b'$' => {
             if bracket {
                 return Err(SmilesError::BondInBracket(Bond::Quadruple));
             }
-            Token::Bond(Bond::Quadruple)
+            Token::Bond(Bond::Quadruple.into())
         }
         b':' => {
             if bracket {
                 return Err(SmilesError::UnexpectedColon);
             }
-            Token::Bond(Bond::Aromatic)
+            Token::Bond(crate::bond::BondDescriptor::aromatic(Bond::Single))
         }
         b'/' => {
             if bracket {
                 return Err(SmilesError::BondInBracket(Bond::Up));
             }
-            Token::Bond(Bond::Up)
+            Token::Bond(Bond::Up.into())
         }
         b'\\' => {
             if bracket {
                 return Err(SmilesError::BondInBracket(Bond::Down));
             }
-            Token::Bond(Bond::Down)
+            Token::Bond(Bond::Down.into())
         }
         _ => return Err(SmilesError::UnexpectedCharacter(char::from(byte))),
     };
@@ -929,13 +929,13 @@ mod tests {
     #[test]
     fn try_bond_branches() {
         let ok_cases = [
-            ('-', Token::Bond(Bond::Single)),
-            ('=', Token::Bond(Bond::Double)),
-            ('#', Token::Bond(Bond::Triple)),
-            ('$', Token::Bond(Bond::Quadruple)),
-            (':', Token::Bond(Bond::Aromatic)),
-            ('/', Token::Bond(Bond::Up)),
-            ('\\', Token::Bond(Bond::Down)),
+            ('-', Token::Bond(Bond::Single.into())),
+            ('=', Token::Bond(Bond::Double.into())),
+            ('#', Token::Bond(Bond::Triple.into())),
+            ('$', Token::Bond(Bond::Quadruple.into())),
+            (':', Token::Bond(crate::bond::BondDescriptor::aromatic(Bond::Single))),
+            ('/', Token::Bond(Bond::Up.into())),
+            ('\\', Token::Bond(Bond::Down.into())),
         ];
 
         for (ch, expected) in ok_cases {

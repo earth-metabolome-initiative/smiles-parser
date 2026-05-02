@@ -110,16 +110,20 @@ fn rendered_bond_text(
     smiles: &Smiles<impl SmilesAtomPolicy>,
     from: usize,
     to: usize,
-    bond: crate::bond::Bond,
+    descriptor: crate::bond::BondDescriptor,
 ) -> &'static str {
     let from_aromatic = smiles.node_by_id(from).unwrap_or_else(|| unreachable!()).aromatic();
     let to_aromatic = smiles.node_by_id(to).unwrap_or_else(|| unreachable!()).aromatic();
-    match bond {
-        crate::bond::Bond::Single if from_aromatic && to_aromatic => "-",
-        crate::bond::Bond::Single => "",
-        crate::bond::Bond::Aromatic if from_aromatic && to_aromatic => "",
-        crate::bond::Bond::Aromatic => ":",
-        other => other.smiles_symbol(),
+    match (descriptor.bond(), descriptor.is_aromatic()) {
+        (crate::bond::Bond::Single | crate::bond::Bond::Double, true)
+            if from_aromatic && to_aromatic =>
+        {
+            ""
+        }
+        (crate::bond::Bond::Single | crate::bond::Bond::Double, true) => ":",
+        (crate::bond::Bond::Single, false) if from_aromatic && to_aromatic => "-",
+        (crate::bond::Bond::Single, false) => "",
+        (other, _) => other.smiles_symbol(),
     }
 }
 
@@ -180,15 +184,46 @@ mod tests {
     fn rendered_bond_text_keeps_colon_for_non_aromatic_endpoints() {
         let aromatic_mismatch: Smiles = "C:C".parse().unwrap();
         assert_eq!(
-            super::rendered_bond_text(&aromatic_mismatch, 0, 1, crate::bond::Bond::Aromatic),
+            super::rendered_bond_text(
+                &aromatic_mismatch,
+                0,
+                1,
+                crate::bond::BondDescriptor::aromatic(crate::bond::Bond::Single)
+            ),
             ":"
         );
 
         let aromatic_pair: Smiles = "c1ccccc1".parse().unwrap();
         assert_eq!(
-            super::rendered_bond_text(&aromatic_pair, 0, 1, crate::bond::Bond::Aromatic),
+            super::rendered_bond_text(
+                &aromatic_pair,
+                0,
+                1,
+                crate::bond::BondDescriptor::aromatic(crate::bond::Bond::Single)
+            ),
             ""
         );
-        assert_eq!(super::rendered_bond_text(&aromatic_pair, 0, 1, crate::bond::Bond::Single), "-");
+        assert_eq!(
+            super::rendered_bond_text(&aromatic_pair, 0, 1, crate::bond::Bond::Single.into()),
+            "-"
+        );
+        assert_eq!(
+            super::rendered_bond_text(
+                &aromatic_pair,
+                0,
+                1,
+                crate::bond::BondDescriptor::aromatic(crate::bond::Bond::Double)
+            ),
+            ""
+        );
+        assert_eq!(
+            super::rendered_bond_text(
+                &aromatic_pair,
+                0,
+                1,
+                crate::bond::BondDescriptor::aromatic(crate::bond::Bond::Triple)
+            ),
+            "#"
+        );
     }
 }

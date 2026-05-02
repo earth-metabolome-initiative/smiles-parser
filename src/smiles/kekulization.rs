@@ -59,7 +59,6 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```rust
-    /// ///
     /// use smiles_parser::prelude::Smiles;
     ///
     /// let original = Smiles::from_str("C1=CN=CN1").expect("valid Kekule imidazole");
@@ -79,12 +78,11 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// Returns a localized Kekule form of the current graph while explicitly
     /// choosing how preserved pre-aromatic source graphs should be handled.
     ///
-    /// Graphs with no aromatic bonds are returned unchanged.
+    /// Graphs with no aromatic atom or bond flags are returned unchanged.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// ///
     /// use smiles_parser::prelude::{KekulizationMode, Smiles};
     ///
     /// let aromatic = Smiles::from_str("c1ccccc1").expect("valid aromatic benzene");
@@ -110,12 +108,18 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
             .bond_matrix()
             .sparse_entries()
             .filter_map(|((row, column), entry)| {
-                (row < column && entry.bond() == Bond::Aromatic)
+                (row < column && entry.aromatic() && localizable_aromatic_bond(entry.bond()))
                     .then_some(AromaticBond { node_a: row, node_b: column })
             })
             .collect::<Vec<_>>();
 
-        if aromatic_bonds.is_empty() {
+        let has_aromatic_flags = self.atom_nodes.iter().any(crate::atom::Atom::aromatic)
+            || self
+                .bond_matrix()
+                .sparse_entries()
+                .any(|((row, column), entry)| row < column && entry.aromatic());
+
+        if aromatic_bonds.is_empty() && !has_aromatic_flags {
             return Ok(self.clone_without_kekulization_source());
         }
 
@@ -123,6 +127,9 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
             && let Some(source) = &self.kekulization_source
         {
             return Ok((**source).clone());
+        }
+        if aromatic_bonds.is_empty() {
+            return Ok(clear_aromatic_flags(self));
         }
 
         let candidate_atom_ids = candidate_atom_ids(self);
@@ -154,11 +161,13 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
                 (row < column).then_some((
                     row,
                     column,
-                    if entry.bond() == Bond::Aromatic {
-                        if matched_edges.contains(&(row, column)) {
-                            entry.with_bond(Bond::Double)
+                    if entry.aromatic() {
+                        if !localizable_aromatic_bond(entry.bond()) {
+                            entry.with_aromatic(false)
+                        } else if matched_edges.contains(&(row, column)) {
+                            entry.with_bond(Bond::Double).with_aromatic(false)
                         } else {
-                            entry.with_bond(Bond::Single)
+                            entry.with_bond(Bond::Single).with_aromatic(false)
                         }
                     } else {
                         *entry
@@ -188,7 +197,6 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```rust
-    /// ///
     /// use smiles_parser::prelude::Smiles;
     ///
     /// let aromatic = Smiles::from_str("c1ccccc1").expect("valid aromatic benzene");
@@ -287,6 +295,36 @@ impl KekulizationCandidateGraph {
     }
 }
 
+#[inline]
+fn localizable_aromatic_bond(bond: Bond) -> bool {
+    !matches!(bond.without_direction(), Bond::Triple | Bond::Quadruple)
+}
+
+fn clear_aromatic_flags<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
+) -> Smiles<AtomPolicy> {
+    let atom_nodes = smiles
+        .atom_nodes
+        .iter()
+        .copied()
+        .map(|atom| if atom.aromatic() { atom.with_aromatic(false) } else { atom })
+        .collect::<Vec<_>>();
+
+    let bond_matrix = BondMatrix::from_sorted_upper_triangular_entries(
+        atom_nodes.len(),
+        smiles.bond_matrix().sparse_entries().filter_map(|((row, column), entry)| {
+            (row < column).then_some((row, column, entry.with_aromatic(false)))
+        }),
+    )
+    .unwrap_or_else(|_| unreachable!("existing bond matrix entries are already valid"));
+
+    Smiles::from_bond_matrix_parts_with_parsed_stereo(
+        atom_nodes,
+        bond_matrix,
+        smiles.parsed_stereo_neighbors.clone(),
+    )
+}
+
 fn has_unlocalizable_aromatic_component(
     atom_count: usize,
     aromatic_bonds: &[AromaticBond],
@@ -364,6 +402,12 @@ fn needs_localized_double_bond(
     let mut degree = 0usize;
     for entry in smiles.bond_matrix().sparse_row_values_ref(atom_id) {
         degree += 1;
+        if entry.aromatic() {
+            if matches!(entry.bond().without_direction(), Bond::Triple | Bond::Quadruple) {
+                return false;
+            }
+            continue;
+        }
         match entry.bond().without_direction() {
             Bond::Double => preexisting_pi_bonds += 1,
             Bond::Triple | Bond::Quadruple => return false,
@@ -424,8 +468,8 @@ mod tests {
     use crate::{
         atom::{Atom, atom_symbol::AtomSymbol},
         bond::{
-            Bond,
-            bond_edge::{BondEdge, bond_edge},
+            Bond, BondDescriptor,
+            bond_edge::{BondEdge, bond_edge_with_aromaticity},
         },
         parser::smiles_parser::parse_wildcard_smiles,
         smiles::BondMatrixBuilder,
@@ -436,6 +480,14 @@ mod tests {
             .bond_matrix()
             .sparse_entries()
             .filter(|((row, column), entry)| *row < *column && entry.bond() == bond)
+            .count()
+    }
+
+    fn count_aromatic_bonds(smiles: &Smiles) -> usize {
+        smiles
+            .bond_matrix()
+            .sparse_entries()
+            .filter(|((row, column), entry)| *row < *column && entry.aromatic())
             .count()
     }
 
@@ -450,7 +502,9 @@ mod tests {
     fn smiles_from_edges(atom_nodes: Vec<Atom>, bond_edges: &[BondEdge]) -> Smiles {
         let mut builder = BondMatrixBuilder::with_capacity(bond_edges.len());
         for edge in bond_edges {
-            builder.push_edge(edge.0, edge.1, edge.2, edge.3).unwrap();
+            let descriptor =
+                if edge.4 { BondDescriptor::aromatic(edge.2) } else { BondDescriptor::new(edge.2) };
+            builder.push_edge_with_descriptor(edge.0, edge.1, descriptor, edge.3).unwrap();
         }
         let number_of_nodes = atom_nodes.len();
         Smiles::from_bond_matrix_parts(atom_nodes, builder.finish(number_of_nodes))
@@ -468,7 +522,7 @@ mod tests {
         let smiles = Smiles::from_str("c1ccccc1").expect("valid aromatic benzene");
         let kekulized = smiles.kekulize().expect("benzene should kekulize");
 
-        assert_eq!(count_bonds(&kekulized, Bond::Aromatic), 0);
+        assert_eq!(count_aromatic_bonds(&kekulized), 0);
         assert_eq!(count_bonds(&kekulized, Bond::Double), 3);
         assert_eq!(count_bonds(&kekulized, Bond::Single), 3);
         assert_eq!(count_aromatic_atoms(&kekulized), 0);
@@ -479,7 +533,7 @@ mod tests {
         let smiles = Smiles::from_str("c1ccccc1-c2ccccc2").expect("valid aromatic biphenyl");
         let kekulized = smiles.kekulize().expect("biphenyl should kekulize");
 
-        assert_eq!(count_bonds(&kekulized, Bond::Aromatic), 0);
+        assert_eq!(count_aromatic_bonds(&kekulized), 0);
         assert_eq!(count_bonds(&kekulized, Bond::Double), 6);
         assert_eq!(count_aromatic_atoms(&kekulized), 0);
     }
@@ -489,7 +543,7 @@ mod tests {
         let smiles = Smiles::from_str("[nH]1cccc1").expect("valid aromatic pyrrole");
         let kekulized = smiles.kekulize().expect("pyrrole should kekulize");
 
-        assert_eq!(count_bonds(&kekulized, Bond::Aromatic), 0);
+        assert_eq!(count_aromatic_bonds(&kekulized), 0);
         assert_eq!(count_bonds(&kekulized, Bond::Double), 2);
         assert_eq!(count_bonds(&kekulized, Bond::Single), 3);
         assert_eq!(count_aromatic_atoms(&kekulized), 0);
@@ -500,7 +554,7 @@ mod tests {
         let smiles = Smiles::from_str("n1ccccc1").expect("valid aromatic pyridine");
         let kekulized = smiles.kekulize().expect("pyridine should kekulize");
 
-        assert_eq!(count_bonds(&kekulized, Bond::Aromatic), 0);
+        assert_eq!(count_aromatic_bonds(&kekulized), 0);
         assert_eq!(count_bonds(&kekulized, Bond::Double), 3);
         assert_eq!(count_bonds(&kekulized, Bond::Single), 3);
         assert_eq!(count_aromatic_atoms(&kekulized), 0);
@@ -511,7 +565,7 @@ mod tests {
         let smiles = Smiles::from_str("o1cccc1").expect("valid aromatic furan");
         let kekulized = smiles.kekulize().expect("furan should kekulize");
 
-        assert_eq!(count_bonds(&kekulized, Bond::Aromatic), 0);
+        assert_eq!(count_aromatic_bonds(&kekulized), 0);
         assert_eq!(count_bonds(&kekulized, Bond::Double), 2);
         assert_eq!(count_bonds(&kekulized, Bond::Single), 3);
         assert_eq!(count_aromatic_atoms(&kekulized), 0);
@@ -522,7 +576,7 @@ mod tests {
         let smiles = Smiles::from_str("c1ncc[nH]1").expect("valid aromatic imidazole");
         let kekulized = smiles.kekulize().expect("imidazole should kekulize");
 
-        assert_eq!(count_bonds(&kekulized, Bond::Aromatic), 0);
+        assert_eq!(count_aromatic_bonds(&kekulized), 0);
         assert_eq!(count_bonds(&kekulized, Bond::Double), 2);
         assert_eq!(count_bonds(&kekulized, Bond::Single), 3);
         assert_eq!(count_aromatic_atoms(&kekulized), 0);
@@ -533,9 +587,30 @@ mod tests {
         let smiles = Smiles::from_str("c1cc[c-]cc1").expect("valid aromatic phenyl anion");
         let kekulized = smiles.kekulize().expect("phenyl anion should kekulize");
 
-        assert_eq!(count_bonds(&kekulized, Bond::Aromatic), 0);
+        assert_eq!(count_aromatic_bonds(&kekulized), 0);
         assert_eq!(count_bonds(&kekulized, Bond::Double), 3);
         assert_eq!(count_aromatic_atoms(&kekulized), 0);
+    }
+
+    #[test]
+    fn standalone_kekulization_preserves_aromatic_triple_bond_order() {
+        let smiles = Smiles::from_str("C1=CC#CC=C1").expect("valid aromatic triple case");
+        let perceived = smiles.perceive_aromaticity().expect("perception should succeed");
+        let kekulized = perceived
+            .aromaticized()
+            .kekulize_standalone()
+            .expect("standalone kekulization should preserve fixed triple bond");
+
+        assert_eq!(count_aromatic_bonds(&kekulized), 0);
+        assert_eq!(count_aromatic_atoms(&kekulized), 0);
+        assert_eq!(count_bonds(&kekulized, Bond::Double), 2);
+        assert_eq!(count_bonds(&kekulized, Bond::Single), 3);
+        assert_eq!(count_bonds(&kekulized, Bond::Triple), 1);
+        assert_eq!(kekulized.edge_for_node_pair((2, 3)).expect("triple edge").2, Bond::Triple);
+        assert_eq!(
+            perceived.kekulize_standalone().expect("policy-stable standalone kekulization"),
+            kekulized
+        );
     }
 
     #[test]
@@ -629,7 +704,7 @@ mod tests {
         let smiles = Smiles::from_str("c1cccc2cccc2c1").expect("valid aromatic azulene");
         let kekulized = smiles.kekulize().expect("azulene should kekulize");
 
-        assert_eq!(count_bonds(&kekulized, Bond::Aromatic), 0);
+        assert_eq!(count_aromatic_bonds(&kekulized), 0);
         assert_eq!(count_bonds(&kekulized, Bond::Double), 5);
         assert_eq!(count_bonds(&kekulized, Bond::Single), 6);
         assert_eq!(count_aromatic_atoms(&kekulized), 0);
@@ -650,16 +725,16 @@ mod tests {
         let smiles = smiles_from_edges(
             vec![aromatic_carbon(), aromatic_carbon(), aromatic_carbon()],
             &[
-                bond_edge(0, 1, Bond::Aromatic, None),
-                bond_edge(1, 2, Bond::Aromatic, None),
-                bond_edge(2, 0, Bond::Aromatic, None),
+                bond_edge_with_aromaticity(0, 1, Bond::Single, None, true),
+                bond_edge_with_aromaticity(1, 2, Bond::Single, None, true),
+                bond_edge_with_aromaticity(2, 0, Bond::Single, None, true),
             ],
         );
         let aromatic_bonds = smiles
             .bond_matrix()
             .sparse_entries()
             .filter_map(|((row, column), entry)| {
-                (row < column && entry.bond() == Bond::Aromatic)
+                (row < column && entry.aromatic())
                     .then_some(AromaticBond { node_a: row, node_b: column })
             })
             .collect::<Vec<_>>();

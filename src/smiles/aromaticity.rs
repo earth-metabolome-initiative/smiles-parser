@@ -136,9 +136,7 @@ pub enum AromaticityDiagnostic {
 /// [`Smiles`] graph.
 ///
 /// Applying an assignment is only lossless when the source graph does not
-/// require clearing pre-existing aromatic labels. Once a graph already contains
-/// [`Bond::Aromatic`] edges, the original non-aromatic bond orders are no
-/// longer recoverable from the transformed graph alone.
+/// require clearing pre-existing aromatic labels.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Error)]
 pub enum AromaticityAssignmentApplicationError {
     /// The assignment references an atom id outside the graph.
@@ -444,7 +442,7 @@ impl AromaticityAssignment {
         }
 
         for ((row, column), entry) in smiles.bond_matrix().sparse_entries() {
-            if row < column && entry.bond() == Bond::Aromatic && !self.contains_edge(row, column) {
+            if row < column && entry.aromatic() && !self.contains_edge(row, column) {
                 return Err(AromaticityAssignmentApplicationError::WouldClearAromaticBond {
                     node_a: row,
                     node_b: column,
@@ -555,6 +553,42 @@ impl<AtomPolicy: SmilesAtomPolicy> AromaticityPerception<AtomPolicy> {
     #[must_use]
     pub fn aromaticized(&self) -> &Smiles<AtomPolicy> {
         &self.aromaticized
+    }
+
+    /// Returns the parsed source bond for a node pair in this perception, if
+    /// the source graph has that edge.
+    ///
+    /// Aromaticity perception preserves node ids between the source and
+    /// aromaticized graphs. This lets callers combine the aromatic assignment
+    /// with the original bond order when an RDKit-style consumer needs both
+    /// facts.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::{
+    ///     bond::Bond,
+    ///     prelude::{AromaticityPolicy, Smiles},
+    /// };
+    ///
+    /// let smiles = "C1=CC#CC=C1".parse::<Smiles>().expect("valid SMILES");
+    /// let perception = smiles
+    ///     .perceive_aromaticity_for(AromaticityPolicy::RdkitDefault)
+    ///     .expect("aromaticity perception should succeed");
+    ///
+    /// assert!(perception.assignment().contains_edge(2, 3));
+    /// assert_eq!(perception.source_bond_for_node_pair((2, 3)), Some(Bond::Triple));
+    /// let edge = perception.aromaticized().edge_for_node_pair((2, 3)).unwrap();
+    /// assert_eq!(edge.2, Bond::Triple);
+    /// assert!(edge.4);
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn source_bond_for_node_pair(&self, nodes: (usize, usize)) -> Option<Bond> {
+        self.aromaticized
+            .kekulization_source
+            .as_deref()
+            .and_then(|source| source.bond_for_node_pair(nodes))
     }
 
     /// Consumes the perception and returns the aromaticity assignment.
@@ -760,6 +794,23 @@ impl WildcardAromaticityPerception {
     #[must_use]
     pub fn aromaticized(&self) -> &WildcardSmiles {
         &self.aromaticized
+    }
+
+    /// Returns the parsed source bond for a node pair in this perception, if
+    /// the source graph has that edge.
+    ///
+    /// Aromaticity perception preserves node ids between the source and
+    /// aromaticized graphs. This lets callers combine the aromatic assignment
+    /// with the original bond order when an RDKit-style consumer needs both
+    /// facts.
+    #[inline]
+    #[must_use]
+    pub fn source_bond_for_node_pair(&self, nodes: (usize, usize)) -> Option<Bond> {
+        self.aromaticized
+            .inner()
+            .kekulization_source
+            .as_deref()
+            .and_then(|source| source.bond_for_node_pair(nodes))
     }
 
     /// Consumes the perception and returns the aromaticity assignment.
@@ -1039,11 +1090,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
                 (row < column).then_some((
                     row,
                     column,
-                    if assignment.contains_edge(row, column) {
-                        entry.with_bond(Bond::Aromatic)
-                    } else {
-                        *entry
-                    },
+                    entry.with_aromatic(entry.aromatic() || assignment.contains_edge(row, column)),
                 ))
             }),
         )

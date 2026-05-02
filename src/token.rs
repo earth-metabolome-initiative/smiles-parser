@@ -4,7 +4,7 @@ use core::ops::Range;
 
 use crate::{
     atom::Atom,
-    bond::{Bond, ring_num::RingNum},
+    bond::{BondDescriptor, ring_num::RingNum},
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -34,7 +34,7 @@ pub enum Token {
     Atom(Atom),
     /// The parsed bond. Single bonds are implicit between atoms if not
     /// explicated as a bond, e.g. `CC` would be `C-C`.
-    Bond(Bond),
+    Bond(BondDescriptor),
     /// Token for left parentheses, used for branching `(`
     LeftParentheses,
     /// Token for right parentheses, used for ending a branch `)`
@@ -64,8 +64,8 @@ impl TokenWithSpan {
     ///     token::{Token, TokenWithSpan},
     /// };
     ///
-    /// let token = TokenWithSpan::new(Token::Bond(Bond::Double), 1, 2);
-    /// assert_eq!(token.token(), Token::Bond(Bond::Double));
+    /// let token = TokenWithSpan::new(Token::Bond(Bond::Double.into()), 1, 2);
+    /// assert_eq!(token.token(), Token::Bond(Bond::Double.into()));
     /// ```
     #[must_use]
     pub fn new(token: Token, start: usize, end: usize) -> Self {
@@ -81,8 +81,8 @@ impl TokenWithSpan {
     ///     token::{Token, TokenWithSpan},
     /// };
     ///
-    /// let token = TokenWithSpan::new(Token::Bond(Bond::Single), 0, 1);
-    /// assert_eq!(token.token(), Token::Bond(Bond::Single));
+    /// let token = TokenWithSpan::new(Token::Bond(Bond::Single.into()), 0, 1);
+    /// assert_eq!(token.token(), Token::Bond(Bond::Single.into()));
     /// ```
     #[must_use]
     pub fn token(&self) -> Token {
@@ -154,7 +154,7 @@ impl TokenWithSpan {
     ///     token::{Token, TokenWithSpan},
     /// };
     ///
-    /// let bond = TokenWithSpan::new(Token::Bond(Bond::Triple), 1, 2);
+    /// let bond = TokenWithSpan::new(Token::Bond(Bond::Triple.into()), 1, 2);
     /// let atom = TokenWithSpan::new(Token::NonBond, 3, 4);
     ///
     /// assert!(bond.is_bond());
@@ -177,7 +177,7 @@ impl Token {
     ///     token::{Token, TokenKind},
     /// };
     ///
-    /// assert_eq!(Token::Bond(Bond::Aromatic).kind(), TokenKind::Bond);
+    /// assert_eq!(Token::Bond(Bond::Single.into()).kind(), TokenKind::Bond);
     /// assert_eq!(Token::NonBond.kind(), TokenKind::NonBond);
     /// ```
     #[inline]
@@ -214,7 +214,7 @@ mod tests {
             Token::NonBond,
             Token::Atom(bracket_atom),
             Token::Atom(organic_atom),
-            Token::Bond(Bond::Double),
+            Token::Bond(Bond::Double.into()),
             Token::LeftParentheses,
             Token::RightParentheses,
             Token::RingClosure(ring_num),
@@ -223,7 +223,7 @@ mod tests {
         assert_eq!(cases[0], Token::NonBond);
         assert_eq!(cases[1], Token::Atom(bracket_atom));
         assert_eq!(cases[2], Token::Atom(organic_atom));
-        assert_eq!(cases[3], Token::Bond(Bond::Double));
+        assert_eq!(cases[3], Token::Bond(Bond::Double.into()));
         assert_eq!(cases[4], Token::LeftParentheses);
         assert_eq!(cases[5], Token::RightParentheses);
         assert_eq!(cases[6], Token::RingClosure(ring_num));
@@ -231,10 +231,10 @@ mod tests {
 
     #[test]
     fn token_with_span_new_and_accessors_work() {
-        let token = Token::Bond(Bond::Triple);
+        let token = Token::Bond(Bond::Triple.into());
         let token_with_span = TokenWithSpan::new(token, 3, 7);
 
-        assert_eq!(token_with_span.token(), Token::Bond(Bond::Triple));
+        assert_eq!(token_with_span.token(), Token::Bond(Bond::Triple.into()));
         assert_eq!(token_with_span.span(), 3..7);
         assert_eq!(token_with_span.start(), 3);
         assert_eq!(token_with_span.end(), 7);
@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn token_kind_and_is_bond_helpers_cover_all_paths() {
-        let bond = TokenWithSpan::new(Token::Bond(Bond::Triple), 1, 2);
+        let bond = TokenWithSpan::new(Token::Bond(Bond::Triple.into()), 1, 2);
         assert_eq!(bond.token_kind(), TokenKind::Bond);
         assert!(bond.is_bond());
 
@@ -289,7 +289,7 @@ mod tests {
             Token::Atom(Atom::new_organic_subset(AtomSymbol::Element(Element::N), false)).kind(),
             TokenKind::Atom
         );
-        assert_eq!(Token::Bond(Bond::Double).kind(), TokenKind::Bond);
+        assert_eq!(Token::Bond(Bond::Double.into()).kind(), TokenKind::Bond);
         assert_eq!(Token::LeftParentheses.kind(), TokenKind::LeftParentheses);
         assert_eq!(Token::RightParentheses.kind(), TokenKind::RightParentheses);
         assert_eq!(Token::RingClosure(RingNum::try_new(1).unwrap()).kind(), TokenKind::RingClosure);

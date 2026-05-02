@@ -2,27 +2,37 @@ use alloc::vec::Vec;
 
 use geometric_traits::traits::SparseValuedMatrix2DRef;
 
-use super::Smiles;
+use super::{BondEntry, Smiles};
 use crate::{
     atom::{AtomSyntax, atom_symbol::AtomSymbol, bracketed::chirality::Chirality},
-    bond::Bond,
+    bond::{Bond, BondDescriptor},
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
 pub(crate) struct BondKindHistogram {
-    counts: [usize; 5],
+    counts: [usize; 4],
+    aromatic_count: usize,
 }
 
 impl BondKindHistogram {
     #[inline]
-    pub(crate) fn record(&mut self, bond: Bond) {
-        self.counts[bond_kind_index(bond)] += 1;
+    pub(crate) fn record(&mut self, entry: BondEntry) {
+        self.counts[bond_kind_index(entry.bond())] += 1;
+        if entry.aromatic() {
+            self.aromatic_count += 1;
+        }
     }
 
     #[inline]
     #[must_use]
     pub(crate) fn count(self, bond: Bond) -> usize {
         self.counts[bond_kind_index(bond)]
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) const fn aromatic_count(self) -> usize {
+        self.aromatic_count
     }
 }
 
@@ -49,7 +59,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
         let mut degree = 0;
         for entry in self.bond_matrix.sparse_row_values_ref(node_id) {
             degree += 1;
-            bond_kind_histogram.record(entry.bond());
+            bond_kind_histogram.record(*entry);
         }
 
         Some(AtomInvariant {
@@ -85,8 +95,22 @@ pub(crate) const fn bond_kind_code(bond: Bond) -> u8 {
         Bond::Double => 1,
         Bond::Triple => 2,
         Bond::Quadruple => 3,
-        Bond::Aromatic => 4,
     }
+}
+
+#[inline]
+pub(crate) const fn bond_descriptor_code(descriptor: BondDescriptor) -> u8 {
+    bond_kind_code(descriptor.bond()) + if descriptor.is_aromatic() { 8 } else { 0 }
+}
+
+#[inline]
+pub(crate) const fn bond_descriptor_index(descriptor: BondDescriptor) -> usize {
+    bond_descriptor_code(descriptor) as usize
+}
+
+#[inline]
+pub(crate) const fn bond_entry_code(entry: BondEntry) -> u8 {
+    bond_kind_code(entry.bond()) + if entry.aromatic() { 8 } else { 0 }
 }
 
 #[inline]
@@ -128,7 +152,18 @@ mod tests {
     fn smiles_from_edges(atom_nodes: Vec<Atom>, bond_edges: &[BondEdge]) -> Smiles {
         let mut builder = BondMatrixBuilder::with_capacity(bond_edges.len());
         for edge in bond_edges {
-            builder.push_edge(edge.0, edge.1, edge.2, edge.3).unwrap();
+            builder
+                .push_edge_with_descriptor(
+                    edge.0,
+                    edge.1,
+                    if edge.4 {
+                        crate::bond::BondDescriptor::aromatic(edge.2)
+                    } else {
+                        edge.2.into()
+                    },
+                    edge.3,
+                )
+                .unwrap();
         }
         let number_of_nodes = atom_nodes.len();
         Smiles::from_bond_matrix_parts(atom_nodes, builder.finish(number_of_nodes))
@@ -199,15 +234,15 @@ mod tests {
             &[
                 bond_edge(0, 1, Bond::Single, None),
                 bond_edge(0, 2, Bond::Double, None),
-                bond_edge(0, 3, Bond::Aromatic, None),
+                crate::bond::bond_edge::bond_edge_with_aromaticity(0, 3, Bond::Single, None, true),
             ],
         );
 
         let invariant = smiles.atom_invariant(0).unwrap();
         assert_eq!(invariant.degree, 3);
-        assert_eq!(invariant.bond_kind_histogram.count(Bond::Single), 1);
+        assert_eq!(invariant.bond_kind_histogram.count(Bond::Single), 2);
         assert_eq!(invariant.bond_kind_histogram.count(Bond::Double), 1);
-        assert_eq!(invariant.bond_kind_histogram.count(Bond::Aromatic), 1);
+        assert_eq!(invariant.bond_kind_histogram.aromatic_count(), 1);
     }
 
     #[test]
@@ -257,12 +292,11 @@ mod tests {
         assert_eq!(bond_kind_code(Bond::Double), 1);
         assert_eq!(bond_kind_code(Bond::Triple), 2);
         assert_eq!(bond_kind_code(Bond::Quadruple), 3);
-        assert_eq!(bond_kind_code(Bond::Aromatic), 4);
 
         assert_eq!(bond_kind_index(Bond::Single), bond_kind_index(Bond::Up));
         assert_eq!(bond_kind_index(Bond::Up), bond_kind_index(Bond::Down));
         assert_ne!(bond_kind_index(Bond::Single), bond_kind_index(Bond::Double));
-        assert_ne!(bond_kind_index(Bond::Triple), bond_kind_index(Bond::Aromatic));
+        assert_ne!(bond_kind_index(Bond::Triple), bond_kind_index(Bond::Quadruple));
     }
 
     #[test]
