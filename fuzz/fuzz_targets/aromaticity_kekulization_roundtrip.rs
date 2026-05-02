@@ -1,7 +1,6 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use smiles_parser::bond::Bond;
 use smiles_parser::prelude::{AromaticityPolicy, AromaticityStatus, Smiles, WildcardSmiles};
 
 // Keep this target in the small-molecule regime so fuzz time goes into
@@ -26,7 +25,7 @@ macro_rules! define_policy_roundtrip_runner {
                 || smiles.number_of_bonds() > MAX_FUZZ_BONDS
                 || smiles.nodes().iter().any(|atom| atom.aromatic())
                 || smiles.nodes().iter().enumerate().any(|(atom_id, _)| {
-                    smiles.edges_for_node(atom_id).any(|edge| edge.2 == Bond::Aromatic)
+                    smiles.edges_for_node(atom_id).any(|edge| edge.4)
                 })
             {
                 return;
