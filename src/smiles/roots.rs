@@ -23,7 +23,7 @@ struct ComponentRootKey {
     rooted_partition_size: usize,
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     #[cfg(test)]
     #[must_use]
     pub(crate) fn component_roots(&self) -> Vec<usize> {
@@ -158,8 +158,9 @@ mod tests {
 
     #[test]
     fn component_roots_of_empty_graph_are_empty() {
-        assert!(Smiles::new().component_roots().is_empty());
-        assert_eq!(Smiles::new().root_of_component(0), None);
+        let smiles = Smiles::<crate::smiles::ConcreteAtoms>::new_for_policy();
+        assert!(smiles.component_roots().is_empty());
+        assert_eq!(smiles.root_of_component(0), None);
     }
 
     #[test]

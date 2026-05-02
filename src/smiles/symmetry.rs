@@ -14,7 +14,7 @@ struct DirectedEdge {
     reverse: usize,
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     #[cfg(test)]
     #[must_use]
     pub(crate) fn rooted_symmetry_classes(&self) -> Vec<usize> {
@@ -136,7 +136,7 @@ impl DirectedEdgeTopology {
     }
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     fn directed_edge_topology(&self) -> DirectedEdgeTopology {
         let mut neighbors_by_node = Vec::with_capacity(self.atom_nodes.len());
         let mut bond_kinds_by_node = Vec::with_capacity(self.atom_nodes.len());
@@ -245,7 +245,11 @@ mod tests {
 
     #[test]
     fn rooted_symmetry_classes_of_empty_graph_are_empty() {
-        assert!(Smiles::new().rooted_symmetry_classes().is_empty());
+        assert!(
+            Smiles::<crate::smiles::ConcreteAtoms>::new_for_policy()
+                .rooted_symmetry_classes()
+                .is_empty()
+        );
     }
 
     #[test]

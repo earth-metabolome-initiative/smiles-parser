@@ -1,5 +1,4 @@
 use alloc::vec::Vec;
-use core::str::FromStr;
 
 use super::super::{Smiles, canonicalization_state_key};
 

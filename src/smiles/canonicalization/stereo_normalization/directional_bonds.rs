@@ -49,7 +49,7 @@ pub(super) struct AtomBasedSubstituentPriorityKey {
     refined_class: usize,
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     #[allow(clippy::too_many_lines)]
     pub(super) fn atom_based_double_bond_normalization(
         &self,
@@ -95,8 +95,14 @@ impl Smiles {
             .iter()
             .map(|record| {
                 DirectionalParityConstraint {
-                    left_edge_key: Smiles::edge_key(record.2.endpoint, record.2.reference_atom),
-                    right_edge_key: Smiles::edge_key(record.3.endpoint, record.3.reference_atom),
+                    left_edge_key: crate::smiles::edge_key(
+                        record.2.endpoint,
+                        record.2.reference_atom,
+                    ),
+                    right_edge_key: crate::smiles::edge_key(
+                        record.3.endpoint,
+                        record.3.reference_atom,
+                    ),
                     same_parity: matches!(record.4, DoubleBondStereoConfig::E),
                 }
             })
@@ -168,11 +174,11 @@ impl Smiles {
             }
 
             for directional_neighbor in directional_neighbors_a {
-                let (left, right) = Smiles::edge_key(endpoint_a, directional_neighbor);
+                let (left, right) = crate::smiles::edge_key(endpoint_a, directional_neighbor);
                 rows[left].push((right, Bond::Single));
             }
             for directional_neighbor in directional_neighbors_b {
-                let (left, right) = Smiles::edge_key(endpoint_b, directional_neighbor);
+                let (left, right) = crate::smiles::edge_key(endpoint_b, directional_neighbor);
                 rows[left].push((right, Bond::Single));
             }
         }
@@ -345,7 +351,7 @@ impl Smiles {
 }
 
 pub(super) fn atom_based_substituent_priority_key(
-    smiles: &Smiles,
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     endpoint: usize,
     neighbor: usize,
     rooted_classes: &[usize],
@@ -373,7 +379,7 @@ pub(super) fn atom_based_substituent_priority_key(
 }
 
 fn non_semantic_double_bond_supports_semantic_stereo(
-    smiles: &Smiles,
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     node_a: usize,
     node_b: usize,
 ) -> bool {
@@ -392,7 +398,7 @@ fn non_semantic_double_bond_supports_semantic_stereo(
 }
 
 fn non_semantic_double_bond_directional_neighbors(
-    smiles: &Smiles,
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     endpoint: usize,
     opposite_endpoint: usize,
 ) -> Vec<usize> {
@@ -408,7 +414,7 @@ fn non_semantic_double_bond_directional_neighbors(
 }
 
 fn non_semantic_double_bond_has_unique_reference_substituent(
-    smiles: &Smiles,
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     endpoint: usize,
     opposite_endpoint: usize,
     rooted_classes: &[usize],
@@ -515,7 +521,7 @@ pub(super) fn atom_based_override_bond(
     from: usize,
     to: usize,
 ) -> Option<Bond> {
-    let (left, right) = Smiles::edge_key(from, to);
+    let (left, right) = crate::smiles::edge_key(from, to);
     let row = rows.get(left)?;
     let index = row.binary_search_by_key(&right, |&(neighbor, _)| neighbor).ok()?;
     Some(row[index].1)

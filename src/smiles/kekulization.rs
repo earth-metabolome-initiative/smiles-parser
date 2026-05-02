@@ -9,7 +9,7 @@ use geometric_traits::traits::{
 };
 use thiserror::Error;
 
-use super::{BondEntry, BondMatrix, Smiles};
+use super::{BondEntry, BondMatrix, Smiles, SmilesAtomPolicy};
 use crate::bond::Bond;
 
 /// Error raised while converting aromatic bonds into a Kekule form.
@@ -49,7 +49,7 @@ pub enum KekulizationMode {
     Standalone,
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// Returns a localized Kekule form of the current graph.
     ///
     /// This is equivalent to calling
@@ -59,8 +59,7 @@ impl Smiles {
     /// # Examples
     ///
     /// ```rust
-    /// use core::str::FromStr;
-    ///
+    /// ///
     /// use smiles_parser::prelude::Smiles;
     ///
     /// let original = Smiles::from_str("C1=CN=CN1").expect("valid Kekule imidazole");
@@ -85,8 +84,7 @@ impl Smiles {
     /// # Examples
     ///
     /// ```rust
-    /// use core::str::FromStr;
-    ///
+    /// ///
     /// use smiles_parser::prelude::{KekulizationMode, Smiles};
     ///
     /// let aromatic = Smiles::from_str("c1ccccc1").expect("valid aromatic benzene");
@@ -190,8 +188,7 @@ impl Smiles {
     /// # Examples
     ///
     /// ```rust
-    /// use core::str::FromStr;
-    ///
+    /// ///
     /// use smiles_parser::prelude::Smiles;
     ///
     /// let aromatic = Smiles::from_str("c1ccccc1").expect("valid aromatic benzene");
@@ -220,7 +217,11 @@ struct KekulizationCandidateGraph {
 }
 
 impl KekulizationCandidateGraph {
-    fn new(smiles: &Smiles, aromatic_bonds: &[AromaticBond], local_atom_ids: &[usize]) -> Self {
+    fn new(
+        smiles: &Smiles<impl SmilesAtomPolicy>,
+        aromatic_bonds: &[AromaticBond],
+        local_atom_ids: &[usize],
+    ) -> Self {
         let mut original_to_local = vec![None; smiles.nodes().len()];
         for (local_id, atom_id) in local_atom_ids.iter().copied().enumerate() {
             original_to_local[atom_id] = Some(local_id);
@@ -332,7 +333,7 @@ fn has_unlocalizable_aromatic_component(
     false
 }
 
-fn candidate_atom_ids(smiles: &Smiles) -> Vec<usize> {
+fn candidate_atom_ids(smiles: &Smiles<impl SmilesAtomPolicy>) -> Vec<usize> {
     let implicit_hydrogen_counts = smiles.implicit_hydrogen_counts();
     smiles
         .nodes()
@@ -346,7 +347,7 @@ fn candidate_atom_ids(smiles: &Smiles) -> Vec<usize> {
 }
 
 fn needs_localized_double_bond(
-    smiles: &Smiles,
+    smiles: &Smiles<impl SmilesAtomPolicy>,
     atom_id: usize,
     atom: &crate::atom::Atom,
     implicit_hydrogen_count: u8,
@@ -412,7 +413,6 @@ mod tests {
         crate::smiles::AromaticityPolicy::RdkitSimple,
         crate::smiles::AromaticityPolicy::RdkitMdl,
     ];
-    use std::str::FromStr;
 
     use elements_rs::Element;
     use geometric_traits::traits::SparseValuedMatrixRef;
@@ -427,6 +427,7 @@ mod tests {
             Bond,
             bond_edge::{BondEdge, bond_edge},
         },
+        parser::smiles_parser::parse_wildcard_smiles,
         smiles::BondMatrixBuilder,
     };
 
@@ -760,7 +761,7 @@ mod tests {
     }
 
     fn assert_fuzz_roundtrip_regression_for_all_policies(input: &str) {
-        let smiles = Smiles::from_str(input).expect("fuzz input should parse");
+        let smiles = parse_wildcard_smiles(input).expect("fuzz input should parse");
 
         for policy in TEST_POLICIES {
             let Ok(perception) = smiles.perceive_aromaticity_for(policy) else {

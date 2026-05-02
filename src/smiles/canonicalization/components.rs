@@ -7,7 +7,7 @@ use super::{
 };
 use crate::smiles::{BondMatrixBuilder, Smiles};
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     pub(super) fn canonical_labeling_with(
         &self,
         whole_graph_labeling: impl Fn(&Self) -> SmilesCanonicalLabeling,

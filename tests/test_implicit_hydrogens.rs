@@ -16,21 +16,15 @@
 
 mod implicit_hydrogen_common;
 
-use std::str::FromStr;
-
 use implicit_hydrogen_common::{
     AROMATIC_CASES, ImplicitHydrogenCase, ORGANIC_SUBSET_CASES, RAW_RDKIT_COMPAT_CASES, all_cases,
 };
-use smiles_parser::smiles::Smiles;
+use smiles_parser::smiles::{Smiles, WildcardSmiles};
 
 #[test]
 fn implicit_hydrogen_fixtures_match_current_parser_node_order() {
     for case in all_cases() {
-        let smiles = Smiles::from_str(case.smiles).unwrap_or_else(|err| {
-            panic!("fixture {} failed to parse:\n{}", case.name, err.render(case.smiles))
-        });
-
-        let actual_labels = smiles.nodes().iter().map(ToString::to_string).collect::<Vec<_>>();
+        let actual_labels = parsed_atom_labels(case);
         let expected_labels = case.atoms.iter().map(|atom| atom.atom).collect::<Vec<_>>();
 
         assert_eq!(
@@ -67,11 +61,7 @@ fn aromatic_implicit_hydrogens_match_fixture() {
 
 fn assert_cases_match_expected(cases: &[ImplicitHydrogenCase]) {
     for case in cases {
-        let smiles = Smiles::from_str(case.smiles).unwrap_or_else(|err| {
-            panic!("fixture {} failed to parse:\n{}", case.name, err.render(case.smiles))
-        });
-
-        let actual = smiles.implicit_hydrogen_counts();
+        let actual = parsed_implicit_hydrogen_counts(case);
         let expected = case.atoms.iter().map(|atom| atom.implicit_hydrogens).collect::<Vec<_>>();
 
         assert_eq!(
@@ -82,5 +72,33 @@ fn assert_cases_match_expected(cases: &[ImplicitHydrogenCase]) {
             case.smiles,
             case.note
         );
+    }
+}
+
+fn parsed_atom_labels(case: &ImplicitHydrogenCase) -> Vec<String> {
+    if case.smiles.contains('*') {
+        let smiles = WildcardSmiles::from_str(case.smiles).unwrap_or_else(|err| {
+            panic!("fixture {} failed to parse:\n{}", case.name, err.render(case.smiles))
+        });
+        smiles.nodes().iter().map(ToString::to_string).collect()
+    } else {
+        let smiles = Smiles::from_str(case.smiles).unwrap_or_else(|err| {
+            panic!("fixture {} failed to parse:\n{}", case.name, err.render(case.smiles))
+        });
+        smiles.nodes().iter().map(ToString::to_string).collect()
+    }
+}
+
+fn parsed_implicit_hydrogen_counts(case: &ImplicitHydrogenCase) -> Vec<u8> {
+    if case.smiles.contains('*') {
+        let smiles = WildcardSmiles::from_str(case.smiles).unwrap_or_else(|err| {
+            panic!("fixture {} failed to parse:\n{}", case.name, err.render(case.smiles))
+        });
+        smiles.implicit_hydrogen_counts().to_vec()
+    } else {
+        let smiles = Smiles::from_str(case.smiles).unwrap_or_else(|err| {
+            panic!("fixture {} failed to parse:\n{}", case.name, err.render(case.smiles))
+        });
+        smiles.implicit_hydrogen_counts().to_vec()
     }
 }

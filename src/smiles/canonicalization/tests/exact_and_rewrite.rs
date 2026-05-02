@@ -1,5 +1,4 @@
 use alloc::{string::ToString, vec::Vec};
-use core::str::FromStr;
 
 use geometric_traits::traits::SparseValuedMatrixRef;
 
@@ -7,7 +6,7 @@ use super::super::{
     Smiles, remap_parsed_stereo_neighbors_row,
     support::{assert_canonicalization_invariants, permute_smiles, same_canonicalization_state},
 };
-use crate::smiles::StereoNeighbor;
+use crate::{parser::smiles_parser::parse_wildcard_smiles, smiles::StereoNeighbor};
 
 #[test]
 fn exact_canonicalize_is_idempotent_for_disconnected_cases() {
@@ -113,7 +112,7 @@ fn canonicalize_remaps_implicit_hydrogen_cache_and_clears_provenance() {
 
 #[test]
 fn canonicalization_spelling_normal_form_keeps_aromatic_wildcards_bracketed() {
-    let aromaticized = Smiles::from_str("******#8OOO*c8")
+    let aromaticized = parse_wildcard_smiles("******#8OOO*c8")
         .unwrap()
         .perceive_aromaticity()
         .unwrap()

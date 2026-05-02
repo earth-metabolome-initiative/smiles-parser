@@ -1,13 +1,16 @@
-use core::str::FromStr;
-
 use geometric_traits::traits::SparseValuedMatrixRef;
 
 use super::super::{
     Smiles, canonicalization_state_key,
     support::{assert_canonicalization_invariants, same_canonicalization_state},
 };
+use crate::{parser::smiles_parser::parse_wildcard_smiles, smiles::WildcardAtoms};
 
-fn hidden_bond_order_digest(smiles: &Smiles) -> u64 {
+fn wildcard_smiles(source: &str) -> Smiles<WildcardAtoms> {
+    parse_wildcard_smiles(source).unwrap()
+}
+
+fn hidden_bond_order_digest(smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>) -> u64 {
     use core::hash::{Hash, Hasher};
     use std::collections::hash_map::DefaultHasher;
 
@@ -22,7 +25,7 @@ fn hidden_bond_order_digest(smiles: &Smiles) -> u64 {
 
 #[test]
 fn canonicalize_handles_wildcard_quadruple_bond_regression() {
-    let smiles = Smiles::from_str("*$*").unwrap();
+    let smiles = wildcard_smiles("*$*");
 
     assert_canonicalization_invariants(&smiles);
 }
@@ -36,23 +39,21 @@ fn canonicalize_handles_aromatic_sulfur_chain_regression() {
 
 #[test]
 fn canonicalize_handles_mixed_aromatic_phosphorus_wildcard_regression() {
-    let smiles = Smiles::from_str("bsC3P1*sC3P1**p1C3P1**OC3p1C3Os*p1C3P1**OC3p1C3Os").unwrap();
+    let smiles = wildcard_smiles("bsC3P1*sC3P1**p1C3P1**OC3p1C3Os*p1C3P1**OC3p1C3Os");
 
     assert_canonicalization_invariants(&smiles);
 }
 
 #[test]
 fn canonicalize_handles_polywildcard_aromatic_oxygen_regression() {
-    let smiles =
-        Smiles::from_str("OO*c8Oc8OOOO**c8OOO*c8OOOO*CO*c8OOOO*c8OOOO**c8OOO*c8OOOO*COOOO")
-            .unwrap();
+    let smiles = wildcard_smiles("OO*c8Oc8OOOO**c8OOO*c8OOOO*CO*c8OOOO*c8OOOO**c8OOO*c8OOOO*COOOO");
 
     assert_canonicalization_invariants(&smiles);
 }
 
 #[test]
 fn canonicalize_handles_aromatic_wildcard_triangle_regression() {
-    let smiles = Smiles::from_str("P1*P1").unwrap();
+    let smiles = wildcard_smiles("P1*P1");
 
     assert_canonicalization_invariants(&smiles);
 }
@@ -60,46 +61,45 @@ fn canonicalize_handles_aromatic_wildcard_triangle_regression() {
 #[test]
 fn canonicalize_handles_fuzz_crash_dfd86928_regression() {
     let smiles =
-        Smiles::from_str("CBBBBBBBBBBBBBBBBBBBBBBB.OBBBBBBBBBBBBBBBBBBBB.OBBP1*P1**BBBBBBB")
-            .unwrap();
+        wildcard_smiles("CBBBBBBBBBBBBBBBBBBBBBBB.OBBBBBBBBBBBBBBBBBBBB.OBBP1*P1**BBBBBBB");
 
     assert_canonicalization_invariants(&smiles);
 }
 
 #[test]
 fn canonicalize_handles_fuzz_crash_partial_aromatic_diagnostics_regression() {
-    let smiles =
-        Smiles::from_str("bsp1C2P1**C3o1**p1*CPp*O14C3Po1**p1C2P1**C3o1$*p1C4P1**Op1C3Os").unwrap();
+    let smiles = wildcard_smiles("bsp1C2P1**C3o1**p1*CPp*O14C3Po1**p1C2P1**C3o1$*p1C4P1**Op1C3Os");
 
     assert_canonicalization_invariants(&smiles);
 }
 
 #[test]
 fn canonicalize_handles_fuzz_crash_component_order_budget_regression() {
-    let smiles = Smiles::from_str("Oooooooooooooooooooo.****.*ccOc**S*nnbsC3P1*soooooooooo.****.*ccOc**S*nnbsC3P1*sC3P1**p1C3P1**OC3p1C3Os*p1C3P2***S*nnnCnsnC3P1**p1C3P1**OC3p1C3Os*p1C3P2***S*nnnCns").unwrap();
+    let smiles = wildcard_smiles(
+        "Oooooooooooooooooooo.****.*ccOc**S*nnbsC3P1*soooooooooo.****.*ccOc**S*nnbsC3P1*sC3P1**p1C3P1**OC3p1C3Os*p1C3P2***S*nnnCnsnC3P1**p1C3P1**OC3p1C3Os*p1C3P2***S*nnnCns",
+    );
 
     assert_canonicalization_invariants(&smiles);
 }
 
 #[test]
 fn canonicalize_handles_fuzz_crash_new_regression_candidate() {
-    let smiles = Smiles::from_str("***SCbs=3P1o*sC3P1**p1C3P1**OC3P1*=*OC3p1C3Os").unwrap();
+    let smiles = wildcard_smiles("***SCbs=3P1o*sC3P1**p1C3P1**OC3P1*=*OC3p1C3Os");
     assert_canonicalization_invariants(&smiles);
 }
 
 #[test]
 fn canonicalize_handles_fuzz_crash_db6568a7_regression() {
-    let smiles = Smiles::from_str(
+    let smiles = wildcard_smiles(
         "*[*@]*.**.******[*@]*.**.**.*.**.**.******.**.****.*.*.**.**.***/**.**.****.**.***.**.**.*.**.**.******N**.****.**.**.**",
-    )
-    .unwrap();
+    );
 
     assert_canonicalization_invariants(&smiles);
 }
 
 #[test]
 fn canonicalize_handles_fuzz_crash_hex_wildcard_oxygen_regression() {
-    let smiles = Smiles::from_str("******#8OOO*c8").unwrap();
+    let smiles = wildcard_smiles("******#8OOO*c8");
 
     assert_canonicalization_invariants(&smiles);
 }

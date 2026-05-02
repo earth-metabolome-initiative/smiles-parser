@@ -126,6 +126,9 @@ pub enum SmilesError {
     /// An unexpected right parentheses `)` was found
     #[error("Unexpected `)`")]
     UnexpectedRightParentheses,
+    /// A wildcard atom was parsed where only concrete atoms are allowed.
+    #[error("Wildcard atom not allowed")]
+    WildcardAtomNotAllowed,
     /// A closing `]` bracket was not found
     #[error("Unclosed '['")]
     UnclosedBracket,
@@ -326,6 +329,7 @@ mod tests {
             (SmilesError::UnexpectedLeftParentheses, "Unexpected '('".to_string()),
             (SmilesError::UnexpectedRightBracket, "Unexpected ']'".to_string()),
             (SmilesError::UnexpectedRightParentheses, "Unexpected `)`".to_string()),
+            (SmilesError::WildcardAtomNotAllowed, "Wildcard atom not allowed".to_string()),
             (SmilesError::UnclosedBracket, "Unclosed '['".to_string()),
             (SmilesError::UnclosedBranch, "Branch not closed".to_string()),
             (SmilesError::UnclosedRing, "Ring not closed".to_string()),

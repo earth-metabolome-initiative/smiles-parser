@@ -1,7 +1,7 @@
 use alloc::string::String;
 use core::fmt::Write;
 
-use super::{Smiles, render_plan::RenderPlan};
+use super::{Smiles, SmilesAtomPolicy, render_plan::RenderPlan};
 
 /// Renders a [`Smiles`] graph by first building a [`RenderPlan`] and then
 /// emitting text from that plan.
@@ -10,7 +10,7 @@ use super::{Smiles, render_plan::RenderPlan};
 /// structural choices must already be encoded in the plan; this function is a
 /// pure write-only pass.
 #[must_use]
-pub(crate) fn emit(smiles: &Smiles) -> String {
+pub(crate) fn emit<AtomPolicy: SmilesAtomPolicy>(smiles: &Smiles<AtomPolicy>) -> String {
     let plan = smiles.render_plan();
     emit_with_plan(smiles, &plan)
 }
@@ -26,7 +26,10 @@ pub(crate) fn emit(smiles: &Smiles) -> String {
 /// - continuation edges
 /// - `.` between disconnected components
 #[must_use]
-fn emit_with_plan(smiles: &Smiles, plan: &RenderPlan) -> String {
+fn emit_with_plan<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
+    plan: &RenderPlan,
+) -> String {
     let mut rendered = String::with_capacity(plan.estimated_rendered_len(smiles));
 
     for (index, component) in plan.components().iter().enumerate() {
@@ -47,7 +50,12 @@ fn emit_with_plan(smiles: &Smiles, plan: &RenderPlan) -> String {
 /// 2. attached closures
 /// 3. parenthesized branch children
 /// 4. continuation child, if any
-fn emit_node(smiles: &Smiles, plan: &RenderPlan, node_id: usize, target: &mut String) {
+fn emit_node<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
+    plan: &RenderPlan,
+    node_id: usize,
+    target: &mut String,
+) {
     let node_plan = plan.node(node_id).unwrap_or_else(|| unreachable!());
     let atom = smiles.node_by_id(node_id).unwrap_or_else(|| unreachable!());
     atom.write_smiles_with_chirality_to_string(target, node_plan.normalized_chirality());
@@ -99,7 +107,7 @@ fn write_ring_label(target: &mut String, label: u16) {
 /// Returns the bond token to print between two planned neighbors after
 /// aromatic elision rules are applied.
 fn rendered_bond_text(
-    smiles: &Smiles,
+    smiles: &Smiles<impl SmilesAtomPolicy>,
     from: usize,
     to: usize,
     bond: crate::bond::Bond,
@@ -120,10 +128,14 @@ mod tests {
     use alloc::string::String;
 
     use super::emit;
-    use crate::smiles::Smiles;
+    use crate::{parser::smiles_parser::parse_wildcard_smiles, smiles::Smiles};
 
     fn render(smiles: &str) -> String {
-        emit(&smiles.parse::<Smiles>().unwrap())
+        if smiles.contains('*') {
+            emit(&parse_wildcard_smiles(smiles).unwrap())
+        } else {
+            emit(&smiles.parse::<Smiles>().unwrap())
+        }
     }
 
     #[test]

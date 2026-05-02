@@ -51,7 +51,10 @@ fn canonical_stereo_neighbor_sort_key(
     }
 }
 
-fn allene_like_stereo_center(smiles: &Smiles, node_id: usize) -> bool {
+fn allene_like_stereo_center(
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
+    node_id: usize,
+) -> bool {
     smiles.edge_count_for_node(node_id) == 2
         && smiles.edges_for_node(node_id).all(|edge| edge.2 == Bond::Double)
 }
@@ -70,7 +73,7 @@ fn non_tetrahedral_default_chirality(
 }
 
 pub(crate) fn stereo_chirality_normal_form(
-    smiles: &Smiles,
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     node_id: usize,
     chirality: Option<Chirality>,
     parsed_neighbors: &[StereoNeighbor],
@@ -134,7 +137,7 @@ fn expected_stereo_neighbor_count(chirality: Chirality) -> usize {
 }
 
 fn stereo_neighbors_with_implicit_hydrogens(
-    smiles: &Smiles,
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     node_id: usize,
     chirality: Chirality,
     parsed_neighbors: &[StereoNeighbor],
@@ -154,7 +157,7 @@ fn stereo_neighbors_with_implicit_hydrogens(
 }
 
 pub(crate) fn canonical_stereo_neighbors_row(
-    smiles: &Smiles,
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     node_id: usize,
     chirality: Option<Chirality>,
     parsed_neighbors: &[StereoNeighbor],
@@ -209,7 +212,7 @@ pub(crate) fn canonical_stereo_neighbors_row(
 }
 
 pub(super) fn normalized_stereo_chirality(
-    smiles: &Smiles,
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     node_id: usize,
     chirality: Option<Chirality>,
     parsed_neighbors: &[StereoNeighbor],
@@ -245,7 +248,7 @@ pub(super) fn normalized_stereo_chirality(
 }
 
 fn stereo_substituent_identity_key(
-    smiles: &Smiles,
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     endpoint: usize,
     neighbor: StereoNeighbor,
     rooted_classes: &[usize],
@@ -266,7 +269,7 @@ fn stereo_substituent_identity_key(
 }
 
 pub(crate) fn tetrahedral_like_is_stereogenic(
-    smiles: &Smiles,
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     node_id: usize,
     chirality: Chirality,
     parsed_neighbors: &[StereoNeighbor],
@@ -302,7 +305,7 @@ fn stereo_neighbor_sequence_key(
 }
 
 fn square_planar_identity_sequence_key(
-    smiles: &Smiles,
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     node_id: usize,
     neighbors: &[StereoNeighbor],
     rooted_classes: &[usize],
@@ -324,7 +327,7 @@ fn square_planar_identity_sequence_key(
 }
 
 fn canonicalize_equivalent_square_planar_neighbors(
-    smiles: &Smiles,
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     node_id: usize,
     neighbors: &[StereoNeighbor],
     new_index_of_old_node: &[usize],
@@ -378,7 +381,7 @@ fn canonicalize_equivalent_square_planar_neighbors(
 }
 
 fn canonical_square_planar_candidate_key(
-    smiles: &Smiles,
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     node_id: usize,
     neighbors: &[StereoNeighbor],
     new_index_of_old_node: &[usize],
@@ -415,7 +418,7 @@ fn square_shape_for_chirality(chirality: Chirality) -> Option<SquareShape> {
 }
 
 fn canonical_square_planar_neighbors(
-    smiles: &Smiles,
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     node_id: usize,
     parsed_neighbors: &[StereoNeighbor],
     new_index_of_old_node: &[usize],

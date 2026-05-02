@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use geometric_traits::traits::SparseValuedMatrix2DRef;
 
 use super::{
-    Smiles,
+    Smiles, SmilesAtomPolicy,
     branches::BranchPlan,
     spanning_tree::SpanningForest,
     stereo::{
@@ -45,7 +45,10 @@ impl RenderPlan {
     /// - closure bond symbols and ring labels
     /// - branch parentheses and child bond symbols
     #[must_use]
-    pub(crate) fn estimated_rendered_len(&self, smiles: &Smiles) -> usize {
+    pub(crate) fn estimated_rendered_len<AtomPolicy: SmilesAtomPolicy>(
+        &self,
+        smiles: &Smiles<AtomPolicy>,
+    ) -> usize {
         let mut total = self.components.len().saturating_sub(1);
 
         for (node_id, node_plan) in self.nodes.iter().enumerate() {
@@ -243,7 +246,7 @@ struct RenderOrdering {
     max_assigned_label: u16,
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// Builds the complete traversal-and-emission plan for this graph.
     ///
     /// This is the planning half of display. It computes every ordering and
@@ -373,8 +376,8 @@ impl Smiles {
 /// This combines the forest, branch plan, component preorder, closure
 /// scheduling, and directional override projection so the final node loop does
 /// not have to recompute any structural decisions.
-fn build_render_ordering(
-    smiles: &Smiles,
+fn build_render_ordering<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
     forest: SpanningForest,
     invariants: &[crate::smiles::invariants::AtomInvariant],
     refined_classes: &[usize],
@@ -470,8 +473,8 @@ fn assign_component_preorder(
     }
 }
 
-fn build_labeled_closures(
-    smiles: &Smiles,
+fn build_labeled_closures<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
     forest: &SpanningForest,
     preorder_indices: &[usize],
     global_preorder: &[usize],
@@ -495,8 +498,8 @@ fn build_labeled_closures(
 /// - nodes are processed in final global preorder
 /// - closings are emitted before openings at the same node
 /// - labels are recycled as soon as the closing endpoint is seen
-fn build_labeled_closures_impl(
-    smiles: &Smiles,
+fn build_labeled_closures_impl<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
     forest: &SpanningForest,
     preorder_indices: &[usize],
     global_preorder: &[usize],
@@ -619,8 +622,8 @@ fn lowest_free_label(used_labels: &[bool]) -> u16 {
 /// - semantic directional overrides derived from supported double-bond stereo
 /// - the fallback policy that preserves raw directional syntax in unsupported
 ///   environments
-fn planned_bond_for_emit(
-    smiles: &Smiles,
+fn planned_bond_for_emit<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
     directional_overrides: &DirectionalBondOverrides,
     bond: Bond,
     from: usize,
@@ -649,8 +652,8 @@ fn planned_bond_for_emit(
 /// Returns whether a raw directional single bond must be preserved because the
 /// surrounding double-bond environment is outside the current semantic stereo
 /// model.
-fn preserve_raw_directional_single(
-    smiles: &Smiles,
+fn preserve_raw_directional_single<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
     directional_overrides: &DirectionalBondOverrides,
     from: usize,
     to: usize,
@@ -666,7 +669,11 @@ fn preserve_raw_directional_single(
 
 /// Returns whether a double bond is simple enough for the semantic alkene
 /// stereo extractor to own it completely.
-fn double_bond_supports_semantic_stereo(smiles: &Smiles, node_a: usize, node_b: usize) -> bool {
+fn double_bond_supports_semantic_stereo<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
+    node_a: usize,
+    node_b: usize,
+) -> bool {
     non_single_family_bond_count(smiles, node_a) == 1
         && non_single_family_bond_count(smiles, node_b) == 1
 }
@@ -675,7 +682,10 @@ fn double_bond_supports_semantic_stereo(smiles: &Smiles, node_a: usize, node_b: 
 ///
 /// `Single`, `Up`, and `Down` are treated as one family here because the
 /// semantic double-bond stereo layer reasons about them together.
-fn non_single_family_bond_count(smiles: &Smiles, node_id: usize) -> usize {
+fn non_single_family_bond_count<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
+    node_id: usize,
+) -> usize {
     smiles
         .bond_matrix()
         .sparse_row_values_ref(node_id)
@@ -692,8 +702,8 @@ fn non_single_family_bond_count(smiles: &Smiles, node_id: usize) -> usize {
 /// - explicit hydrogen for chiral `[XH]` centers
 /// - closure partners in their node-local closure order
 /// - tree children in final branch/continuation order
-fn emitted_stereo_neighbors(
-    smiles: &Smiles,
+fn emitted_stereo_neighbors<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
     node_id: usize,
     parent: Option<usize>,
     closures: &[ClosureRenderPlan],
@@ -742,7 +752,12 @@ fn decimal_len_u16(value: u16) -> usize {
 
 /// Returns the rendered width of a bond token after aromatic elision rules are
 /// applied.
-fn rendered_bond_text_len(smiles: &Smiles, from: usize, to: usize, bond: Bond) -> usize {
+fn rendered_bond_text_len<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
+    from: usize,
+    to: usize,
+    bond: Bond,
+) -> usize {
     let from_aromatic = smiles.node_by_id(from).unwrap_or_else(|| unreachable!()).aromatic();
     let to_aromatic = smiles.node_by_id(to).unwrap_or_else(|| unreachable!()).aromatic();
     match bond {
@@ -766,7 +781,7 @@ mod tests {
 
     #[test]
     fn render_plan_of_empty_graph_is_empty() {
-        let plan = Smiles::new().render_plan();
+        let plan = Smiles::<crate::smiles::ConcreteAtoms>::new_for_policy().render_plan();
         assert!(plan.components().is_empty());
         assert_eq!(plan.node(0), None);
     }

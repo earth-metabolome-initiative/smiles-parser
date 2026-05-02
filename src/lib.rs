@@ -31,9 +31,10 @@ pub use crate::{
         AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
         AromaticityModel, AromaticityPerception, AromaticityPolicy, AromaticityRingFamilyKind,
         AromaticityStatus, DoubleBondStereoConfig, KekulizationError, KekulizationMode,
-        MolecularFormulaConversionError, RdkitDefaultAromaticity, RdkitMdlAromaticity,
-        RdkitSimpleAromaticity, RingAtomMembership, RingAtomMembershipScratch, RingMembership,
-        Smiles, SmilesComponents, SymmSssrResult, SymmSssrStatus,
+        RdkitDefaultAromaticity, RdkitMdlAromaticity, RdkitSimpleAromaticity, RingAtomMembership,
+        RingAtomMembershipScratch, RingMembership, Smiles, SmilesComponents, SymmSssrResult,
+        SymmSssrStatus, WildcardAromaticityPerception, WildcardMolecularFormulaConversionError,
+        WildcardSmiles, WildcardSmilesComponents,
     },
 };
 
@@ -43,9 +44,10 @@ pub mod prelude {
         AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
         AromaticityModel, AromaticityPerception, AromaticityPolicy, AromaticityRingFamilyKind,
         AromaticityStatus, DoubleBondStereoConfig, KekulizationError, KekulizationMode,
-        MolecularFormulaConversionError, RdkitDefaultAromaticity, RdkitMdlAromaticity,
-        RdkitSimpleAromaticity, RingAtomMembership, RingAtomMembershipScratch, RingMembership,
-        Smiles, SmilesComponents, SmilesError, SmilesErrorWithSpan, SymmSssrResult, SymmSssrStatus,
+        RdkitDefaultAromaticity, RdkitMdlAromaticity, RdkitSimpleAromaticity, RingAtomMembership,
+        RingAtomMembershipScratch, RingMembership, Smiles, SmilesComponents, SmilesError,
+        SmilesErrorWithSpan, SymmSssrResult, SymmSssrStatus, WildcardAromaticityPerception,
+        WildcardMolecularFormulaConversionError, WildcardSmiles, WildcardSmilesComponents,
     };
     #[cfg(feature = "datasets")]
     pub use crate::{

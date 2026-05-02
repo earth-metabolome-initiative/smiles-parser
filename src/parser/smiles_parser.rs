@@ -1,15 +1,16 @@
 //! Parser state used while turning tokenized SMILES into a graph.
 
 use alloc::vec::Vec;
+use core::marker::PhantomData;
 
-use elements_rs::Element;
+use elements_rs::{Element, Isotope};
 
 use crate::{
     atom::Atom,
     bond::{Bond, ring_num::RingNum},
     errors::{SmilesError, SmilesErrorWithSpan},
     parser::token_iter::TokenIter,
-    smiles::{BondMatrixBuilder, Smiles, StereoNeighbor},
+    smiles::{BondMatrixBuilder, Smiles, SmilesAtomPolicy, StereoNeighbor, WildcardAtoms},
     token::{Token, TokenKind, TokenWithSpan},
 };
 
@@ -23,8 +24,24 @@ fn next_token(tokens: &mut TokenIter<'_>) -> Result<Option<TokenWithSpan>, Smile
 }
 
 pub(crate) fn parse_smiles(input: &str) -> Result<Smiles, SmilesErrorWithSpan> {
+    parse_smiles_with_policy(input)
+}
+
+pub(crate) fn parse_wildcard_smiles(
+    input: &str,
+) -> Result<Smiles<WildcardAtoms>, SmilesErrorWithSpan> {
+    parse_smiles_with_policy(input)
+}
+
+pub(crate) fn parse_smiles_with_policy<AtomPolicy: SmilesAtomPolicy>(
+    input: &str,
+) -> Result<Smiles<AtomPolicy>, SmilesErrorWithSpan> {
+    if input.is_empty() {
+        return Err(SmilesErrorWithSpan::new(SmilesError::MissingElement, 0, 0));
+    }
+
     let mut tokens = TokenIter::from(input);
-    let mut parser_state = ParserState::new(input.len());
+    let mut parser_state = ParserState::<AtomPolicy>::new_for_policy(input.len());
     let mut previous = None;
     let mut current = next_token(&mut tokens)?;
     let mut next = next_token(&mut tokens)?;
@@ -46,7 +63,7 @@ pub(crate) fn parse_smiles(input: &str) -> Result<Smiles, SmilesErrorWithSpan> {
             }
             Token::NonBond => {
                 parser_state.validate_component_boundary()?;
-                ParserState::validate_non_bond(previous, next_kind, start, end)?;
+                ParserState::<AtomPolicy>::validate_non_bond(previous, next_kind, start, end)?;
             }
             Token::RingClosure(ring_num) => {
                 parser_state.validate_and_add_ring_num(start, end, ring_num)?;
@@ -66,7 +83,7 @@ pub(crate) fn parse_smiles(input: &str) -> Result<Smiles, SmilesErrorWithSpan> {
 }
 
 /// Structure containing parser state.
-struct ParserState {
+struct ParserState<AtomPolicy = crate::smiles::ConcreteAtoms> {
     /// Nodes accumulated during parsing.
     atom_nodes: Vec<Atom>,
     /// Bonds accumulated during parsing.
@@ -84,6 +101,7 @@ struct ParserState {
     parsed_stereo_neighbors: Vec<Vec<PendingStereoNeighbor>>,
     /// The last used span
     last_span: (usize, usize),
+    atom_policy: PhantomData<fn() -> AtomPolicy>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -93,10 +111,10 @@ enum PendingStereoNeighbor {
     RingLabel(RingNum),
 }
 
-impl ParserState {
+impl<AtomPolicy: SmilesAtomPolicy> ParserState<AtomPolicy> {
     /// Creates a new initial state for the parser.
     #[must_use]
-    fn new(input_len: usize) -> Self {
+    fn new_for_policy(input_len: usize) -> Self {
         Self {
             atom_nodes: Vec::with_capacity(input_len),
             bond_matrix: BondMatrixBuilder::with_capacity(input_len),
@@ -106,6 +124,7 @@ impl ParserState {
             ring_open: [None; 100],
             parsed_stereo_neighbors: Vec::with_capacity(input_len),
             last_span: (0, 0),
+            atom_policy: PhantomData,
         }
     }
     /// Updates the last span field.
@@ -162,7 +181,7 @@ impl ParserState {
     }
     /// Consumes the parser state and returns the parsed SMILES graph.
     #[must_use]
-    fn into_smiles(self) -> Smiles {
+    fn into_smiles(self) -> Smiles<AtomPolicy> {
         let number_of_nodes = self.atom_nodes.len();
         let parsed_stereo_neighbors = self
             .parsed_stereo_neighbors
@@ -238,6 +257,8 @@ impl ParserState {
     /// Adds an atom to the SMILES graph, either bracketed or unbracketed.
     ///
     /// # Errors
+    /// - Returns [`SmilesError::InvalidIsotope`] if a concrete isotope label is
+    ///   not known by `elements-rs`.
     /// - Returns [`SmilesError::InvalidHydrogenWithExplicitHydrogensFound`] if
     ///   a bracketed hydrogen carries an explicit hydrogen count greater than
     ///   one.
@@ -250,6 +271,11 @@ impl ParserState {
         start: usize,
         end: usize,
     ) -> Result<(), SmilesErrorWithSpan> {
+        if !AtomPolicy::ALLOW_WILDCARDS && atom.symbol().is_wildcard() {
+            return Err(SmilesErrorWithSpan::new(SmilesError::WildcardAtomNotAllowed, start, end));
+        }
+        validate_concrete_isotope(&atom, start, end)?;
+
         let id = self.atom_nodes.len();
         let previous_atom = self.last_atom();
         if matches!(atom.element(), Some(Element::H)) && atom.hydrogen_count() > 1 {
@@ -495,6 +521,34 @@ impl ParserState {
     }
 }
 
+fn validate_concrete_isotope(
+    atom: &Atom,
+    start: usize,
+    end: usize,
+) -> Result<(), SmilesErrorWithSpan> {
+    let Some(mass_number) = atom.isotope_mass_number() else {
+        return Ok(());
+    };
+    let Some(element) = atom.element() else {
+        // Isotope-qualified wildcards appear in placeholder corpora such as
+        // PubChem. They still cannot be converted to exact formulas, but they
+        // do not name a concrete isotope to validate here.
+        return Ok(());
+    };
+
+    Isotope::try_from((element, mass_number))
+        .map(|_| ())
+        .map_err(|_| SmilesErrorWithSpan::new(SmilesError::InvalidIsotope, start, end))
+}
+
+#[cfg(test)]
+impl ParserState {
+    #[must_use]
+    fn new(input_len: usize) -> Self {
+        Self::new_for_policy(input_len)
+    }
+}
+
 #[inline]
 fn default_bond(nodes: &[Atom], id_a: usize, id_b: usize) -> Bond {
     let node_a = &nodes[id_a];
@@ -504,7 +558,6 @@ fn default_bond(nodes: &[Atom], id_a: usize, id_b: usize) -> Bond {
 
 #[cfg(test)]
 mod tests {
-    use core::str::FromStr;
 
     use elements_rs::Element;
 
@@ -762,9 +815,13 @@ mod tests {
 
     #[test]
     fn validate_non_bond_rejects_invalid_left_context() {
-        let err =
-            ParserState::validate_non_bond(Some(TokenKind::Bond), Some(TokenKind::Atom), 4, 5)
-                .expect_err("expected invalid non-bond token");
+        let err = ParserState::<crate::smiles::ConcreteAtoms>::validate_non_bond(
+            Some(TokenKind::Bond),
+            Some(TokenKind::Atom),
+            4,
+            5,
+        )
+        .expect_err("expected invalid non-bond token");
         assert_eq!(err.smiles_error(), SmilesError::InvalidNonBondToken);
         assert_eq!(err.start(), 4);
         assert_eq!(err.end(), 5);

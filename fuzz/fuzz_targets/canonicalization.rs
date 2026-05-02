@@ -1,9 +1,9 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use smiles_parser::smiles::Smiles;
+use smiles_parser::smiles::{Smiles, WildcardSmiles};
 
-fuzz_target!(|data: &str| {
+fn assert_strict_canonicalization(data: &str) {
     match data.parse::<Smiles>() {
         Ok(smiles) => {
             smiles.debug_assert_canonicalization_invariants();
@@ -12,4 +12,20 @@ fuzz_target!(|data: &str| {
             let _ = err.render(data);
         }
     }
+}
+
+fn assert_wildcard_canonicalization(data: &str) {
+    match data.parse::<WildcardSmiles>() {
+        Ok(smiles) => {
+            smiles.debug_assert_canonicalization_invariants();
+        }
+        Err(err) => {
+            let _ = err.render(data);
+        }
+    }
+}
+
+fuzz_target!(|data: &str| {
+    assert_strict_canonicalization(data);
+    assert_wildcard_canonicalization(data);
 });

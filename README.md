@@ -7,6 +7,8 @@ A parser that checks the validity of SMILES strings and converts them into molec
 ## Parsing Specification
 This parser was designed by following the [OpenSMILES specification](http://opensmiles.org/opensmiles.html) and [Wikipedia Article](https://en.wikipedia.org/wiki/Simplified_Molecular_Input_Line_Entry_System).
 It also accepts bracketed aromatic `te` as a compatibility extension.
+The default `Smiles` type accepts only concrete atoms. Use `WildcardSmiles` for SMILES strings that intentionally contain wildcard (`*`) atoms.
+`WildcardSmiles` exposes the same graph inspection and transformation APIs, and conversion back to `Smiles` is fallible so wildcard atoms cannot enter the strict type by accident.
 
 ## SMILES Parsing Rules:
 
@@ -14,9 +16,9 @@ It also accepts bracketed aromatic `te` as a compatibility extension.
 
 | Character | SMILES Purpose |
 | --------- | -------------- |
-| `A–Z, a–z` | **Atom symbols**. Unbracketed atoms are limited to the organic subset `B C N O P S F Cl Br I` plus aromatic forms `b c n o p s` and `*`. Inside brackets, atom symbols must match a valid element symbol (e.g., `Si`, `Na`) or a supported aromatic lowercase form (e.g., `se`, `as`, `te`) or `*`. Aromatic atoms are denoted by lowercase symbols. Multi-character element symbols use initial uppercase + lowercase (e.g., `Cl`, `Br`, `Si`), except bracketed aromatic symbols like `se`, `as`, `te`. | 
+| `A–Z, a–z` | **Atom symbols**. Unbracketed atoms are limited to the organic subset `B C N O P S F Cl Br I` plus aromatic forms `b c n o p s`. Inside brackets, atom symbols must match a valid element symbol (e.g., `Si`, `Na`) or a supported aromatic lowercase form (e.g., `se`, `as`, `te`). Aromatic atoms are denoted by lowercase symbols. Multi-character element symbols use initial uppercase + lowercase (e.g., `Cl`, `Br`, `Si`), except bracketed aromatic symbols like `se`, `as`, `te`. |
 | `[` `]` | **Bracket atoms**. Enter/exit bracket-atom grammar: `[` *isotope? symbol chiral? hcount? charge? class?* `]`. Brackets are required for non-organic-subset elements and whenever isotope, explicit hydrogen count, charge, chirality, or atom class are specified. |
-| `*` | **Wildcard atom**. May appear unbracketed (`*`) or bracketed (`[*]`), and in brackets may carry isotope/chirality/H-count/charge/class. |
+| `*` | **Wildcard atom**. Rejected by `Smiles`; accepted by `WildcardSmiles` either unbracketed (`*`) or bracketed (`[*]`), and in brackets may carry isotope/chirality/H-count/charge/class. |
 | `@` | **Chirality tag introducer** inside bracket atoms. Used as `@` / `@@` and extended forms like `@TH1`, `@AL1`, `@SP1`, `@TB1`, `@OH1` |
 | `+` `-` | **Charge signs** inside bracket atoms (e.g., `[O-]`, `[Cu+2]`, `[Ti++++]`). Note: `-` is also a **bond symbol** outside brackets.|
 | `:` `-` `=` `#` `$` `/` `\` `.` | **Bond symbols** in the main chain. `.` is the dot/disconnect (“no bond between components”). `-` is an explicit single bond (assumed to be single bond if bond is omitted from notation) and must be distinguished from charge sign by context (inside vs outside brackets). `:` represents an aromatic *one and a half* bond but may also be used for class. |
@@ -29,6 +31,7 @@ It also accepts bracketed aromatic `te` as a compatibility extension.
 ```rust
 use core::str::FromStr;
 
+use molecular_formulas::prelude::ChemicalFormula;
 use smiles_parser::smiles::Smiles;
 
 let smiles = Smiles::from_str("CCO").expect("valid SMILES should parse");
@@ -56,4 +59,8 @@ assert_eq!(
 
 // You can also inspect the rendered graph again as a SMILES string.
 assert_eq!(smiles.render(), "CCO");
+
+// Strict SMILES contain only concrete atoms, so molecular formula conversion is infallible.
+let formula: ChemicalFormula<u32, i32> = ChemicalFormula::from(&smiles);
+assert_eq!(formula.to_string(), "C₂H₆O");
 ```

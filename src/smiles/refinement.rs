@@ -54,7 +54,7 @@ struct AtomInvariantKey {
     bond_kind_histogram: [usize; 5],
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     #[cfg(test)]
     #[must_use]
     pub(crate) fn refined_atom_classes(&self) -> AtomPartition {
@@ -226,7 +226,8 @@ mod tests {
 
     #[test]
     fn partition_refinement_of_empty_graph_is_empty() {
-        let partition = Smiles::new().refined_atom_classes();
+        let partition =
+            Smiles::<crate::smiles::ConcreteAtoms>::new_for_policy().refined_atom_classes();
         assert_eq!(partition, AtomPartition { classes: Vec::new() });
     }
 

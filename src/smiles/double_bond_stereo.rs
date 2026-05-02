@@ -79,7 +79,7 @@ struct DoubleBondStereoCandidate {
     double_bond: BondEdge,
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     #[must_use]
     pub(super) fn double_bond_stereo_records(&self) -> Vec<DoubleBondStereoRecord> {
         let candidates = self.double_bond_stereo_candidates();
@@ -99,9 +99,9 @@ impl Smiles {
         node_a: usize,
         node_b: usize,
     ) -> Option<DoubleBondStereoConfig> {
-        let edge_key = Smiles::edge_key(node_a, node_b);
+        let edge_key = crate::smiles::edge_key(node_a, node_b);
         self.double_bond_stereo_records().into_iter().find_map(|record| {
-            (Smiles::edge_key(record.double_bond.0, record.double_bond.1) == edge_key)
+            (crate::smiles::edge_key(record.double_bond.0, record.double_bond.1) == edge_key)
                 .then_some(record.config())
         })
     }
@@ -466,7 +466,7 @@ impl PartialOrd for SubstituentPriorityKey {
 }
 
 fn substituent_priority_key(
-    smiles: &Smiles,
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     endpoint: usize,
     neighbor: usize,
     rooted_classes: &[usize],
@@ -638,7 +638,11 @@ mod tests {
 
     #[test]
     fn double_bond_stereo_of_empty_graph_is_empty() {
-        assert!(Smiles::new().double_bond_stereo_records().is_empty());
+        assert!(
+            Smiles::<crate::smiles::ConcreteAtoms>::new_for_policy()
+                .double_bond_stereo_records()
+                .is_empty()
+        );
     }
 
     #[test]

@@ -27,7 +27,7 @@ struct NeighborOrderKey {
     atom_class: u16,
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     #[cfg(test)]
     #[must_use]
     pub(crate) fn ordered_neighbor_edges(&self, node_id: usize) -> Vec<BondEdge> {
@@ -91,7 +91,7 @@ impl Smiles {
     }
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     fn ordered_neighbor_edges_row_with_planning(
         &self,
         node_id: usize,
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn ordered_neighbors_of_empty_or_missing_node_are_empty() {
-        let smiles = Smiles::new();
+        let smiles = Smiles::<crate::smiles::ConcreteAtoms>::new_for_policy();
         assert!(smiles.ordered_neighbor_edges(0).is_empty());
         assert!(smiles.ordered_neighbor_ids(0).is_empty());
     }

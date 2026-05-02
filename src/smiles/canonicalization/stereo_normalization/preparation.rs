@@ -13,7 +13,7 @@ pub(super) struct StereoNormalizationPreparation {
     pub(super) rooted_classes: Vec<usize>,
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     pub(super) fn has_stereo_markup_for_normalization(&self) -> bool {
         self.atom_nodes.iter().any(|atom| atom.chirality().is_some())
             || self.bond_matrix().sparse_entries().any(|((_row, _column), entry)| {

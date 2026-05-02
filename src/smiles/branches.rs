@@ -96,7 +96,7 @@ impl PartialOrd for ChildOrderKey {
     }
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     #[cfg(test)]
     #[must_use]
     pub(crate) fn branch_plan(&self) -> BranchPlan {
@@ -287,7 +287,7 @@ mod tests {
 
     #[test]
     fn branch_plan_of_empty_graph_is_empty() {
-        let plan = Smiles::new().branch_plan();
+        let plan = Smiles::<crate::smiles::ConcreteAtoms>::new_for_policy().branch_plan();
         assert!(plan.ordered_children(0).is_empty());
         assert_eq!(plan.continuation_child(0), None);
         assert!(plan.branch_children(0).is_empty());

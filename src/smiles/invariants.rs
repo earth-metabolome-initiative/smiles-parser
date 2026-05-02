@@ -40,7 +40,7 @@ pub(crate) struct AtomInvariant {
     pub(crate) bond_kind_histogram: BondKindHistogram,
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     #[inline]
     #[must_use]
     pub(crate) fn atom_invariant(&self, node_id: usize) -> Option<AtomInvariant> {
@@ -136,7 +136,9 @@ mod tests {
 
     #[test]
     fn atom_invariants_of_empty_graph_are_empty() {
-        assert!(Smiles::new().atom_invariants().is_empty());
+        assert!(
+            Smiles::<crate::smiles::ConcreteAtoms>::new_for_policy().atom_invariants().is_empty()
+        );
     }
 
     #[test]

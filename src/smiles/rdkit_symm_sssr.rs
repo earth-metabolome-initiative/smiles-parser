@@ -8,7 +8,8 @@ use geometric_traits::traits::{SparseMatrix2D, SparseValuedMatrix2DRef, SparseVa
 use hashbrown::{HashMap, HashSet};
 
 use super::{
-    RingMembership, Smiles, SymmSssrResult, SymmSssrStatus, canonicalize_cycle, cycle_edges,
+    RingMembership, Smiles, SmilesAtomPolicy, SymmSssrResult, SymmSssrStatus, canonicalize_cycle,
+    cycle_edges,
 };
 use crate::bond::bond_edge::{BondEdge, bond_edge_other};
 
@@ -17,12 +18,14 @@ const GRAY: u8 = 1;
 const BLACK: u8 = 2;
 
 #[cfg(test)]
-pub(crate) fn symmetrize_sssr_with_status(smiles: &Smiles) -> SymmSssrResult {
+pub(crate) fn symmetrize_sssr_with_status<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
+) -> SymmSssrResult {
     RingSearchState::new(smiles).symmetrize_sssr_with_status()
 }
 
 pub(crate) fn symmetrize_sssr_with_ring_membership(
-    smiles: &Smiles,
+    smiles: &Smiles<impl SmilesAtomPolicy>,
     ring_membership: &RingMembership,
 ) -> SymmSssrResult {
     if let Some(cycles) =
@@ -268,8 +271,8 @@ impl SmallestRingsBfsScratch {
 }
 
 #[derive(Debug, Clone)]
-struct RingSearchState<'a> {
-    smiles: &'a Smiles,
+struct RingSearchState<'a, AtomPolicy = crate::smiles::ConcreteAtoms> {
+    smiles: &'a Smiles<AtomPolicy>,
     fragments: Vec<Vec<usize>>,
     ordered_incident_bonds: Vec<Vec<BondEdge>>,
     bfs_scratch: SmallestRingsBfsScratch,
@@ -286,17 +289,17 @@ struct RingSearchState<'a> {
     hit_queue_cutoff: Cell<bool>,
 }
 
-impl<'a> RingSearchState<'a> {
-    fn new(smiles: &'a Smiles) -> Self {
+impl<'a, AtomPolicy: SmilesAtomPolicy> RingSearchState<'a, AtomPolicy> {
+    fn new(smiles: &'a Smiles<AtomPolicy>) -> Self {
         Self::with_bfs_budget(smiles, RdkitBfsBudget::default())
     }
 
     #[cfg(test)]
-    fn new_with_bfs_budget(smiles: &'a Smiles, bfs_budget: RdkitBfsBudget) -> Self {
+    fn new_with_bfs_budget(smiles: &'a Smiles<AtomPolicy>, bfs_budget: RdkitBfsBudget) -> Self {
         Self::with_bfs_budget(smiles, bfs_budget)
     }
 
-    fn with_bfs_budget(smiles: &'a Smiles, bfs_budget: RdkitBfsBudget) -> Self {
+    fn with_bfs_budget(smiles: &'a Smiles<AtomPolicy>, bfs_budget: RdkitBfsBudget) -> Self {
         let atom_count = smiles.nodes().len();
         let ordered_incident_bonds = (0..atom_count)
             .map(|atom_id| RdkitIncidentBondOrdering::for_node(smiles, atom_id))
@@ -1073,7 +1076,7 @@ struct RdkitBridgeScanOrder {
 }
 
 impl RdkitBridgeScanOrder {
-    fn new(smiles: &Smiles) -> Self {
+    fn new(smiles: &Smiles<impl SmilesAtomPolicy>) -> Self {
         let mut edges = smiles
             .bond_matrix()
             .sparse_entries()
@@ -1153,7 +1156,7 @@ fn compute_ring_invariant(ring: &[usize], atom_count: usize) -> RdkitRingInvaria
 struct RdkitIncidentBondOrdering;
 
 impl RdkitIncidentBondOrdering {
-    fn for_node(smiles: &Smiles, atom_id: usize) -> Vec<BondEdge> {
+    fn for_node(smiles: &Smiles<impl SmilesAtomPolicy>, atom_id: usize) -> Vec<BondEdge> {
         let mut edges = smiles
             .bond_matrix()
             .sparse_row(atom_id)
@@ -1168,7 +1171,7 @@ impl RdkitIncidentBondOrdering {
 }
 
 #[cfg(test)]
-fn ordered_edges_for_node(smiles: &Smiles, atom_id: usize) -> Vec<BondEdge> {
+fn ordered_edges_for_node(smiles: &Smiles<impl SmilesAtomPolicy>, atom_id: usize) -> Vec<BondEdge> {
     RdkitIncidentBondOrdering::for_node(smiles, atom_id)
 }
 
@@ -1305,7 +1308,7 @@ impl RdkitLibstdcppRingSizeOrdering {
     }
 }
 
-fn connected_fragments(smiles: &Smiles) -> Vec<Vec<usize>> {
+fn connected_fragments(smiles: &Smiles<impl SmilesAtomPolicy>) -> Vec<Vec<usize>> {
     let mut seen = vec![false; smiles.nodes().len()];
     let mut fragments = Vec::<Vec<usize>>::new();
 

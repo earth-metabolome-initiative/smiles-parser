@@ -1,20 +1,58 @@
 use core::str::FromStr;
 
-use super::Smiles;
-use crate::{errors::SmilesErrorWithSpan, parser::smiles_parser::parse_smiles};
+use super::{Smiles, SmilesAtomPolicy, WildcardSmiles};
+use crate::{
+    errors::SmilesErrorWithSpan,
+    parser::smiles_parser::{parse_smiles, parse_smiles_with_policy, parse_wildcard_smiles},
+};
 
-impl FromStr for Smiles {
+impl Smiles {
+    /// Parses a strict [`Smiles`] graph from text.
+    ///
+    /// Wildcard (`*`) atoms are rejected. Parse
+    /// [`WildcardSmiles`] when wildcard atoms are part
+    /// of the expected input language.
+    ///
+    /// # Errors
+    /// Returns a spanned parse error when tokenization or graph construction
+    /// fails.
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> Result<Self, SmilesErrorWithSpan> {
+        parse_smiles(s)
+    }
+}
+
+impl<AtomPolicy: SmilesAtomPolicy> FromStr for Smiles<AtomPolicy> {
     type Err = SmilesErrorWithSpan;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        parse_smiles(s)
+        parse_smiles_with_policy(s)
+    }
+}
+
+impl WildcardSmiles {
+    /// Parses a wildcard-capable [`WildcardSmiles`] graph from text.
+    ///
+    /// # Errors
+    /// Returns a spanned parse error when tokenization or graph construction
+    /// fails.
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> Result<Self, SmilesErrorWithSpan> {
+        parse_wildcard_smiles(s).map(Self::from_inner)
+    }
+}
+
+impl FromStr for WildcardSmiles {
+    type Err = SmilesErrorWithSpan;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_str(s)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use alloc::string::ToString;
-    use std::str::FromStr;
 
     use elements_rs::Element;
 
@@ -25,7 +63,7 @@ mod tests {
             bond_edge::{bond_edge, bond_edge_ring_num_val},
             ring_num::RingNum,
         },
-        smiles::Smiles,
+        smiles::{Smiles, WildcardSmiles},
     };
 
     #[test]
@@ -73,5 +111,52 @@ mod tests {
         assert_eq!(err.start(), 1);
         assert_eq!(err.end(), 2);
         assert_eq!(err.to_string(), "Branch not closed at 1..2");
+    }
+
+    #[test]
+    fn empty_input_is_not_a_valid_smiles() {
+        let err = Smiles::from_str("").expect_err("empty input should not parse");
+        assert_eq!(err.smiles_error(), crate::errors::SmilesError::MissingElement);
+        assert_eq!((err.start(), err.end()), (0, 0));
+
+        let err = WildcardSmiles::from_str("").expect_err("empty input should not parse");
+        assert_eq!(err.smiles_error(), crate::errors::SmilesError::MissingElement);
+        assert_eq!((err.start(), err.end()), (0, 0));
+    }
+
+    #[test]
+    fn strict_smiles_rejects_wildcards() {
+        for (source, span) in [
+            ("*", (0, 1)),
+            ("C(*)C", (2, 3)),
+            ("[*]", (0, 3)),
+            ("[13*]", (0, 5)),
+            ("[*:1]", (0, 5)),
+        ] {
+            let err = Smiles::from_str(source).expect_err("strict SMILES should reject wildcard");
+            assert_eq!(err.smiles_error(), crate::errors::SmilesError::WildcardAtomNotAllowed);
+            assert_eq!((err.start(), err.end()), span);
+        }
+    }
+
+    #[test]
+    fn wildcard_smiles_accepts_wildcards() {
+        for source in ["*", "C(*)C", "[*]", "[13*]", "[*:1]"] {
+            WildcardSmiles::from_str(source)
+                .unwrap_or_else(|error| panic!("failed to parse {source}: {error}"));
+        }
+    }
+
+    #[test]
+    fn concrete_isotopes_are_validated_while_parsing() {
+        let err = Smiles::from_str("[999C]").expect_err("unknown carbon isotope should be invalid");
+
+        assert_eq!(err.smiles_error(), crate::errors::SmilesError::InvalidIsotope);
+        assert_eq!((err.start(), err.end()), (0, 6));
+
+        let err = WildcardSmiles::from_str("[999C]")
+            .expect_err("wildcard-capable parsing should still validate concrete isotopes");
+        assert_eq!(err.smiles_error(), crate::errors::SmilesError::InvalidIsotope);
+        assert_eq!((err.start(), err.end()), (0, 6));
     }
 }

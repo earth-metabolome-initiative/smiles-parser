@@ -28,13 +28,13 @@ use alloc::vec::Vec;
 use elements_rs::{AllowedValences, ChargedValences, Element};
 use geometric_traits::traits::SparseValuedMatrix2DRef;
 
-use super::Smiles;
+use super::{Smiles, SmilesAtomPolicy};
 use crate::{
     atom::{Atom, AtomSyntax, atom_symbol::AtomSymbol},
     bond::Bond,
 };
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     #[inline]
     #[must_use]
     pub(crate) fn recompute_implicit_hydrogen_counts(&self) -> Vec<u8> {
@@ -116,7 +116,11 @@ impl Smiles {
 /// For bracket atoms, returning `0` is both the SMILES rule and the behavior
 /// observed from raw `RDKit`.
 #[inline]
-fn implicit_hydrogens_for_node(smiles: &Smiles, node_id: usize, node: &Atom) -> u8 {
+fn implicit_hydrogens_for_node<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
+    node_id: usize,
+    node: &Atom,
+) -> u8 {
     let explicit_valence = explicit_valence(smiles, node_id);
     match node.syntax() {
         AtomSyntax::Bracket => 0,
@@ -137,7 +141,7 @@ fn implicit_hydrogens_for_node(smiles: &Smiles, node_id: usize, node: &Atom) -> 
 
 #[inline]
 pub(super) fn implicit_hydrogens_if_written_unbracketed(
-    smiles: &Smiles,
+    smiles: &Smiles<impl SmilesAtomPolicy>,
     node_id: usize,
     node: &Atom,
 ) -> u8 {
@@ -163,7 +167,7 @@ pub(super) fn implicit_hydrogens_if_written_unbracketed(
 /// This split also mirrors raw `RDKit`: bracket hydrogens stay explicit instead
 /// of being folded back into a later implicit-hydrogen completion step.
 #[inline]
-pub(crate) fn explicit_valence(smiles: &Smiles, node_id: usize) -> u8 {
+pub(crate) fn explicit_valence(smiles: &Smiles<impl SmilesAtomPolicy>, node_id: usize) -> u8 {
     smiles.bond_matrix().sparse_row_values_ref(node_id).map(|entry| bond_order(entry.bond())).sum()
 }
 
@@ -236,7 +240,6 @@ fn aromatic_implicit_hydrogens(element: Element, explicit_valence: u8) -> u8 {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
 
     use elements_rs::{AllowedValences, ChargedValences, Element};
 
@@ -244,7 +247,7 @@ mod tests {
         Smiles, aromatic_implicit_hydrogens, bond_order, explicit_valence,
         implicit_hydrogens_for_node, target_valence,
     };
-    use crate::bond::Bond;
+    use crate::{bond::Bond, smiles::WildcardSmiles};
 
     #[test]
     fn bracket_atoms_never_gain_implicit_hydrogens() {
@@ -260,7 +263,7 @@ mod tests {
 
     #[test]
     fn wildcard_atoms_never_gain_implicit_hydrogens() {
-        let smiles = Smiles::from_str("*").unwrap();
+        let smiles = WildcardSmiles::from_str("*").unwrap();
         assert_eq!(smiles.implicit_hydrogen_counts(), &[0]);
     }
 

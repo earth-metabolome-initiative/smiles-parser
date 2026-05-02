@@ -18,7 +18,7 @@ use self::{
     directional_bonds::{AtomBasedDoubleBondNormalization, atom_based_override_bond},
 };
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     pub(crate) fn semantic_tetrahedral_chirality(&self, node_id: usize) -> Option<Chirality> {
         let chirality = self.node_by_id(node_id)?.chirality()?;
         let parsed_neighbors = self.parsed_stereo_neighbors_row(node_id);

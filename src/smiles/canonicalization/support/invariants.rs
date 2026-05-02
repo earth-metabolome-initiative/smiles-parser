@@ -152,7 +152,10 @@ fn deterministic_permutations(node_count: usize) -> Vec<Vec<usize>> {
 }
 
 #[track_caller]
-fn assert_labeling_is_a_permutation(smiles: &Smiles, labeling: &SmilesCanonicalLabeling) {
+fn assert_labeling_is_a_permutation(
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
+    labeling: &SmilesCanonicalLabeling,
+) {
     let node_count = smiles.nodes().len();
     assert_eq!(labeling.order().len(), node_count);
     assert_eq!(labeling.new_index_of_old_node().len(), node_count);
@@ -181,7 +184,10 @@ fn assert_labeling_is_a_permutation(smiles: &Smiles, labeling: &SmilesCanonicalL
 }
 
 #[track_caller]
-fn assert_normal_form_chemistry_invariants(original: &Smiles, normalized: &Smiles) {
+fn assert_normal_form_chemistry_invariants(
+    original: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
+    normalized: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
+) {
     assert_eq!(
         normalized.nodes().len(),
         original.nodes().len(),
@@ -218,7 +224,9 @@ fn assert_normal_form_chemistry_invariants(original: &Smiles, normalized: &Smile
 type TetrahedralStereoSignature = ((u8, u8), Vec<CanonicalStereoNeighborKey>);
 type DoubleBondStereoSignature = ([usize; 2], [(usize, usize); 2], DoubleBondStereoConfig);
 
-fn tetrahedral_stereo_signature(smiles: &Smiles) -> Vec<TetrahedralStereoSignature> {
+fn tetrahedral_stereo_signature(
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
+) -> Vec<TetrahedralStereoSignature> {
     let labeling = smiles.stereo_neutral_canonical_labeling();
     let refined_classes = smiles.stereo_neutral_refined_classes();
     let rooted_classes = smiles.stereo_neutral_rooted_classes(&refined_classes);
@@ -276,7 +284,9 @@ fn tetrahedral_stereo_signature(smiles: &Smiles) -> Vec<TetrahedralStereoSignatu
     signature
 }
 
-fn double_bond_stereo_signature(smiles: &Smiles) -> Vec<DoubleBondStereoSignature> {
+fn double_bond_stereo_signature(
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
+) -> Vec<DoubleBondStereoSignature> {
     let labeling = smiles.stereo_neutral_canonical_labeling();
     let mut signature = smiles
         .double_bond_stereo_records()
@@ -308,7 +318,10 @@ fn double_bond_stereo_signature(smiles: &Smiles) -> Vec<DoubleBondStereoSignatur
 }
 
 #[track_caller]
-fn assert_stereo_normal_form_invariants(normalized: &Smiles, stereo_normalized: &Smiles) {
+fn assert_stereo_normal_form_invariants(
+    normalized: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
+    stereo_normalized: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
+) {
     assert_eq!(
         tetrahedral_stereo_signature(normalized),
         tetrahedral_stereo_signature(stereo_normalized),
@@ -323,8 +336,8 @@ fn assert_stereo_normal_form_invariants(normalized: &Smiles, stereo_normalized: 
 
 #[track_caller]
 fn assert_core_rewrite_invariants(
-    normalized: &Smiles,
-    canonicalized: &Smiles,
+    normalized: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
+    canonicalized: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     order: &[usize],
     new_index_of_old_node: &[usize],
 ) {
@@ -396,8 +409,8 @@ fn assert_core_rewrite_invariants(
 
 #[track_caller]
 fn assert_ring_membership_invariants(
-    normalized: &Smiles,
-    canonicalized: &Smiles,
+    normalized: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
+    canonicalized: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     new_index_of_old_node: &[usize],
 ) {
     let expected_ring_atoms =
@@ -419,8 +432,8 @@ fn assert_ring_membership_invariants(
 
 #[track_caller]
 fn assert_aromaticity_invariants(
-    normalized: &Smiles,
-    canonicalized: &Smiles,
+    normalized: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
+    canonicalized: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     new_index_of_old_node: &[usize],
 ) {
     for policy in [
@@ -471,7 +484,10 @@ fn assert_aromaticity_invariants(
 }
 
 #[track_caller]
-fn assert_kekulization_invariants(smiles: &Smiles, canonicalized: &Smiles) {
+fn assert_kekulization_invariants(
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
+    canonicalized: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
+) {
     match (smiles.kekulize_standalone(), canonicalized.kekulize_standalone()) {
         (Ok(expected), Ok(actual)) => {
             same_canonicalization_state(&expected.canonicalize(), &actual.canonicalize());
@@ -491,7 +507,9 @@ fn assert_kekulization_invariants(smiles: &Smiles, canonicalized: &Smiles) {
 }
 
 #[track_caller]
-pub(crate) fn assert_canonicalization_invariants(smiles: &Smiles) {
+pub(crate) fn assert_canonicalization_invariants(
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
+) {
     let normalized = smiles.canonicalization_normal_form();
     assert_normal_form_chemistry_invariants(smiles, &normalized);
     let stereo_normalized = normalized.stereo_normal_form();

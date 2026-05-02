@@ -2,18 +2,10 @@
 
 mod canonicalization_common;
 
-use core::str::FromStr;
-
-use canonicalization_common::{assert_same_canonical_group, canonical_string};
+use canonicalization_common::{
+    assert_same_canonical_group, canonical_string, wildcard_canonical_string,
+};
 use smiles_parser::smiles::Smiles;
-
-#[test]
-fn canonical_labeling_of_empty_graph_is_empty() {
-    let labeling = Smiles::new().canonical_labeling();
-    assert!(labeling.order().is_empty());
-    assert!(labeling.new_index_of_old_node().is_empty());
-    assert!(Smiles::new().is_canonical());
-}
 
 #[test]
 fn canonical_labeling_inverse_matches_order() {
@@ -127,5 +119,5 @@ fn canonicalize_converges_additional_source_backed_real_world_groups() {
 
 #[test]
 fn canonicalize_converges_default_wildcard_parser_spellings() {
-    assert_eq!(canonical_string("O*O"), canonical_string("O[*]O"));
+    assert_eq!(wildcard_canonical_string("O*O"), wildcard_canonical_string("O[*]O"));
 }

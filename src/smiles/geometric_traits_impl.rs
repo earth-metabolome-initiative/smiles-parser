@@ -1,5 +1,8 @@
 use alloc::{boxed::Box, vec::Vec};
-use core::hash::{Hash, Hasher};
+use core::{
+    hash::{Hash, Hasher},
+    marker::PhantomData,
+};
 
 use geometric_traits::{
     impls::{SymmetricCSR2D, ValuedCSR2D},
@@ -7,7 +10,7 @@ use geometric_traits::{
 };
 use hashbrown::HashSet;
 
-use super::Smiles;
+use super::{Smiles, WildcardSmiles};
 use crate::{
     atom::Atom,
     bond::{
@@ -148,7 +151,7 @@ impl BondMatrixBuilder {
     #[inline]
     #[must_use]
     pub(crate) fn contains_edge(&self, node_a: usize, node_b: usize) -> bool {
-        let (row, column) = Smiles::edge_key(node_a, node_b);
+        let (row, column) = crate::smiles::edge_key(node_a, node_b);
         self.seen_edges.contains(&(row, column))
     }
 
@@ -160,7 +163,7 @@ impl BondMatrixBuilder {
         bond: Bond,
         ring_num: Option<RingNum>,
     ) -> Result<(), SmilesError> {
-        let (row, column) = Smiles::edge_key(node_a, node_b);
+        let (row, column) = crate::smiles::edge_key(node_a, node_b);
         if row == column {
             return Err(SmilesError::SelfLoopEdge(row));
         }
@@ -256,7 +259,7 @@ fn is_row_major_sorted(entries: &[PendingBond]) -> bool {
     entries.windows(2).all(|window| window[0].row_major_key() <= window[1].row_major_key())
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     #[inline]
     #[must_use]
     pub(crate) fn from_bond_matrix_parts(atom_nodes: Vec<Atom>, bond_matrix: BondMatrix) -> Self {
@@ -299,6 +302,7 @@ impl Smiles {
             parsed_stereo_neighbors,
             implicit_hydrogen_cache: Vec::new(),
             kekulization_source,
+            atom_policy: PhantomData,
         };
         smiles.implicit_hydrogen_cache = smiles.recompute_implicit_hydrogen_counts();
         smiles
@@ -320,6 +324,7 @@ impl Smiles {
             parsed_stereo_neighbors,
             implicit_hydrogen_cache,
             kekulization_source,
+            atom_policy: PhantomData,
         };
         assert_eq!(
             smiles.atom_nodes.len(),
@@ -365,7 +370,7 @@ impl Smiles {
     }
 }
 
-impl Graph for Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Graph for Smiles<AtomPolicy> {
     #[inline]
     fn has_nodes(&self) -> bool {
         !self.atom_nodes.is_empty()
@@ -377,7 +382,7 @@ impl Graph for Smiles {
     }
 }
 
-impl MonoplexGraph for Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> MonoplexGraph for Smiles<AtomPolicy> {
     type Edge = <BondMatrix as geometric_traits::traits::Edges>::Edge;
     type Edges = BondMatrix;
 
@@ -387,7 +392,7 @@ impl MonoplexGraph for Smiles {
     }
 }
 
-impl MonopartiteGraph for Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> MonopartiteGraph for Smiles<AtomPolicy> {
     type NodeId = usize;
     type NodeSymbol = Atom;
     type Nodes = Vec<Atom>;
@@ -398,9 +403,41 @@ impl MonopartiteGraph for Smiles {
     }
 }
 
+impl Graph for WildcardSmiles {
+    #[inline]
+    fn has_nodes(&self) -> bool {
+        self.inner().has_nodes()
+    }
+
+    #[inline]
+    fn has_edges(&self) -> bool {
+        self.inner().has_edges()
+    }
+}
+
+impl MonoplexGraph for WildcardSmiles {
+    type Edge = <BondMatrix as geometric_traits::traits::Edges>::Edge;
+    type Edges = BondMatrix;
+
+    #[inline]
+    fn edges(&self) -> &Self::Edges {
+        self.inner().edges()
+    }
+}
+
+impl MonopartiteGraph for WildcardSmiles {
+    type NodeId = usize;
+    type NodeSymbol = Atom;
+    type Nodes = Vec<Atom>;
+
+    #[inline]
+    fn nodes_vocabulary(&self) -> &Self::Nodes {
+        self.inner().nodes_vocabulary()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use core::str::FromStr;
     use std::{
         collections::hash_map::DefaultHasher,
         hash::{Hash, Hasher},
@@ -458,11 +495,21 @@ mod tests {
 
     #[test]
     fn empty_smiles_reports_no_nodes_or_edges() {
-        let smiles = Smiles::default();
+        let smiles = Smiles::<crate::smiles::ConcreteAtoms>::new_for_policy();
 
         assert_eq!(smiles.number_of_bonds(), 0);
         assert!(!Graph::has_nodes(&smiles));
         assert!(!Graph::has_edges(&smiles));
+    }
+
+    #[test]
+    fn wildcard_smiles_exposes_graph_traits() {
+        let smiles = WildcardSmiles::from_str("*C").unwrap();
+
+        assert!(Graph::has_nodes(&smiles));
+        assert!(Graph::has_edges(&smiles));
+        assert_eq!(smiles.nodes_vocabulary().len(), 2);
+        assert_eq!(smiles.edges().number_of_defined_values(), 2);
     }
 
     struct DirectionalParityCase {

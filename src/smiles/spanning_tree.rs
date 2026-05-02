@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 
 use geometric_traits::traits::{SparseMatrix2D, SparseValuedMatrix2DRef};
 
-use super::{Smiles, invariants::AtomInvariant};
+use super::{Smiles, SmilesAtomPolicy, invariants::AtomInvariant};
 use crate::bond::{
     Bond,
     bond_edge::{BondEdge, bond_edge_other},
@@ -76,7 +76,11 @@ impl ForestBuildState {
         }
     }
 
-    fn into_forest(self, roots: &[usize], smiles: &Smiles) -> SpanningForest {
+    fn into_forest<AtomPolicy: SmilesAtomPolicy>(
+        self,
+        roots: &[usize],
+        smiles: &Smiles<AtomPolicy>,
+    ) -> SpanningForest {
         let mut closure_keys = self.closure_pairs;
         closure_keys.sort_unstable();
         closure_keys.dedup();
@@ -96,7 +100,7 @@ impl ForestBuildState {
     }
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     #[cfg(test)]
     #[must_use]
     pub(crate) fn spanning_forest(&self) -> SpanningForest {
@@ -186,7 +190,7 @@ impl Smiles {
         }
 
         if state.visited[neighbor_id] {
-            state.closure_pairs.push(Self::edge_key(node_id, neighbor_id));
+            state.closure_pairs.push(crate::smiles::edge_key(node_id, neighbor_id));
         } else {
             state.visited[neighbor_id] = true;
             state.parents[neighbor_id] = Some(node_id);
@@ -224,7 +228,7 @@ impl Smiles {
             }
 
             if state.visited[neighbor_id] {
-                state.closure_pairs.push(Self::edge_key(node_id, neighbor_id));
+                state.closure_pairs.push(crate::smiles::edge_key(node_id, neighbor_id));
             } else {
                 state.visited[neighbor_id] = true;
                 state.parents[neighbor_id] = Some(node_id);
@@ -244,7 +248,7 @@ mod tests {
 
     #[test]
     fn spanning_forest_of_empty_graph_is_empty() {
-        let forest = Smiles::new().spanning_forest();
+        let forest = Smiles::<crate::smiles::ConcreteAtoms>::new_for_policy().spanning_forest();
         assert!(forest.roots().is_empty());
         assert!(forest.closure_edges().is_empty());
         assert_eq!(forest.parent_of(0), None);

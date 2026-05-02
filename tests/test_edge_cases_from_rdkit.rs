@@ -8,8 +8,6 @@
 //! - report the error at the offending token instead of silently repairing it
 //! - fix the grammar hole, not just these exact strings
 
-use std::str::FromStr;
-
 use smiles_parser::smiles::Smiles;
 
 const RD_KIT_PARSER_REJECTS: &[&str] = &[

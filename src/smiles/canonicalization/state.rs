@@ -5,7 +5,7 @@ use geometric_traits::traits::SparseValuedMatrixRef;
 use crate::{
     atom::{Atom, AtomSyntax, atom_symbol::AtomSymbol, bracketed::chirality::Chirality},
     bond::Bond,
-    smiles::{Smiles, StereoNeighbor},
+    smiles::{Smiles, SmilesAtomPolicy, StereoNeighbor},
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -61,7 +61,9 @@ pub(super) fn stereo_neutral_canonical_atom_label(atom: Atom) -> CanonicalAtomLa
     label
 }
 
-pub(super) fn canonicalization_state_key(smiles: &Smiles) -> CanonicalizationStateKey {
+pub(super) fn canonicalization_state_key<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
+) -> CanonicalizationStateKey {
     let atom_labels = smiles.nodes().iter().copied().map(canonical_atom_label).collect();
     let bond_edges = smiles
         .bond_matrix()

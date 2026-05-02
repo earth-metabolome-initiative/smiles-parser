@@ -1,24 +1,22 @@
 //! Conversion tests from parsed SMILES graphs into molecular formulas.
 
-use std::{
-    io::{BufRead, BufReader, Cursor, Read},
-    str::FromStr,
-};
+use std::io::{BufRead, BufReader, Cursor, Read};
 
 use elements_rs::Element;
 use flate2::read::GzDecoder;
 use molecular_formulas::{ChargedMolecularFormula, MolecularFormula, prelude::ChemicalFormula};
-use smiles_parser::prelude::{MolecularFormulaConversionError, Smiles};
+use smiles_parser::prelude::{Smiles, WildcardMolecularFormulaConversionError, WildcardSmiles};
 
 const RDKIT_MOLECULAR_FORMULA_FIXTURE: &[u8] =
     include_bytes!("fixtures/rdkit_molecular_formula.csv.gz");
 const RDKIT_MOLECULAR_FORMULA_HEADER: &str =
     "name,smiles,rdkit_formula,rdkit_fragment_formula,formal_charge";
+type TestFormula = ChemicalFormula<u32, i32>;
 
 #[test]
 fn methane_smiles_converts_to_formula_with_implicit_hydrogens() {
     let smiles = Smiles::from_str("C").expect("methane skeleton should parse");
-    let formula = ChemicalFormula::try_from(smiles).expect("methane formula should convert");
+    let formula: TestFormula = ChemicalFormula::from(smiles);
 
     assert_eq!(formula.to_string(), "CH₄");
     assert_eq!(formula.count_of_element::<u32>(Element::C), Some(1));
@@ -28,8 +26,7 @@ fn methane_smiles_converts_to_formula_with_implicit_hydrogens() {
 #[test]
 fn charged_isotopic_smiles_converts_to_formula() {
     let smiles = Smiles::from_str("[13CH3][NH3+]").expect("charged isotopic SMILES should parse");
-    let formula =
-        ChemicalFormula::try_from(&smiles).expect("charged isotopic formula should convert");
+    let formula: TestFormula = ChemicalFormula::from(&smiles);
 
     assert_eq!(formula.to_string(), "[¹³C]H₆N⁺");
     assert_eq!(formula.count_of_element::<u32>(Element::C), Some(1));
@@ -41,7 +38,7 @@ fn charged_isotopic_smiles_converts_to_formula() {
 #[test]
 fn disconnected_smiles_converts_to_formula_mixture() {
     let smiles = Smiles::from_str("[Na+].[Cl-]").expect("salt SMILES should parse");
-    let formula = ChemicalFormula::try_from(smiles).expect("salt formula should convert");
+    let formula: TestFormula = ChemicalFormula::from(smiles);
 
     assert_eq!(formula.to_string(), "Na⁺.Cl⁻");
     assert!(formula.charge().abs() < f64::EPSILON);
@@ -49,10 +46,10 @@ fn disconnected_smiles_converts_to_formula_mixture() {
 
 #[test]
 fn wildcard_smiles_returns_formula_conversion_error() {
-    let smiles = Smiles::from_str("*").expect("wildcard SMILES should parse");
-    let error = ChemicalFormula::try_from(smiles).expect_err("wildcard cannot produce a formula");
+    let smiles = WildcardSmiles::from_str("*").expect("wildcard SMILES should parse");
+    let error = TestFormula::try_from(smiles).expect_err("wildcard cannot produce a formula");
 
-    assert_eq!(error, MolecularFormulaConversionError::WildcardAtom { atom_id: 0 });
+    assert_eq!(error, WildcardMolecularFormulaConversionError::WildcardAtom { atom_id: 0 });
 }
 
 #[test]
@@ -63,7 +60,6 @@ fn rdkit_molecular_formula_fixture_matches_conversion() {
 
     assert_eq!(stats.total, 10_036);
     assert_eq!(stats.wildcards, 0);
-    assert_eq!(stats.unsupported_isotopes, 0);
 }
 
 #[derive(Debug, Default)]
@@ -71,7 +67,6 @@ struct RdkitMolecularFormulaFixtureStats {
     total: usize,
     formulas: usize,
     wildcards: usize,
-    unsupported_isotopes: usize,
 }
 
 fn assert_rdkit_molecular_formula_fixture_matches<R: Read>(
@@ -108,47 +103,14 @@ fn assert_rdkit_molecular_formula_fixture_matches<R: Read>(
 
         let smiles = Smiles::from_str(smiles_text)
             .unwrap_or_else(|error| panic!("{name} failed to parse {smiles_text}: {error}"));
-        let actual = ChemicalFormula::try_from(&smiles);
-
         if rdkit_fragment_formula.contains('*') {
-            let error = match actual {
-                Ok(formula) => {
-                    panic!("{name} converted wildcard formula {rdkit_fragment_formula}: {formula}")
-                }
-                Err(error) => error,
-            };
-            assert!(
-                matches!(error, MolecularFormulaConversionError::WildcardAtom { .. }),
-                "{name} failed with the wrong error for wildcard formula {rdkit_fragment_formula}: {error}"
-            );
             stats.wildcards += 1;
             print_rdkit_fixture_progress(&stats);
             continue;
         }
 
-        let actual = match actual {
-            Ok(actual) => actual,
-            Err(MolecularFormulaConversionError::UnsupportedIsotope {
-                element,
-                mass_number,
-                ..
-            }) => {
-                let isotope = format!("[{mass_number}{}]", element.symbol());
-                assert!(
-                    rdkit_fragment_formula.contains(&isotope),
-                    "{name} failed with unsupported isotope {isotope}, but RDKit formula is {rdkit_fragment_formula}"
-                );
-                assert!(
-                    ChemicalFormula::<u16, i16>::try_from(rdkit_fragment_formula).is_err(),
-                    "{name} RDKit formula {rdkit_fragment_formula} unexpectedly became representable"
-                );
-                stats.unsupported_isotopes += 1;
-                print_rdkit_fixture_progress(&stats);
-                continue;
-            }
-            Err(error) => panic!("{name} failed to convert {smiles_text}: {error}"),
-        };
-        let expected = ChemicalFormula::try_from(rdkit_fragment_formula).unwrap_or_else(|error| {
+        let actual: TestFormula = ChemicalFormula::from(&smiles);
+        let expected = TestFormula::try_from(rdkit_fragment_formula).unwrap_or_else(|error| {
             panic!("{name} has invalid RDKit formula {rdkit_fragment_formula}: {error}")
         });
         stats.formulas += 1;
@@ -172,8 +134,8 @@ fn assert_rdkit_molecular_formula_fixture_matches<R: Read>(
 fn print_rdkit_fixture_progress(stats: &RdkitMolecularFormulaFixtureStats) {
     if stats.total.is_multiple_of(1_000_000) {
         eprintln!(
-            "processed {} RDKit rows: {} molecular formulas, {} wildcards, {} unsupported isotopes",
-            stats.total, stats.formulas, stats.wildcards, stats.unsupported_isotopes
+            "processed {} RDKit rows: {} molecular formulas, {} wildcards",
+            stats.total, stats.formulas, stats.wildcards
         );
     }
 }

@@ -13,9 +13,10 @@ use std::{
 
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
+use molecular_formulas::prelude::ChemicalFormula;
 use rayon::prelude::*;
 use smiles_parser::prelude::{
-    DatasetFetchOptions, DatasetSource, GzipMode, PUBCHEM_SMILES, Smiles,
+    DatasetFetchOptions, DatasetSource, GzipMode, PUBCHEM_SMILES, Smiles, WildcardSmiles,
 };
 
 #[test]
@@ -72,6 +73,68 @@ fn validate_pubchem_canonicalization_corpus() -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
+#[test]
+#[ignore = "This test streams the whole PubChem CID-SMILES corpus and validates strict SMILES to formula conversion in parallel."]
+fn validate_pubchem_molecular_formula_corpus() -> Result<(), Box<dyn std::error::Error>> {
+    require_release_build()?;
+
+    let corpus_path = pubchem_formula_corpus_path()?;
+    let limit = env_usize("PUBCHEM_FORMULA_VALIDATE_LIMIT");
+    let total_records = pubchem_record_count(&corpus_path)?;
+    let record_count = limit.map_or(total_records, |limit| limit.min(total_records));
+
+    let progress_bar = ProgressBar::new(
+        u64::try_from(record_count)
+            .unwrap_or_else(|_| unreachable!("usize always fits into u64 on supported targets")),
+    );
+    progress_bar.set_style(
+        ProgressStyle::with_template(
+            "{wide_bar} {pos}/{len} [{elapsed_precise}<{eta_precise}] {per_sec} {msg}",
+        )
+        .unwrap_or_else(|_| unreachable!("progress template is static and valid"))
+        .progress_chars("=>-"),
+    );
+    progress_bar.set_message("molecular formula");
+
+    let started = Instant::now();
+    let formulas = AtomicUsize::new(0);
+    let wildcards = AtomicUsize::new(0);
+
+    let validation_result =
+        open_pubchem_corpus(&corpus_path)?.lines().take(record_count).par_bridge().try_for_each(
+            |line| -> Result<(), String> {
+                let line = line.map_err(|error| error.to_string())?;
+                match validate_formula_record_line(&line)? {
+                    FormulaRecordKind::Formula => {
+                        formulas.fetch_add(1, Ordering::Relaxed);
+                    }
+                    FormulaRecordKind::Wildcard => {
+                        wildcards.fetch_add(1, Ordering::Relaxed);
+                    }
+                }
+                progress_bar.inc(1);
+                Ok(())
+            },
+        );
+
+    if let Err(error) = validation_result {
+        progress_bar.abandon_with_message("molecular formula validation failed");
+        return Err(io::Error::other(error).into());
+    }
+
+    progress_bar.finish_with_message("molecular formula validation complete");
+    let formulas = formulas.load(Ordering::Relaxed);
+    let wildcards = wildcards.load(Ordering::Relaxed);
+    let elapsed = started.elapsed();
+    let rate = records_per_second(record_count, elapsed);
+    eprintln!(
+        "completed records={record_count} formulas={formulas} skipped_wildcards={wildcards} elapsed={:.1}s rate={rate}/s",
+        elapsed.as_secs_f64()
+    );
+
+    Ok(())
+}
+
 fn pubchem_record_count(path: &Path) -> Result<usize, io::Error> {
     Ok(open_pubchem_corpus(path)?.lines().count())
 }
@@ -88,16 +151,64 @@ fn pubchem_corpus_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
     Ok(artifact.path().to_path_buf())
 }
 
+fn pubchem_formula_corpus_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    if let Ok(path) = env::var("PUBCHEM_FORMULA_CORPUS") {
+        return Ok(PathBuf::from(path));
+    }
+
+    pubchem_corpus_path()
+}
+
 fn validate_record_line(line: &str) -> Result<(), String> {
     let (cid, smiles_text) = line
         .split_once('\t')
         .ok_or_else(|| format!("expected CID<TAB>SMILES record, got: {line}"))?;
 
+    if smiles_text.contains('*') {
+        let smiles = smiles_text.parse::<WildcardSmiles>().map_err(|error| {
+            format!("cid={cid} failed to parse wildcard SMILES:\n{}", error.render(smiles_text))
+        })?;
+        validate_canonicalization(cid, smiles_text, &smiles.canonicalize())?;
+    } else {
+        let smiles = smiles_text.parse::<Smiles>().map_err(|error| {
+            format!("cid={cid} failed to parse SMILES:\n{}", error.render(smiles_text))
+        })?;
+        validate_canonicalization(cid, smiles_text, &smiles.canonicalize())?;
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum FormulaRecordKind {
+    Formula,
+    Wildcard,
+}
+
+fn validate_formula_record_line(line: &str) -> Result<FormulaRecordKind, String> {
+    let (cid, smiles_text) = line
+        .split_once('\t')
+        .ok_or_else(|| format!("expected CID<TAB>SMILES record, got: {line}"))?;
+
+    if smiles_text.contains('*') {
+        smiles_text.parse::<WildcardSmiles>().map_err(|error| {
+            format!("cid={cid} failed to parse wildcard SMILES:\n{}", error.render(smiles_text))
+        })?;
+        return Ok(FormulaRecordKind::Wildcard);
+    }
+
     let smiles = smiles_text.parse::<Smiles>().map_err(|error| {
         format!("cid={cid} failed to parse SMILES:\n{}", error.render(smiles_text))
     })?;
+    let _formula: ChemicalFormula<u32, i32> = ChemicalFormula::from(&smiles);
+    Ok(FormulaRecordKind::Formula)
+}
 
-    let canonicalized = smiles.canonicalize();
+fn validate_canonicalization(
+    cid: &str,
+    smiles_text: &str,
+    canonicalized: &impl CanonicalizedSmiles,
+) -> Result<(), String> {
     if !canonicalized.is_canonical() {
         return Err(format!(
             "cid={cid} canonicalize() did not reach a canonical fixed point: {smiles_text}"
@@ -105,13 +216,39 @@ fn validate_record_line(line: &str) -> Result<(), String> {
     }
 
     let recanonicalized = canonicalized.canonicalize();
-    if canonicalized != recanonicalized {
+    if canonicalized != &recanonicalized {
         return Err(format!(
             "cid={cid} canonicalize() is not idempotent:\ninput={smiles_text}\nfirst={canonicalized}\nsecond={recanonicalized}"
         ));
     }
 
     Ok(())
+}
+
+trait CanonicalizedSmiles: Sized + PartialEq + core::fmt::Display {
+    fn is_canonical(&self) -> bool;
+
+    fn canonicalize(&self) -> Self;
+}
+
+impl CanonicalizedSmiles for Smiles {
+    fn is_canonical(&self) -> bool {
+        Smiles::is_canonical(self)
+    }
+
+    fn canonicalize(&self) -> Self {
+        Smiles::canonicalize(self)
+    }
+}
+
+impl CanonicalizedSmiles for WildcardSmiles {
+    fn is_canonical(&self) -> bool {
+        WildcardSmiles::is_canonical(self)
+    }
+
+    fn canonicalize(&self) -> Self {
+        WildcardSmiles::canonicalize(self)
+    }
 }
 
 enum PubchemCorpusReader {

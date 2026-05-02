@@ -1,9 +1,7 @@
 //! Connected-components parity checks against documented `RDKit` fragment
 //! behavior.
 
-use std::str::FromStr;
-
-use smiles_parser::smiles::Smiles;
+use smiles_parser::smiles::{Smiles, WildcardSmiles};
 
 struct RdkitFixture {
     smiles: &'static str,
@@ -95,13 +93,11 @@ fn connected_components_returns_atoms_for_each_component() {
 }
 
 #[test]
-fn connected_components_of_empty_graph_is_empty() {
-    let smiles = Smiles::new();
+fn wildcard_connected_components_keep_wildcard_api_surface() {
+    let smiles = WildcardSmiles::from_str("*.CC").unwrap();
     let components = smiles.connected_components();
 
-    assert_eq!(components.number_of_components(), 0);
-    assert_eq!(components.largest_component_size(), 0);
-    assert_eq!(components.smallest_component_size(), 0);
-    assert!(components.component_identifiers().collect::<Vec<_>>().is_empty());
-    assert!(components.node_ids_of_component(0).collect::<Vec<_>>().is_empty());
+    assert_eq!(components.number_of_components(), 2);
+    assert_eq!(components.component_identifiers().collect::<Vec<_>>(), vec![0, 1, 1]);
+    assert!(components.nodes_of_component(0).next().unwrap().symbol().is_wildcard());
 }

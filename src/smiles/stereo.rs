@@ -44,7 +44,7 @@ impl DirectionalBondOverrides {
     #[inline]
     #[must_use]
     pub(crate) fn get(&self, from: usize, to: usize) -> Option<Bond> {
-        let (left, right) = Smiles::edge_key(from, to);
+        let (left, right) = crate::smiles::edge_key(from, to);
         let row = self.rows.get(left)?;
         let index = row.binary_search_by_key(&right, |&(neighbor, _)| neighbor).ok()?;
         Some(row[index].1)
@@ -57,7 +57,7 @@ impl DirectionalBondOverrides {
     }
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     #[inline]
     #[must_use]
     pub(super) fn parsed_stereo_neighbors_row(&self, node_id: usize) -> &[StereoNeighbor] {
@@ -102,11 +102,11 @@ impl Smiles {
             .into_iter()
             .map(|record| {
                 DirectionalParityConstraint {
-                    left_edge_key: Smiles::edge_key(
+                    left_edge_key: crate::smiles::edge_key(
                         record.side_a().endpoint(),
                         record.side_a().reference_atom(),
                     ),
-                    right_edge_key: Smiles::edge_key(
+                    right_edge_key: crate::smiles::edge_key(
                         record.side_b().endpoint(),
                         record.side_b().reference_atom(),
                     ),
@@ -438,7 +438,11 @@ mod tests {
 
     #[test]
     fn projected_directional_bond_overrides_are_empty_without_double_bond_stereo() {
-        assert!(Smiles::new().projected_directional_bond_overrides(&[]).is_empty());
+        assert!(
+            Smiles::<crate::smiles::ConcreteAtoms>::new_for_policy()
+                .projected_directional_bond_overrides(&[])
+                .is_empty()
+        );
         let smiles: Smiles = "CCO".parse().unwrap();
         let preorder = identity_preorder(&smiles);
         assert!(smiles.projected_directional_bond_overrides(&preorder).is_empty());
@@ -471,14 +475,14 @@ mod tests {
         let overrides = smiles.projected_directional_bond_overrides(&preorder);
 
         let left_reference =
-            Smiles::edge_key(record.side_a().endpoint(), record.side_a().reference_atom());
+            crate::smiles::edge_key(record.side_a().endpoint(), record.side_a().reference_atom());
         let right_reference =
-            Smiles::edge_key(record.side_b().endpoint(), record.side_b().reference_atom());
+            crate::smiles::edge_key(record.side_b().endpoint(), record.side_b().reference_atom());
 
         assert!(overrides.contains_key(&left_reference));
         assert!(overrides.contains_key(&right_reference));
 
-        let left_raw = Smiles::edge_key(record.side_a().endpoint(), 1);
+        let left_raw = crate::smiles::edge_key(record.side_a().endpoint(), 1);
         if left_raw != left_reference {
             assert!(!overrides.contains_key(&left_raw));
         }

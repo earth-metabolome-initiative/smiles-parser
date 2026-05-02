@@ -1,7 +1,5 @@
 //! Test for tokenizing square brackets
 
-use std::str::FromStr;
-
 use elements_rs::Element;
 use smiles_parser::{errors::SmilesError, smiles::Smiles};
 

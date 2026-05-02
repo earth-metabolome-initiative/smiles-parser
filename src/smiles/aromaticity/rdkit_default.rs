@@ -14,23 +14,32 @@ use crate::smiles::RingComponent;
 use crate::{
     atom::Atom,
     bond::Bond,
-    smiles::{RingMembership, SymmSssrStatus, cycle_edges, rdkit_symm_sssr},
+    smiles::{RingMembership, SmilesAtomPolicy, SymmSssrStatus, cycle_edges, rdkit_symm_sssr},
 };
 
 impl AromaticityModel for RdkitDefaultAromaticity {
-    fn assignment(&self, smiles: &Smiles) -> AromaticityAssignment {
+    fn assignment<AtomPolicy: SmilesAtomPolicy>(
+        &self,
+        smiles: &Smiles<AtomPolicy>,
+    ) -> AromaticityAssignment {
         RdkitAromaticityFlavor::Default.assignment(smiles)
     }
 }
 
 impl AromaticityModel for RdkitMdlAromaticity {
-    fn assignment(&self, smiles: &Smiles) -> AromaticityAssignment {
+    fn assignment<AtomPolicy: SmilesAtomPolicy>(
+        &self,
+        smiles: &Smiles<AtomPolicy>,
+    ) -> AromaticityAssignment {
         RdkitAromaticityFlavor::Mdl.assignment(smiles)
     }
 }
 
 impl AromaticityModel for RdkitSimpleAromaticity {
-    fn assignment(&self, smiles: &Smiles) -> AromaticityAssignment {
+    fn assignment<AtomPolicy: SmilesAtomPolicy>(
+        &self,
+        smiles: &Smiles<AtomPolicy>,
+    ) -> AromaticityAssignment {
         RdkitAromaticityFlavor::Simple.assignment(smiles)
     }
 }
@@ -70,7 +79,10 @@ impl RdkitAromaticityFlavor {
         }
     }
 
-    fn assignment(self, smiles: &Smiles) -> AromaticityAssignment {
+    fn assignment<AtomPolicy: SmilesAtomPolicy>(
+        self,
+        smiles: &Smiles<AtomPolicy>,
+    ) -> AromaticityAssignment {
         if let Some(prepared_smiles) = RdkitPreAromaticityNormalization::apply(smiles) {
             self.assignment_with_overrides(
                 &prepared_smiles.smiles,
@@ -82,9 +94,9 @@ impl RdkitAromaticityFlavor {
         }
     }
 
-    fn assignment_with_overrides(
+    fn assignment_with_overrides<AtomPolicy: SmilesAtomPolicy>(
         self,
-        smiles: &Smiles,
+        smiles: &Smiles<AtomPolicy>,
         implicit_hydrogen_overrides: &HashMap<usize, u8>,
     ) -> AromaticityAssignment {
         match self.quick_assignment(smiles, implicit_hydrogen_overrides) {
@@ -101,9 +113,9 @@ impl RdkitAromaticityFlavor {
         }
     }
 
-    fn quick_assignment(
+    fn quick_assignment<AtomPolicy: SmilesAtomPolicy>(
         self,
-        smiles: &Smiles,
+        smiles: &Smiles<AtomPolicy>,
         implicit_hydrogen_overrides: &HashMap<usize, u8>,
     ) -> QuickAssignment {
         let ring_membership = smiles.ring_membership();
@@ -155,8 +167,8 @@ enum QuickAssignment {
 struct RdkitPreAromaticityNormalization;
 
 #[derive(Debug)]
-struct RdkitNormalizedSmiles {
-    smiles: Smiles,
+struct RdkitNormalizedSmiles<AtomPolicy> {
+    smiles: Smiles<AtomPolicy>,
     implicit_hydrogen_overrides: HashMap<usize, u8>,
 }
 
@@ -167,7 +179,9 @@ struct RdkitPhosphorusCleanupTarget {
 }
 
 impl RdkitPreAromaticityNormalization {
-    fn apply(smiles: &Smiles) -> Option<RdkitNormalizedSmiles> {
+    fn apply<AtomPolicy: SmilesAtomPolicy>(
+        smiles: &Smiles<AtomPolicy>,
+    ) -> Option<RdkitNormalizedSmiles<AtomPolicy>> {
         let phosphorus_targets = Self::phosphorus_cleanup_targets(smiles);
         if phosphorus_targets.is_empty() {
             return None;
@@ -187,7 +201,7 @@ impl RdkitPreAromaticityNormalization {
             implicit_hydrogen_overrides.insert(target.phosphorus_atom_id, 0);
             implicit_hydrogen_overrides.insert(target.oxygen_atom_id, 0);
             bonds_to_single
-                .insert(Smiles::edge_key(target.phosphorus_atom_id, target.oxygen_atom_id));
+                .insert(crate::smiles::edge_key(target.phosphorus_atom_id, target.oxygen_atom_id));
         }
 
         let bond_matrix = crate::smiles::BondMatrix::from_sorted_upper_triangular_entries(
@@ -207,12 +221,14 @@ impl RdkitPreAromaticityNormalization {
         .unwrap_or_else(|_| unreachable!("existing bond matrix entries are already valid"));
 
         Some(RdkitNormalizedSmiles {
-            smiles: Smiles::from_bond_matrix_parts(atom_nodes, bond_matrix),
+            smiles: Smiles::<AtomPolicy>::from_bond_matrix_parts(atom_nodes, bond_matrix),
             implicit_hydrogen_overrides,
         })
     }
 
-    fn phosphorus_cleanup_targets(smiles: &Smiles) -> Vec<RdkitPhosphorusCleanupTarget> {
+    fn phosphorus_cleanup_targets<AtomPolicy: SmilesAtomPolicy>(
+        smiles: &Smiles<AtomPolicy>,
+    ) -> Vec<RdkitPhosphorusCleanupTarget> {
         let mut targets = Vec::<RdkitPhosphorusCleanupTarget>::new();
 
         for phosphorus_atom_id in 0..smiles.nodes().len() {
@@ -317,8 +333,8 @@ struct RdkitAtomAromContext {
 }
 
 impl RdkitAtomAromContext {
-    fn build(
-        smiles: &Smiles,
+    fn build<AtomPolicy: SmilesAtomPolicy>(
+        smiles: &Smiles<AtomPolicy>,
         ring_membership: &RingMembership,
         implicit_hydrogen_overrides: &HashMap<usize, u8>,
         radical_electrons: &[u8],
@@ -412,9 +428,9 @@ impl Default for RdkitPerAtomAromaticityState {
 struct RdkitDefaultElectronModel;
 
 impl RdkitDefaultElectronModel {
-    fn build_states(
+    fn build_states<AtomPolicy: SmilesAtomPolicy>(
         flavor: RdkitAromaticityFlavor,
-        smiles: &Smiles,
+        smiles: &Smiles<AtomPolicy>,
         ring_membership: &RingMembership,
         implicit_hydrogen_overrides: &HashMap<usize, u8>,
     ) -> Vec<RdkitPerAtomAromaticityState> {
@@ -765,23 +781,23 @@ impl RdkitFamilyEvaluation {
 }
 
 #[derive(Debug)]
-struct RdkitDefaultContext<'a> {
+struct RdkitDefaultContext<'a, AtomPolicy = crate::smiles::ConcreteAtoms> {
     flavor: RdkitAromaticityFlavor,
-    smiles: &'a Smiles,
+    smiles: &'a Smiles<AtomPolicy>,
     atom_states: Vec<RdkitPerAtomAromaticityState>,
     symm_sssr_cycles: Vec<Vec<usize>>,
     symm_sssr_status: SymmSssrStatus,
 }
 
-impl RdkitDefaultContext<'_> {
+impl<AtomPolicy: SmilesAtomPolicy> RdkitDefaultContext<'_, AtomPolicy> {
     const MAX_FUSED_AROMATIC_RING_SIZE: usize = 24;
 
     #[cfg(test)]
     fn new<'a>(
         flavor: RdkitAromaticityFlavor,
-        smiles: &'a Smiles,
+        smiles: &'a Smiles<AtomPolicy>,
         implicit_hydrogen_overrides: &HashMap<usize, u8>,
-    ) -> RdkitDefaultContext<'a> {
+    ) -> RdkitDefaultContext<'a, AtomPolicy> {
         let ring_membership = smiles.ring_membership();
         let atom_states = RdkitDefaultElectronModel::build_states(
             flavor,
@@ -799,10 +815,10 @@ impl RdkitDefaultContext<'_> {
 
     fn new_with_ring_membership_and_atom_states<'a>(
         flavor: RdkitAromaticityFlavor,
-        smiles: &'a Smiles,
+        smiles: &'a Smiles<AtomPolicy>,
         ring_membership: &RingMembership,
         atom_states: Vec<RdkitPerAtomAromaticityState>,
-    ) -> RdkitDefaultContext<'a> {
+    ) -> RdkitDefaultContext<'a, AtomPolicy> {
         let symm_sssr =
             rdkit_symm_sssr::symmetrize_sssr_with_ring_membership(smiles, ring_membership);
         RdkitDefaultContext {
@@ -858,7 +874,7 @@ impl RdkitDefaultContext<'_> {
     }
 
     fn ring_families(&self) -> Vec<RdkitDefaultRingFamily> {
-        Smiles::rdkit_fused_symm_sssr_cycle_families_from_cycles(
+        Smiles::<AtomPolicy>::rdkit_fused_symm_sssr_cycle_families_from_cycles(
             &self.symm_sssr_cycles,
             Self::MAX_FUSED_AROMATIC_RING_SIZE,
         )
@@ -1444,7 +1460,7 @@ fn rdkit_adjusted_default_valence(element: Element, formal_charge: i8) -> Option
     default_valence_for(adjusted_element, 0)
 }
 
-fn assign_radicals(smiles: &Smiles) -> Vec<u8> {
+fn assign_radicals<AtomPolicy: SmilesAtomPolicy>(smiles: &Smiles<AtomPolicy>) -> Vec<u8> {
     smiles
         .nodes()
         .iter()
@@ -1453,7 +1469,11 @@ fn assign_radicals(smiles: &Smiles) -> Vec<u8> {
         .collect()
 }
 
-fn assign_radicals_for_atom(smiles: &Smiles, atom_id: usize, atom: &Atom) -> u8 {
+fn assign_radicals_for_atom<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
+    atom_id: usize,
+    atom: &Atom,
+) -> u8 {
     if !atom.is_bracket_atom() {
         return 0;
     }
@@ -1495,12 +1515,15 @@ fn assign_radicals_for_atom(smiles: &Smiles, atom_id: usize, atom: &Atom) -> u8 
     u8::try_from(available_valence % 2).unwrap_or(0)
 }
 
-fn raw_total_valence(smiles: &Smiles, atom_id: usize) -> i16 {
+fn raw_total_valence<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
+    atom_id: usize,
+) -> i16 {
     i16::from(smiles.total_valence(atom_id))
 }
 
 pub(crate) fn rdkit_smarts_total_valence(
-    smiles: &Smiles,
+    smiles: &Smiles<impl SmilesAtomPolicy>,
     atom_id: usize,
     aromaticity: &AromaticityAssignment,
 ) -> u8 {
@@ -1900,7 +1923,7 @@ impl<'a> RdkitConnectedSubsystemSearch<'a> {
     }
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     fn rdkit_fused_symm_sssr_cycle_families_from_cycles(
         cycles: &[Vec<usize>],
         max_fused_ring_size: usize,
@@ -1954,9 +1977,9 @@ impl Smiles {
 
     #[cfg(test)]
     pub(crate) fn fused_symm_sssr_components(&self) -> Vec<RingComponent> {
-        Smiles::rdkit_fused_symm_sssr_cycle_families_from_cycles(
+        Self::rdkit_fused_symm_sssr_cycle_families_from_cycles(
             self.symm_sssr_result().cycles(),
-            RdkitDefaultContext::MAX_FUSED_AROMATIC_RING_SIZE,
+            RdkitDefaultContext::<AtomPolicy>::MAX_FUSED_AROMATIC_RING_SIZE,
         )
         .into_iter()
         .map(|family_seed| {

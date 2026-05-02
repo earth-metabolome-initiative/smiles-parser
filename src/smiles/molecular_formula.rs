@@ -5,46 +5,20 @@ use alloc::{
 use core::str::FromStr;
 
 use elements_rs::{Element, Isotope};
-use molecular_formulas::{ChemicalFormula, errors::ParserError};
+use molecular_formulas::{ChargeLike, ChemicalFormula, CountLike};
 use thiserror::Error;
 
-use super::Smiles;
+use super::{Smiles, SmilesAtomPolicy, WildcardSmiles};
 
-/// Error raised while converting a [`Smiles`] graph into a molecular formula.
+/// Error raised while converting a [`WildcardSmiles`] graph into a molecular
+/// formula.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum MolecularFormulaConversionError {
-    /// The SMILES graph does not contain any atoms.
-    #[error("cannot convert an empty SMILES graph to a molecular formula")]
-    EmptySmiles,
+pub enum WildcardMolecularFormulaConversionError {
     /// A wildcard atom cannot be represented by an exact molecular formula.
     #[error("cannot convert wildcard atom at index {atom_id} to a molecular formula")]
     WildcardAtom {
         /// Index of the wildcard atom in the SMILES graph.
         atom_id: usize,
-    },
-    /// The target molecular formula type cannot represent this isotope.
-    #[error("cannot convert unsupported isotope {mass_number}{element} at atom index {atom_id}")]
-    UnsupportedIsotope {
-        /// Index of the isotope atom in the SMILES graph.
-        atom_id: usize,
-        /// Element carrying the unsupported isotope mass number.
-        element: Element,
-        /// Parsed isotope mass number.
-        mass_number: u16,
-    },
-    /// An atom or hydrogen count exceeded the supported conversion range.
-    #[error("SMILES molecular formula count overflowed")]
-    CountOverflow,
-    /// A component charge exceeded the supported conversion range.
-    #[error("SMILES molecular formula charge overflowed")]
-    ChargeOverflow,
-    /// The generated formula was rejected by `molecular-formulas`.
-    #[error("generated molecular formula `{formula}` failed to parse: {source}")]
-    Parser {
-        /// Generated formula string.
-        formula: String,
-        /// Parser error returned by `molecular-formulas`.
-        source: ParserError,
     },
 }
 
@@ -84,24 +58,18 @@ struct ComponentFormula {
 }
 
 impl ComponentFormula {
-    fn add_species(
-        &mut self,
-        species: FormulaSpecies,
-        count: u32,
-    ) -> Result<(), MolecularFormulaConversionError> {
+    fn add_species(&mut self, species: FormulaSpecies, count: u32) {
         if count == 0 {
-            return Ok(());
+            return;
         }
 
         if let Some(entry) = self.species_counts.iter_mut().find(|entry| entry.species == species) {
-            entry.count = entry
-                .count
-                .checked_add(count)
-                .ok_or(MolecularFormulaConversionError::CountOverflow)?;
+            entry.count = entry.count.checked_add(count).unwrap_or_else(|| {
+                unreachable!("parsed SMILES atom and hydrogen counts should fit into u32")
+            });
         } else {
             self.species_counts.push(FormulaSpeciesCount { species, count });
         }
-        Ok(())
     }
 
     fn write_formula(&mut self, target: &mut String) {
@@ -125,28 +93,73 @@ impl ComponentFormula {
     }
 }
 
-impl TryFrom<&Smiles> for ChemicalFormula {
-    type Error = MolecularFormulaConversionError;
-
-    fn try_from(smiles: &Smiles) -> Result<Self, Self::Error> {
-        let formula = smiles_formula_string(smiles)?;
-        Self::from_str(&formula)
-            .map_err(|source| MolecularFormulaConversionError::Parser { formula, source })
+impl<Count, Charge> From<&Smiles> for ChemicalFormula<Count, Charge>
+where
+    Count: CountLike,
+    Charge: ChargeLike + TryFrom<Count>,
+    Isotope: TryFrom<(Element, Count), Error = elements_rs::errors::Error>,
+{
+    fn from(smiles: &Smiles) -> Self {
+        let formula = strict_smiles_formula_string(smiles);
+        parse_generated_formula(&formula)
     }
 }
 
-impl TryFrom<Smiles> for ChemicalFormula {
-    type Error = MolecularFormulaConversionError;
+impl<Count, Charge> From<Smiles> for ChemicalFormula<Count, Charge>
+where
+    Count: CountLike,
+    Charge: ChargeLike + TryFrom<Count>,
+    Isotope: TryFrom<(Element, Count), Error = elements_rs::errors::Error>,
+{
+    fn from(smiles: Smiles) -> Self {
+        Self::from(&smiles)
+    }
+}
 
-    fn try_from(smiles: Smiles) -> Result<Self, Self::Error> {
+impl<Count, Charge> TryFrom<&WildcardSmiles> for ChemicalFormula<Count, Charge>
+where
+    Count: CountLike,
+    Charge: ChargeLike + TryFrom<Count>,
+    Isotope: TryFrom<(Element, Count), Error = elements_rs::errors::Error>,
+{
+    type Error = WildcardMolecularFormulaConversionError;
+
+    fn try_from(smiles: &WildcardSmiles) -> Result<Self, Self::Error> {
+        let formula = smiles_formula_string(smiles.inner())?;
+        Ok(parse_generated_formula(&formula))
+    }
+}
+
+impl<Count, Charge> TryFrom<WildcardSmiles> for ChemicalFormula<Count, Charge>
+where
+    Count: CountLike,
+    Charge: ChargeLike + TryFrom<Count>,
+    Isotope: TryFrom<(Element, Count), Error = elements_rs::errors::Error>,
+{
+    type Error = WildcardMolecularFormulaConversionError;
+
+    fn try_from(smiles: WildcardSmiles) -> Result<Self, Self::Error> {
         Self::try_from(&smiles)
     }
 }
 
-fn smiles_formula_string(smiles: &Smiles) -> Result<String, MolecularFormulaConversionError> {
-    if smiles.nodes().is_empty() {
-        return Err(MolecularFormulaConversionError::EmptySmiles);
-    }
+fn strict_smiles_formula_string(smiles: &Smiles) -> String {
+    smiles_formula_string(smiles).unwrap_or_else(|error| {
+        match error {
+            WildcardMolecularFormulaConversionError::WildcardAtom { .. } => {
+                unreachable!("strict Smiles cannot contain wildcard atoms")
+            }
+        }
+    })
+}
+
+fn smiles_formula_string<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
+) -> Result<String, WildcardMolecularFormulaConversionError> {
+    debug_assert!(
+        !smiles.nodes().is_empty(),
+        "parsed SMILES graphs are non-empty; empty graphs are crate-internal only"
+    );
 
     let components = smiles.connected_components();
     let mut component_formulas =
@@ -155,29 +168,20 @@ fn smiles_formula_string(smiles: &Smiles) -> Result<String, MolecularFormulaConv
 
     for (atom_id, atom) in smiles.nodes().iter().enumerate() {
         let component = &mut component_formulas[component_ids[atom_id]];
-        let element =
-            atom.element().ok_or(MolecularFormulaConversionError::WildcardAtom { atom_id })?;
-        if let Some(mass_number) = atom.isotope_mass_number()
-            && Isotope::try_from((element, mass_number)).is_err()
-        {
-            return Err(MolecularFormulaConversionError::UnsupportedIsotope {
-                atom_id,
-                element,
-                mass_number,
-            });
-        }
+        let element = atom
+            .element()
+            .ok_or(WildcardMolecularFormulaConversionError::WildcardAtom { atom_id })?;
         let species = atom.isotope_mass_number().map_or(FormulaSpecies::Element(element), |mass| {
             FormulaSpecies::Isotope { element, mass_number: mass }
         });
-        component.add_species(species, 1)?;
-        let hydrogen_count = u32::from(atom.hydrogen_count())
-            .checked_add(u32::from(smiles.implicit_hydrogen_count(atom_id)))
-            .ok_or(MolecularFormulaConversionError::CountOverflow)?;
-        component.add_species(FormulaSpecies::Element(Element::H), hydrogen_count)?;
+        component.add_species(species, 1);
+        let hydrogen_count =
+            u32::from(atom.hydrogen_count()) + u32::from(smiles.implicit_hydrogen_count(atom_id));
+        component.add_species(FormulaSpecies::Element(Element::H), hydrogen_count);
         component.charge = component
             .charge
             .checked_add(i32::from(atom.charge_value()))
-            .ok_or(MolecularFormulaConversionError::ChargeOverflow)?;
+            .unwrap_or_else(|| unreachable!("parsed SMILES formal charges should fit into i32"));
     }
 
     let mut formula = String::new();
@@ -188,6 +192,17 @@ fn smiles_formula_string(smiles: &Smiles) -> Result<String, MolecularFormulaConv
         component.write_formula(&mut formula);
     }
     Ok(formula)
+}
+
+fn parse_generated_formula<Count, Charge>(formula: &str) -> ChemicalFormula<Count, Charge>
+where
+    Count: CountLike,
+    Charge: ChargeLike + TryFrom<Count>,
+    Isotope: TryFrom<(Element, Count), Error = elements_rs::errors::Error>,
+{
+    ChemicalFormula::from_str(formula).unwrap_or_else(|error| {
+        unreachable!("generated formula `{formula}` should parse as ChemicalFormula: {error}")
+    })
 }
 
 fn formula_species_order(
@@ -253,17 +268,19 @@ mod tests {
 
     use super::*;
 
+    type TestFormula = ChemicalFormula<u32, i32>;
+
     #[test]
     fn formula_string_counts_implicit_hydrogens() {
         let smiles: Smiles = "c1ccccc1".parse().unwrap();
 
-        assert_eq!(smiles_formula_string(&smiles).unwrap(), "C6H6");
+        assert_eq!(strict_smiles_formula_string(&smiles), "C6H6");
     }
 
     #[test]
     fn formula_conversion_preserves_isotopes_explicit_hydrogens_and_charge() {
         let smiles: Smiles = "[13CH3][NH3+]".parse().unwrap();
-        let formula = ChemicalFormula::try_from(&smiles).unwrap();
+        let formula: TestFormula = ChemicalFormula::from(&smiles);
 
         assert_eq!(formula.to_string(), "[¹³C]H₆N⁺");
         assert_eq!(formula.count_of_element::<u32>(Element::C), Some(1));
@@ -275,48 +292,36 @@ mod tests {
     #[test]
     fn formula_conversion_preserves_disconnected_components() {
         let smiles: Smiles = "[Na+].[Cl-]".parse().unwrap();
-        let formula = ChemicalFormula::try_from(smiles).unwrap();
+        let formula: TestFormula = ChemicalFormula::from(smiles);
 
         assert_eq!(formula.to_string(), "Na⁺.Cl⁻");
         assert!(formula.charge().abs() < f64::EPSILON);
     }
 
     #[test]
+    fn formula_conversion_uses_explicit_count_and_charge_types() {
+        let smiles: Smiles = "C".parse().unwrap();
+        let compact: ChemicalFormula<u8, i8> = ChemicalFormula::from(&smiles);
+        let wide: ChemicalFormula<u32, i32> = ChemicalFormula::from(&smiles);
+
+        assert_eq!(compact.to_string(), "CH₄");
+        assert_eq!(wide.to_string(), compact.to_string());
+    }
+
+    #[test]
     fn formula_conversion_matches_rdkit_non_carbon_isotope_ordering() {
         let smiles: Smiles = "C([18OH])([131I])Cl".parse().unwrap();
-        let formula = ChemicalFormula::try_from(smiles).unwrap();
-        let rdkit_formula = ChemicalFormula::try_from("CH2Cl[18O][131I]").unwrap();
+        let formula: TestFormula = ChemicalFormula::from(smiles);
+        let rdkit_formula = TestFormula::try_from("CH2Cl[18O][131I]").unwrap();
 
         assert_eq!(formula, rdkit_formula);
     }
 
     #[test]
-    fn formula_conversion_rejects_empty_smiles() {
-        let error = ChemicalFormula::try_from(Smiles::new()).unwrap_err();
-
-        assert_eq!(error, MolecularFormulaConversionError::EmptySmiles);
-    }
-
-    #[test]
     fn formula_conversion_rejects_wildcards() {
-        let smiles: Smiles = "*".parse().unwrap();
-        let error = ChemicalFormula::try_from(smiles).unwrap_err();
+        let smiles: WildcardSmiles = "*".parse().unwrap();
+        let error = TestFormula::try_from(smiles).unwrap_err();
 
-        assert_eq!(error, MolecularFormulaConversionError::WildcardAtom { atom_id: 0 });
-    }
-
-    #[test]
-    fn formula_conversion_rejects_unsupported_isotopes() {
-        let smiles: Smiles = "[999C]".parse().unwrap();
-        let error = ChemicalFormula::try_from(smiles).unwrap_err();
-
-        assert_eq!(
-            error,
-            MolecularFormulaConversionError::UnsupportedIsotope {
-                atom_id: 0,
-                element: Element::C,
-                mass_number: 999,
-            }
-        );
+        assert_eq!(error, WildcardMolecularFormulaConversionError::WildcardAtom { atom_id: 0 });
     }
 }

@@ -78,7 +78,7 @@ impl SmilesCanonicalLabeling {
     }
 }
 
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     fn exact_canonical_labeling(&self) -> SmilesCanonicalLabeling {
         self.canonical_labeling_with(Self::exact_canonical_labeling_whole_graph)
     }
@@ -134,7 +134,7 @@ impl Smiles {
             }
             let new_row = new_index_of_old_node[row];
             let new_column = new_index_of_old_node[column];
-            let (new_row, new_column) = Smiles::edge_key(new_row, new_column);
+            let (new_row, new_column) = crate::smiles::edge_key(new_row, new_column);
             canonical_edges.push((new_row, new_column, entry.bond()));
         }
         canonical_edges.sort_unstable_by_key(|(row, column, _bond)| (*row, *column));
@@ -457,7 +457,7 @@ impl Smiles {
 }
 
 #[cfg(feature = "fuzzing")]
-impl Smiles {
+impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// Panics if canonicalization invariants are violated.
     ///
     /// This is intended for fuzzing and other internal validation passes.
@@ -467,8 +467,22 @@ impl Smiles {
     }
 }
 
+#[cfg(feature = "fuzzing")]
+impl super::WildcardSmiles {
+    /// Panics if canonicalization invariants are violated.
+    ///
+    /// This is intended for fuzzing and other internal validation passes.
+    #[doc(hidden)]
+    pub fn debug_assert_canonicalization_invariants(&self) {
+        self.inner().debug_assert_canonicalization_invariants();
+    }
+}
+
 #[allow(dead_code)]
-fn exact_preserves_aromatic_subgraphs(before: &Smiles, after: &Smiles) -> bool {
+fn exact_preserves_aromatic_subgraphs<AtomPolicy: crate::smiles::SmilesAtomPolicy>(
+    before: &Smiles<AtomPolicy>,
+    after: &Smiles<AtomPolicy>,
+) -> bool {
     [
         super::AromaticityPolicy::RdkitDefault,
         super::AromaticityPolicy::RdkitSimple,
@@ -504,7 +518,11 @@ fn atom_with_hydrogen_count(atom: Atom, hydrogens: u8) -> Atom {
     }
 }
 
-fn maybe_collapse_atom_to_organic_subset(smiles: &Smiles, node_id: usize, atom: Atom) -> Atom {
+fn maybe_collapse_atom_to_organic_subset<AtomPolicy: crate::smiles::SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
+    node_id: usize,
+    atom: Atom,
+) -> Atom {
     if atom.syntax() != AtomSyntax::Bracket
         || atom.isotope_mass_number().is_some()
         || atom.charge_value() != 0
@@ -541,7 +559,11 @@ fn canonicalization_valid_unbracketed(symbol: AtomSymbol) -> bool {
     )
 }
 
-fn canonicalization_atom_spelling_normal_form(smiles: &Smiles, node_id: usize, atom: Atom) -> Atom {
+fn canonicalization_atom_spelling_normal_form<AtomPolicy: crate::smiles::SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
+    node_id: usize,
+    atom: Atom,
+) -> Atom {
     if atom.syntax() == AtomSyntax::Bracket {
         maybe_collapse_atom_to_organic_subset(smiles, node_id, atom)
     } else {
@@ -550,7 +572,7 @@ fn canonicalization_atom_spelling_normal_form(smiles: &Smiles, node_id: usize, a
 }
 
 fn canonicalization_implicit_hydrogen_count(
-    smiles: &Smiles,
+    smiles: &Smiles<impl crate::smiles::SmilesAtomPolicy>,
     node_id: usize,
     rewritten_atom: Atom,
 ) -> u8 {
@@ -565,8 +587,8 @@ fn canonicalization_implicit_hydrogen_count(
     }
 }
 
-fn remap_parsed_stereo_neighbors_row(
-    smiles: &Smiles,
+fn remap_parsed_stereo_neighbors_row<AtomPolicy: crate::smiles::SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
     old_node: usize,
     new_index_of_old_node: &[usize],
 ) -> Vec<StereoNeighbor> {

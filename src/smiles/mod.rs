@@ -9,8 +9,6 @@
 //! into a SMILES string.
 //!
 //! ```rust
-//! use core::str::FromStr;
-//!
 //! use smiles_parser::prelude::Smiles;
 //!
 //! let source = "CC";
@@ -23,7 +21,7 @@
 //! # Ok::<(), smiles_parser::errors::SmilesErrorWithSpan>(())
 //! ```
 use alloc::{boxed::Box, string::String, vec::Vec};
-use core::fmt;
+use core::{fmt, marker::PhantomData};
 
 use elements_rs::Element;
 use geometric_traits::traits::{
@@ -34,6 +32,7 @@ use geometric_traits::traits::{
 use crate::{
     atom::{Atom, atom_symbol::AtomSymbol, bracketed::chirality::Chirality},
     bond::bond_edge::BondEdge,
+    errors::SmilesError,
 };
 
 mod aromaticity;
@@ -63,13 +62,14 @@ pub use self::{
         AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
         AromaticityModel, AromaticityPerception, AromaticityPolicy, AromaticityRingFamilyKind,
         AromaticityStatus, RdkitDefaultAromaticity, RdkitMdlAromaticity, RdkitSimpleAromaticity,
+        WildcardAromaticityPerception,
     },
     canonicalization::SmilesCanonicalLabeling,
-    connected_components::SmilesComponents,
+    connected_components::{SmilesComponents, WildcardSmilesComponents},
     double_bond_stereo::DoubleBondStereoConfig,
     geometric_traits_impl::{BondEntry, BondMatrix},
     kekulization::{KekulizationError, KekulizationMode},
-    molecular_formula::MolecularFormulaConversionError,
+    molecular_formula::WildcardMolecularFormulaConversionError,
 };
 pub(crate) use self::{
     geometric_traits_impl::{BondMatrixBuilder, build_bond_matrix_from_known_simple_edges},
@@ -317,36 +317,100 @@ pub struct RingAtomMembershipScratch {
     lowlink: Vec<usize>,
 }
 
+mod sealed {
+    pub trait Sealed {}
+}
+
+/// Type-level policy describing whether a SMILES graph may contain wildcard
+/// (`*`) atoms.
+///
+/// This trait is sealed; use [`ConcreteAtoms`] through the default [`Smiles`]
+/// type or use [`WildcardSmiles`] when wildcard atoms are part of the input
+/// language.
+pub trait SmilesAtomPolicy:
+    sealed::Sealed + Copy + Clone + fmt::Debug + PartialEq + Eq + 'static
+{
+    /// Whether wildcard atoms are accepted by the parser and internal
+    /// constructors for this SMILES policy.
+    const ALLOW_WILDCARDS: bool;
+}
+
+/// Default atom policy for [`Smiles`]: every atom must resolve to a concrete
+/// element.
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash)]
+pub struct ConcreteAtoms;
+
+/// Atom policy for [`WildcardSmiles`]: wildcard (`*`) atoms are allowed.
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash)]
+pub(crate) struct WildcardAtoms;
+
+impl sealed::Sealed for ConcreteAtoms {}
+impl sealed::Sealed for WildcardAtoms {}
+
+impl SmilesAtomPolicy for ConcreteAtoms {
+    const ALLOW_WILDCARDS: bool = false;
+}
+
+impl SmilesAtomPolicy for WildcardAtoms {
+    const ALLOW_WILDCARDS: bool = true;
+}
+
 /// Represents a parsed SMILES graph.
 #[derive(Debug, Clone)]
-pub struct Smiles {
+pub struct Smiles<AtomPolicy = ConcreteAtoms> {
     atom_nodes: Vec<Atom>,
     bond_matrix: BondMatrix,
     parsed_stereo_neighbors: Vec<Vec<StereoNeighbor>>,
     implicit_hydrogen_cache: Vec<u8>,
     kekulization_source: Option<Box<Self>>,
+    atom_policy: PhantomData<fn() -> AtomPolicy>,
+}
+
+/// A parsed SMILES graph that may contain wildcard (`*`) atoms.
+///
+/// This type preserves the wildcard-capable behavior that older [`Smiles`]
+/// parsing accepted. Use [`Smiles`] when every atom must resolve to a concrete
+/// chemical element.
+#[derive(Debug, Clone)]
+pub struct WildcardSmiles {
+    inner: Smiles<WildcardAtoms>,
+}
+
+#[inline]
+#[must_use]
+pub(crate) const fn edge_key(node_a: usize, node_b: usize) -> (usize, usize) {
+    if node_a < node_b { (node_a, node_b) } else { (node_b, node_a) }
 }
 
 impl Smiles {
-    /// Creates a new empty [`Smiles`] graph.
+    /// Returns a normalized edge key with node IDs in ascending order.
     ///
     /// # Examples
     ///
     /// ```
     /// use smiles_parser::prelude::Smiles;
     ///
-    /// let smiles = Smiles::new();
-    /// assert!(smiles.nodes().is_empty());
+    /// assert_eq!(Smiles::edge_key(4, 1), (1, 4));
     /// ```
     #[inline]
     #[must_use]
-    pub fn new() -> Self {
+    pub fn edge_key(node_a: usize, node_b: usize) -> (usize, usize) {
+        edge_key(node_a, node_b)
+    }
+}
+
+impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
+    #[cfg(test)]
+    #[inline]
+    #[must_use]
+    pub(crate) fn new_for_policy() -> Self {
         Self {
             atom_nodes: Vec::new(),
             bond_matrix: BondMatrix::default(),
             parsed_stereo_neighbors: Vec::new(),
             implicit_hydrogen_cache: Vec::new(),
             kekulization_source: None,
+            atom_policy: PhantomData,
         }
     }
 
@@ -386,19 +450,32 @@ impl Smiles {
         self.atom_nodes.get(id)
     }
 
-    /// Returns a normalized edge key with node IDs in ascending order.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use smiles_parser::prelude::Smiles;
-    ///
-    /// assert_eq!(Smiles::edge_key(4, 1), (1, 4));
-    /// ```
     #[inline]
     #[must_use]
-    pub fn edge_key(node_a: usize, node_b: usize) -> (usize, usize) {
-        if node_a < node_b { (node_a, node_b) } else { (node_b, node_a) }
+    pub(crate) fn contains_wildcard_atom(&self) -> bool {
+        self.atom_nodes.iter().any(|atom| atom.symbol().is_wildcard())
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn into_atom_policy<TargetPolicy: SmilesAtomPolicy>(self) -> Smiles<TargetPolicy> {
+        let Self {
+            atom_nodes,
+            bond_matrix,
+            parsed_stereo_neighbors,
+            implicit_hydrogen_cache,
+            kekulization_source,
+            atom_policy: _,
+        } = self;
+        Smiles {
+            atom_nodes,
+            bond_matrix,
+            parsed_stereo_neighbors,
+            implicit_hydrogen_cache,
+            kekulization_source: kekulization_source
+                .map(|source| Box::new((*source).into_atom_policy())),
+            atom_policy: PhantomData,
+        }
     }
 
     /// Returns the bond connecting the given pair of node ids, if present.
@@ -415,7 +492,7 @@ impl Smiles {
     #[inline]
     #[must_use]
     pub fn edge_for_node_pair(&self, nodes: (usize, usize)) -> Option<BondEdge> {
-        let (row, column) = Self::edge_key(nodes.0, nodes.1);
+        let (row, column) = edge_key(nodes.0, nodes.1);
         let rank = self.bond_matrix.try_rank(row, column)?;
         let entry = *self.bond_matrix.select_value_ref(rank);
         Some(entry.to_bond_edge(row, column))
@@ -424,7 +501,7 @@ impl Smiles {
     #[inline]
     #[must_use]
     pub(crate) fn bond_for_node_pair(&self, nodes: (usize, usize)) -> Option<crate::bond::Bond> {
-        let (row, column) = Self::edge_key(nodes.0, nodes.1);
+        let (row, column) = edge_key(nodes.0, nodes.1);
         let rank = self.bond_matrix.try_rank(row, column)?;
         Some(self.bond_matrix.select_value_ref(rank).bond())
     }
@@ -890,6 +967,7 @@ impl Smiles {
             parsed_stereo_neighbors: self.parsed_stereo_neighbors.clone(),
             implicit_hydrogen_cache: self.implicit_hydrogen_cache.clone(),
             kekulization_source: self.kekulization_source.clone(),
+            atom_policy: PhantomData,
         }
     }
 
@@ -1006,6 +1084,7 @@ impl Smiles {
             parsed_stereo_neighbors: self.parsed_stereo_neighbors.clone(),
             implicit_hydrogen_cache: self.implicit_hydrogen_cache.clone(),
             kekulization_source: None,
+            atom_policy: PhantomData,
         }
     }
 
@@ -1180,7 +1259,7 @@ impl Smiles {
                 );
                 lowlink[atom_id] = lowlink[atom_id].min(lowlink[neighbor_atom_id]);
                 if lowlink[neighbor_atom_id] > discovery_order[atom_id] {
-                    let (row, column) = Self::edge_key(atom_id, neighbor_atom_id);
+                    let (row, column) = edge_key(atom_id, neighbor_atom_id);
                     bridge_keys.push(Self::packed_edge_key(row, column));
                 }
             } else if parent_atom_id != Some(neighbor_atom_id) {
@@ -1366,6 +1445,267 @@ fn cycle_edges(cycle: &[usize]) -> Vec<[usize; 2]> {
         .collect()
 }
 
+impl WildcardSmiles {
+    #[inline]
+    #[must_use]
+    pub(crate) fn from_inner(inner: Smiles<WildcardAtoms>) -> Self {
+        Self { inner }
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn inner(&self) -> &Smiles<WildcardAtoms> {
+        &self.inner
+    }
+
+    /// Returns a slice of all parsed [`Atom`] values.
+    #[inline]
+    #[must_use]
+    pub fn nodes(&self) -> &[Atom] {
+        self.inner.nodes()
+    }
+
+    /// Returns the atom with the given positional index, if present.
+    #[inline]
+    #[must_use]
+    pub fn node_by_id(&self, id: usize) -> Option<&Atom> {
+        self.inner.node_by_id(id)
+    }
+
+    /// Returns the bond connecting the given pair of node ids, if present.
+    #[inline]
+    #[must_use]
+    pub fn edge_for_node_pair(&self, nodes: (usize, usize)) -> Option<BondEdge> {
+        self.inner.edge_for_node_pair(nodes)
+    }
+
+    /// Returns the number of bonds incident to the provided node id.
+    #[inline]
+    #[must_use]
+    pub fn edge_count_for_node(&self, id: usize) -> usize {
+        self.inner.edge_count_for_node(id)
+    }
+
+    /// Returns the connectivity count for the provided atom id.
+    #[inline]
+    #[must_use]
+    pub fn connectivity_count(&self, id: usize) -> u8 {
+        self.inner.connectivity_count(id)
+    }
+
+    /// Returns the total valence for the provided atom id.
+    #[inline]
+    #[must_use]
+    pub fn total_valence(&self, id: usize) -> u8 {
+        self.inner.total_valence(id)
+    }
+
+    /// Returns the RDKit-style SMARTS total valence for the provided atom id
+    /// under the supplied aromaticity assignment.
+    #[inline]
+    #[must_use]
+    pub fn smarts_total_valence(&self, id: usize, aromaticity: &AromaticityAssignment) -> u8 {
+        self.inner.smarts_total_valence(id, aromaticity)
+    }
+
+    /// Returns a zero-allocation iterator over the bonds incident to the
+    /// provided node id.
+    #[inline]
+    pub fn edges_for_node(&self, id: usize) -> impl Iterator<Item = BondEdge> + '_ {
+        self.inner.edges_for_node(id)
+    }
+
+    /// Returns semantic tetrahedral or allene-like chirality for SMARTS-style
+    /// matching.
+    #[inline]
+    #[must_use]
+    pub fn smarts_tetrahedral_chirality(&self, atom_id: usize) -> Option<Chirality> {
+        self.inner.smarts_tetrahedral_chirality(atom_id)
+    }
+
+    /// Returns semantic `E`/`Z` stereo for the requested double bond, if any.
+    #[inline]
+    #[must_use]
+    pub fn double_bond_stereo_config(
+        &self,
+        node_a: usize,
+        node_b: usize,
+    ) -> Option<DoubleBondStereoConfig> {
+        self.inner.double_bond_stereo_config(node_a, node_b)
+    }
+
+    /// Returns the atoms and bonds that belong to at least one ring.
+    #[inline]
+    #[must_use]
+    pub fn ring_membership(&self) -> RingMembership {
+        self.inner.ring_membership()
+    }
+
+    /// Returns atom-only ring membership for the graph.
+    #[inline]
+    #[must_use]
+    pub fn ring_atom_membership(&self) -> RingAtomMembership {
+        self.inner.ring_atom_membership()
+    }
+
+    /// Writes atom-only ring membership into caller-provided output and
+    /// scratch buffers.
+    #[inline]
+    pub fn write_ring_atom_membership(
+        &self,
+        ring_atom_membership: &mut RingAtomMembership,
+        scratch: &mut RingAtomMembershipScratch,
+    ) {
+        self.inner.write_ring_atom_membership(ring_atom_membership, scratch);
+    }
+
+    /// Returns the canonicalized symmetric-SSSR-style cycle set together with
+    /// search completeness status.
+    #[inline]
+    #[must_use]
+    pub fn symm_sssr_result(&self) -> SymmSssrResult {
+        self.inner.symm_sssr_result()
+    }
+
+    /// Returns the symmetric valued sparse matrix storing the graph bonds.
+    #[inline]
+    #[must_use]
+    pub fn bond_matrix(&self) -> &BondMatrix {
+        self.inner.bond_matrix()
+    }
+
+    /// Returns the number of unique chemical bonds in the graph.
+    #[inline]
+    #[must_use]
+    pub fn number_of_bonds(&self) -> usize {
+        self.inner.number_of_bonds()
+    }
+
+    /// Returns the cached implicit hydrogen count for every atom.
+    #[inline]
+    #[must_use]
+    pub fn implicit_hydrogen_counts(&self) -> &[u8] {
+        self.inner.implicit_hydrogen_counts()
+    }
+
+    /// Returns the implicit hydrogen count for the provided atom id.
+    #[inline]
+    #[must_use]
+    pub fn implicit_hydrogen_count(&self, id: usize) -> u8 {
+        self.inner.implicit_hydrogen_count(id)
+    }
+
+    /// Returns the canonical labeling of the current graph.
+    #[inline]
+    #[must_use]
+    pub fn canonical_labeling(&self) -> SmilesCanonicalLabeling {
+        self.inner.canonical_labeling()
+    }
+
+    /// Returns whether the current graph is already in canonical form.
+    #[inline]
+    #[must_use]
+    pub fn is_canonical(&self) -> bool {
+        self.inner.is_canonical()
+    }
+
+    /// Returns the graph rewritten into canonical node order.
+    #[inline]
+    #[must_use]
+    pub fn canonicalize(&self) -> Self {
+        Self::from_inner(self.inner.canonicalize())
+    }
+
+    /// Returns a graph with directional single bonds collapsed to ordinary
+    /// single bonds.
+    #[inline]
+    #[must_use]
+    pub fn with_directional_bonds_collapsed(&self) -> Self {
+        Self::from_inner(self.inner.with_directional_bonds_collapsed())
+    }
+
+    /// Returns a variant of the graph with all currently implied hydrogens
+    /// materialized as terminal `[H]` atoms.
+    #[inline]
+    #[must_use]
+    pub fn with_explicit_hydrogens(&self) -> Self {
+        Self::from_inner(self.inner.with_explicit_hydrogens())
+    }
+
+    /// Renders the graph back into a SMILES string.
+    #[inline]
+    #[must_use]
+    pub fn render(&self) -> String {
+        self.inner.render()
+    }
+
+    /// Returns a localized Kekule form of the current graph.
+    ///
+    /// # Errors
+    /// Returns a [`KekulizationError`] if no valid localized form exists.
+    #[inline]
+    pub fn kekulize(&self) -> Result<Self, KekulizationError> {
+        self.inner.kekulize().map(Self::from_inner)
+    }
+
+    /// Returns a localized Kekule form of the current graph using the provided
+    /// mode.
+    ///
+    /// # Errors
+    /// Returns a [`KekulizationError`] if no valid localized form exists.
+    #[inline]
+    pub fn kekulize_with(&self, mode: KekulizationMode) -> Result<Self, KekulizationError> {
+        self.inner.kekulize_with(mode).map(Self::from_inner)
+    }
+
+    /// Returns a localized Kekule form by solving from the current aromatic
+    /// graph alone.
+    ///
+    /// # Errors
+    /// Returns a [`KekulizationError`] if no valid localized form exists.
+    #[inline]
+    pub fn kekulize_standalone(&self) -> Result<Self, KekulizationError> {
+        self.inner.kekulize_standalone().map(Self::from_inner)
+    }
+
+    /// Returns a new graph with the provided aromaticity assignment applied.
+    ///
+    /// # Errors
+    /// Returns an [`AromaticityAssignmentApplicationError`] if the assignment
+    /// is inconsistent with the graph.
+    #[inline]
+    pub fn try_with_aromaticity_assignment(
+        &self,
+        assignment: &AromaticityAssignment,
+    ) -> Result<Self, AromaticityAssignmentApplicationError> {
+        self.inner.try_with_aromaticity_assignment(assignment).map(Self::from_inner)
+    }
+}
+
+impl Smiles<WildcardAtoms> {
+    fn try_into_smiles(self) -> Result<Smiles, SmilesError> {
+        if self.contains_wildcard_atom() {
+            Err(SmilesError::WildcardAtomNotAllowed)
+        } else {
+            Ok(self.into_atom_policy())
+        }
+    }
+}
+
+impl TryFrom<WildcardSmiles> for Smiles {
+    type Error = SmilesError;
+
+    fn try_from(smiles: WildcardSmiles) -> Result<Self, Self::Error> {
+        smiles.inner.try_into_smiles()
+    }
+}
+
+impl From<Smiles> for WildcardSmiles {
+    fn from(smiles: Smiles) -> Self {
+        Self::from_inner(smiles.into_atom_policy())
+    }
+}
+
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RingComponent {
@@ -1373,19 +1713,33 @@ pub(crate) struct RingComponent {
     bond_edges: Vec<[usize; 2]>,
 }
 
-impl Default for Smiles {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl PartialEq for Smiles {
-    fn eq(&self, other: &Self) -> bool {
+impl<LeftPolicy: SmilesAtomPolicy, RightPolicy: SmilesAtomPolicy> PartialEq<Smiles<RightPolicy>>
+    for Smiles<LeftPolicy>
+{
+    fn eq(&self, other: &Smiles<RightPolicy>) -> bool {
         self.atom_nodes == other.atom_nodes && self.bond_matrix == other.bond_matrix
     }
 }
 
-impl fmt::Display for Smiles {
+impl PartialEq for WildcardSmiles {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl PartialEq<Smiles> for WildcardSmiles {
+    fn eq(&self, other: &Smiles) -> bool {
+        self.inner == *other
+    }
+}
+
+impl PartialEq<WildcardSmiles> for Smiles {
+    fn eq(&self, other: &WildcardSmiles) -> bool {
+        *self == other.inner
+    }
+}
+
+impl<AtomPolicy: SmilesAtomPolicy> fmt::Display for Smiles<AtomPolicy> {
     /// Formats the graph by running the full render pipeline and writing the
     /// resulting SMILES string into `f`.
     ///
@@ -1396,10 +1750,15 @@ impl fmt::Display for Smiles {
     }
 }
 
+impl fmt::Display for WildcardSmiles {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.render())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::{string::ToString, vec::Vec};
-    use std::str::FromStr;
 
     use elements_rs::Element;
 
@@ -1407,7 +1766,8 @@ mod tests {
         AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
         AromaticityModel, AromaticityPolicy, AromaticityStatus, BondMatrixBuilder,
         DoubleBondStereoConfig, RdkitMdlAromaticity, RdkitSimpleAromaticity, RingAtomMembership,
-        RingAtomMembershipScratch, RingMembership, Smiles, StereoNeighbor,
+        RingAtomMembershipScratch, RingMembership, Smiles, SmilesAtomPolicy, StereoNeighbor,
+        WildcardSmiles,
     };
     use crate::{
         atom::{Atom, AtomSyntax, atom_symbol::AtomSymbol, bracketed::chirality::Chirality},
@@ -1445,17 +1805,6 @@ mod tests {
     }
 
     #[test]
-    fn smiles_new_and_default_create_empty_graph() {
-        let smiles = Smiles::new();
-        assert!(smiles.nodes().is_empty());
-        assert_eq!(smiles.number_of_bonds(), 0);
-
-        let default_smiles = Smiles::default();
-        assert!(default_smiles.nodes().is_empty());
-        assert_eq!(default_smiles.number_of_bonds(), 0);
-    }
-
-    #[test]
     fn bond_matrix_builder_rejects_self_loops() {
         let mut builder = BondMatrixBuilder::with_capacity(1);
         let err = builder.push_edge(0, 0, Bond::Single, None).expect_err("self-loop should fail");
@@ -1464,9 +1813,9 @@ mod tests {
 
     #[test]
     fn edge_key_normalizes_node_order() {
-        assert_eq!(Smiles::edge_key(1, 4), (1, 4));
-        assert_eq!(Smiles::edge_key(4, 1), (1, 4));
-        assert_eq!(Smiles::edge_key(3, 3), (3, 3));
+        assert_eq!(crate::smiles::edge_key(1, 4), (1, 4));
+        assert_eq!(crate::smiles::edge_key(4, 1), (1, 4));
+        assert_eq!(crate::smiles::edge_key(3, 3), (3, 3));
     }
 
     #[test]
@@ -1973,7 +2322,10 @@ mod tests {
         struct SingleBondModel;
 
         impl AromaticityModel for SingleBondModel {
-            fn assignment(&self, _smiles: &Smiles) -> AromaticityAssignment {
+            fn assignment<AtomPolicy: SmilesAtomPolicy>(
+                &self,
+                _smiles: &Smiles<AtomPolicy>,
+            ) -> AromaticityAssignment {
                 AromaticityAssignment::new(AromaticityStatus::Complete, vec![0, 1], vec![[0, 1]])
             }
         }
@@ -2341,7 +2693,10 @@ mod tests {
         struct PartialModel;
 
         impl AromaticityModel for PartialModel {
-            fn assignment(&self, _smiles: &Smiles) -> AromaticityAssignment {
+            fn assignment<AtomPolicy: SmilesAtomPolicy>(
+                &self,
+                _smiles: &Smiles<AtomPolicy>,
+            ) -> AromaticityAssignment {
                 AromaticityAssignment::new(AromaticityStatus::Partial, vec![0, 1], vec![[0, 1]])
             }
         }
@@ -2359,7 +2714,10 @@ mod tests {
         struct PartialModel;
 
         impl AromaticityModel for PartialModel {
-            fn assignment(&self, _smiles: &Smiles) -> AromaticityAssignment {
+            fn assignment<AtomPolicy: SmilesAtomPolicy>(
+                &self,
+                _smiles: &Smiles<AtomPolicy>,
+            ) -> AromaticityAssignment {
                 AromaticityAssignment::new(AromaticityStatus::Partial, vec![0, 1], vec![[0, 1]])
             }
         }
@@ -2674,13 +3032,38 @@ mod tests {
     #[test]
     fn edge_case_wildcard_carbon_bond() {
         let input = "*c-c";
-        let smiles: Smiles = input.parse().unwrap();
+        let smiles: WildcardSmiles = input.parse().unwrap();
 
         let rendered = smiles.to_string();
-        let reparsed: Smiles = rendered.parse().unwrap();
+        let reparsed: WildcardSmiles = rendered.parse().unwrap();
         let rerendered = reparsed.to_string();
 
         assert_eq!(rendered, rerendered);
+    }
+
+    #[test]
+    fn wildcard_aromaticity_perception_preserves_wildcard_wrapper() {
+        let smiles: WildcardSmiles = "*C1=CC=CC=C1".parse().unwrap();
+        let perception = smiles.perceive_aromaticity().unwrap();
+
+        assert!(perception.assignment().contains_atom(1));
+
+        let aromaticized: WildcardSmiles = perception.into_aromaticized();
+
+        assert!(aromaticized.node_by_id(0).unwrap().symbol().is_wildcard());
+        assert!(aromaticized.node_by_id(1).unwrap().aromatic());
+    }
+
+    #[test]
+    fn strict_and_wildcard_smiles_convert_through_traits() {
+        let strict: Smiles = "CO".parse().unwrap();
+        let wildcard = WildcardSmiles::from(strict.clone());
+
+        assert_eq!(wildcard.to_string(), strict.to_string());
+        assert_eq!(Smiles::try_from(wildcard).unwrap(), strict);
+
+        let wildcard: WildcardSmiles = "*O".parse().unwrap();
+        assert_eq!(Smiles::try_from(wildcard).unwrap_err(), SmilesError::WildcardAtomNotAllowed);
     }
 
     #[test]
@@ -2693,9 +3076,9 @@ mod tests {
 
     #[test]
     fn explicit_single_between_aromatic_atoms_survives_render_roundtrip() {
-        let smiles: Smiles = "*c-c".parse().unwrap();
+        let smiles: WildcardSmiles = "*c-c".parse().unwrap();
         let rendered = smiles.to_string();
-        let reparsed: Smiles = rendered.parse().unwrap();
+        let reparsed: WildcardSmiles = rendered.parse().unwrap();
 
         assert_eq!(rendered, reparsed.to_string());
         assert_eq!(reparsed.edge_for_node_pair((0, 1)).unwrap().2, Bond::Single);

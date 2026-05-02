@@ -52,9 +52,9 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
 name = "elements_rs"
-version = "0.2.2"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6ff486947c32888bc0f13dc1f2556999b2d010b624f71f7a414e5ae8d810f8d"
+checksum = "4bd188e809697c6ab48177f32792f1d29f41451e7956336b0ba939adfde120aa"
 dependencies = [
  "serde",
  "strum",
@@ -170,6 +170,17 @@ checksum = "f12a681b7dd8ce12bff52488013ba614b869148d54dd79836ab85aafdd53f08d"
 dependencies = [
  "arbitrary",
  "cc",
+]
+
+[[package]]
+name = "molecular-formulas"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f50760a98089095da7db7c128617b704d2e257ac942dd37b44387d138b63c24e"
+dependencies = [
+ "elements_rs",
+ "num-traits",
+ "thiserror",
 ]
 
 [[package]]
@@ -292,6 +303,7 @@ dependencies = [
  "elements_rs",
  "geometric-traits",
  "hashbrown",
+ "molecular-formulas",
  "smallvec",
  "thiserror",
 ]

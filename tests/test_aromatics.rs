@@ -1,7 +1,5 @@
 //! Tests on Elements that should or should not be parsed as aromatic
 
-use std::str::FromStr;
-
 use elements_rs::Element;
 use smiles_parser::{
     atom::{Atom, atom_symbol::AtomSymbol},
