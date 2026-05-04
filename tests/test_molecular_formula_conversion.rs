@@ -19,8 +19,8 @@ fn methane_smiles_converts_to_formula_with_implicit_hydrogens() {
     let formula: TestFormula = ChemicalFormula::from(smiles);
 
     assert_eq!(formula.to_string(), "CH₄");
-    assert_eq!(formula.count_of_element::<u32>(Element::C), Some(1));
-    assert_eq!(formula.count_of_element::<u32>(Element::H), Some(4));
+    assert_eq!(formula.count_of_element::<u32>(Element::C), Ok(1));
+    assert_eq!(formula.count_of_element::<u32>(Element::H), Ok(4));
 }
 
 #[test]
@@ -29,9 +29,9 @@ fn charged_isotopic_smiles_converts_to_formula() {
     let formula: TestFormula = ChemicalFormula::from(&smiles);
 
     assert_eq!(formula.to_string(), "[¹³C]H₆N⁺");
-    assert_eq!(formula.count_of_element::<u32>(Element::C), Some(1));
-    assert_eq!(formula.count_of_element::<u32>(Element::H), Some(6));
-    assert_eq!(formula.count_of_element::<u32>(Element::N), Some(1));
+    assert_eq!(formula.count_of_element::<u32>(Element::C), Ok(1));
+    assert_eq!(formula.count_of_element::<u32>(Element::H), Ok(6));
+    assert_eq!(formula.count_of_element::<u32>(Element::N), Ok(1));
     assert!((formula.charge() - 1.0).abs() < f64::EPSILON);
 }
 
