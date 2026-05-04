@@ -366,16 +366,19 @@ fn assert_core_rewrite_invariants(
                 panic!("missing edge after canonicalization: {new_row}-{new_column}")
             });
         assert_eq!(
-            rewritten.2,
+            rewritten.bond(),
             entry.bond(),
             "bond kind changed during canonicalization for edge {row}-{column}",
         );
         assert_eq!(
-            rewritten.4,
+            rewritten.is_aromatic(),
             entry.aromatic(),
             "bond aromaticity changed during canonicalization for edge {row}-{column}",
         );
-        assert!(rewritten.3.is_none(), "canonicalization should clear ring-number provenance");
+        assert!(
+            rewritten.ring_num().is_none(),
+            "canonicalization should clear ring-number provenance"
+        );
     }
 
     let expected_neighbors: Vec<Vec<StereoNeighbor>> = order

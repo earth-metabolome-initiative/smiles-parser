@@ -579,8 +579,8 @@ impl<AtomPolicy: SmilesAtomPolicy> AromaticityPerception<AtomPolicy> {
     /// assert!(perception.assignment().contains_edge(2, 3));
     /// assert_eq!(perception.source_bond_for_node_pair((2, 3)), Some(Bond::Triple));
     /// let edge = perception.aromaticized().edge_for_node_pair((2, 3)).unwrap();
-    /// assert_eq!(edge.2, Bond::Triple);
-    /// assert!(edge.4);
+    /// assert_eq!(edge.bond(), Bond::Triple);
+    /// assert!(edge.is_aromatic());
     /// ```
     #[inline]
     #[must_use]

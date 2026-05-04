@@ -700,7 +700,7 @@ mod tests {
         let smiles = state.into_smiles();
         assert_eq!(smiles.nodes().len(), 2);
         assert_eq!(smiles.number_of_bonds(), 1);
-        assert_eq!(smiles.edge_for_node_pair((0, 1)).unwrap().2, Bond::Triple);
+        assert_eq!(smiles.edge_for_node_pair((0, 1)).unwrap().bond(), Bond::Triple);
     }
 
     #[test]
@@ -886,7 +886,7 @@ mod tests {
         let smiles = state.into_smiles();
         let edge = smiles.edge_for_node_pair((0, 1)).unwrap();
         assert_eq!(smiles.number_of_bonds(), 1);
-        assert_eq!(edge.2, Bond::Triple);
+        assert_eq!(edge.bond(), Bond::Triple);
         assert_eq!(crate::bond::bond_edge::bond_edge_ring_num_val(edge), Some(4));
     }
 
@@ -904,7 +904,7 @@ mod tests {
         state.validate_and_add_ring_num(2, 3, ring).unwrap();
 
         let smiles = state.into_smiles();
-        assert_eq!(smiles.edge_for_node_pair((0, 1)).unwrap().2, Bond::Quadruple);
+        assert_eq!(smiles.edge_for_node_pair((0, 1)).unwrap().bond(), Bond::Quadruple);
     }
 
     #[test]

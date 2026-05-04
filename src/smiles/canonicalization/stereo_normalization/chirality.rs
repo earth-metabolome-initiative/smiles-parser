@@ -56,7 +56,9 @@ fn allene_like_stereo_center(
     node_id: usize,
 ) -> bool {
     smiles.edge_count_for_node(node_id) == 2
-        && smiles.edges_for_node(node_id).all(|edge| edge.2 == Bond::Double && !edge.4)
+        && smiles
+            .edges_for_node(node_id)
+            .all(|edge| edge.bond() == Bond::Double && !edge.is_aromatic())
 }
 
 fn non_tetrahedral_default_chirality(

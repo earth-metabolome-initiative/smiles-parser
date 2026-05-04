@@ -154,14 +154,10 @@ mod tests {
         for edge in bond_edges {
             builder
                 .push_edge_with_descriptor(
-                    edge.0,
-                    edge.1,
-                    if edge.4 {
-                        crate::bond::BondDescriptor::aromatic(edge.2)
-                    } else {
-                        edge.2.into()
-                    },
-                    edge.3,
+                    edge.source(),
+                    edge.target(),
+                    edge.descriptor(),
+                    edge.ring_num(),
                 )
                 .unwrap();
         }

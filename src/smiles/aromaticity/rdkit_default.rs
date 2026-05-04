@@ -249,8 +249,8 @@ impl RdkitPreAromaticityNormalization {
             let mut has_double_to_carbon_or_nitrogen = false;
 
             for edge in incident_bonds {
-                let bond = edge.2.without_direction();
-                let neighbor_atom_id = edge.1;
+                let bond = edge.bond().without_direction();
+                let neighbor_atom_id = edge.target();
                 let neighbor_atom = &smiles.nodes()[neighbor_atom_id];
 
                 if bond == Bond::Double
@@ -358,20 +358,20 @@ impl RdkitAtomAromContext {
         let mut multiple_bond_kinds = Vec::<Bond>::new();
 
         for edge in edges {
-            let bond = edge.2.without_direction();
+            let bond = edge.bond().without_direction();
             explicit_valence += bond_valence_contribution(bond);
-            if edge.4 || matches!(bond, Bond::Double | Bond::Triple | Bond::Quadruple) {
+            if edge.is_aromatic() || matches!(bond, Bond::Double | Bond::Triple | Bond::Quadruple) {
                 incident_multiple_bond = true;
-                if ring_membership.contains_edge(atom_id, edge.1) {
+                if ring_membership.contains_edge(atom_id, edge.target()) {
                     incident_cyclic_multiple_bond = true;
                 }
             }
             if matches!(bond, Bond::Double | Bond::Triple | Bond::Quadruple) {
                 multiple_bond_kinds.push(bond);
-                if !ring_membership.contains_edge(atom_id, edge.1)
+                if !ring_membership.contains_edge(atom_id, edge.target())
                     && incident_noncyclic_multiple_bond_to.is_none()
                 {
-                    incident_noncyclic_multiple_bond_to = Some(edge.1);
+                    incident_noncyclic_multiple_bond_to = Some(edge.target());
                 }
             }
         }
@@ -2361,7 +2361,7 @@ mod tests {
         assert_eq!(cleaned.implicit_hydrogen_overrides.get(&9), Some(&0));
         assert_eq!(cleaned.implicit_hydrogen_overrides.get(&10), Some(&0));
         assert_eq!(
-            cleaned.smiles.edge_for_node_pair((9, 10)).expect("cleaned P-O bond").2,
+            cleaned.smiles.edge_for_node_pair((9, 10)).expect("cleaned P-O bond").bond(),
             Bond::Single
         );
 
@@ -2401,7 +2401,7 @@ mod tests {
         assert_eq!(cleaned.implicit_hydrogen_overrides.get(&9), Some(&0));
         assert_eq!(cleaned.implicit_hydrogen_overrides.get(&10), Some(&0));
         assert_eq!(
-            cleaned.smiles.edge_for_node_pair((9, 10)).expect("phosphorus oxygen bond").2,
+            cleaned.smiles.edge_for_node_pair((9, 10)).expect("phosphorus oxygen bond").bond(),
             Bond::Single
         );
     }

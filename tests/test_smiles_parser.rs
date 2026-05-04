@@ -95,5 +95,5 @@ fn test_parse_tribenzo_annulene_variant() {
 }
 
 fn has_edge(smiles: &Smiles, a: usize, b: usize, bond: Bond) -> bool {
-    smiles.edge_for_node_pair((a, b)).is_some_and(|edge| edge.2 == bond)
+    smiles.edge_for_node_pair((a, b)).is_some_and(|edge| edge.bond() == bond)
 }

@@ -259,7 +259,7 @@ mod tests {
     use crate::{
         atom::{Atom, AtomSyntax, atom_symbol::AtomSymbol, bracketed::chirality::Chirality},
         bond::{
-            Bond, BondDescriptor,
+            Bond,
             bond_edge::{BondEdge, bond_edge},
         },
         smiles::{
@@ -275,9 +275,15 @@ mod tests {
     fn smiles_from_edges(atom_nodes: Vec<Atom>, bond_edges: &[BondEdge]) -> Smiles {
         let mut builder = BondMatrixBuilder::with_capacity(bond_edges.len());
         for edge in bond_edges {
-            let descriptor =
-                if edge.4 { BondDescriptor::aromatic(edge.2) } else { BondDescriptor::new(edge.2) };
-            builder.push_edge_with_descriptor(edge.0, edge.1, descriptor, edge.3).unwrap();
+            let descriptor = edge.descriptor();
+            builder
+                .push_edge_with_descriptor(
+                    edge.source(),
+                    edge.target(),
+                    descriptor,
+                    edge.ring_num(),
+                )
+                .unwrap();
         }
         let number_of_nodes = atom_nodes.len();
         Smiles::from_bond_matrix_parts(atom_nodes, builder.finish(number_of_nodes))

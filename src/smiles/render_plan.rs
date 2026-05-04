@@ -337,7 +337,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
                         bond: planned_bond_for_emit(
                             self,
                             &ordering.directional_overrides,
-                            if edge.4 { BondDescriptor::aromatic(edge.2) } else { edge.2.into() },
+                            edge.descriptor(),
                             node_id,
                             child,
                             false,
@@ -508,7 +508,7 @@ fn build_labeled_closures_impl<AtomPolicy: SmilesAtomPolicy>(
     let node_count = smiles.nodes().len();
     let mut drafts_by_node = vec![Vec::new(); node_count];
     for (closure_id, &edge) in forest.closure_edges().iter().enumerate() {
-        let (node_a, node_b) = (edge.0, edge.1);
+        let (node_a, node_b) = (edge.source(), edge.target());
         drafts_by_node[node_a].push(ClosureDraft { closure_id, edge, partner: node_b });
         drafts_by_node[node_b].push(ClosureDraft { closure_id, edge, partner: node_a });
     }
@@ -542,11 +542,7 @@ fn build_labeled_closures_impl<AtomPolicy: SmilesAtomPolicy>(
                 bond: planned_bond_for_emit(
                     smiles,
                     directional_overrides,
-                    if draft.edge.4 {
-                        BondDescriptor::aromatic(draft.edge.2)
-                    } else {
-                        draft.edge.2.into()
-                    },
+                    draft.edge.descriptor(),
                     node_id,
                     draft.partner,
                     true,
@@ -591,7 +587,10 @@ fn compare_closure_drafts_for_node(
             }
         })
         .then_with(|| left.partner.cmp(&right.partner))
-        .then_with(|| (left.edge.0, left.edge.1).cmp(&(right.edge.0, right.edge.1)))
+        .then_with(|| {
+            (left.edge.source(), left.edge.target())
+                .cmp(&(right.edge.source(), right.edge.target()))
+        })
 }
 
 /// Returns the ordering key for a closure opening endpoint.
@@ -666,9 +665,9 @@ fn preserve_raw_directional_single<AtomPolicy: SmilesAtomPolicy>(
     [from, to].into_iter().any(|node_id| {
         !directional_overrides.has_semantic_endpoint(node_id)
             && smiles.edges_for_node(node_id).any(|edge| {
-                edge.2 == Bond::Double
-                    && !edge.4
-                    && !double_bond_supports_semantic_stereo(smiles, edge.0, edge.1)
+                edge.bond() == Bond::Double
+                    && !edge.is_aromatic()
+                    && !double_bond_supports_semantic_stereo(smiles, edge.source(), edge.target())
             })
     })
 }

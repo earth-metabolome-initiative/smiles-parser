@@ -360,10 +360,10 @@ pub(super) fn atom_based_substituent_priority_key(
     let atom = smiles.node_by_id(neighbor).unwrap_or_else(|| unreachable!());
     let atomic_number = atom.element().map_or(0, u8::from);
     let edge = smiles.edge_for_node_pair((endpoint, neighbor)).unwrap_or_else(|| unreachable!());
-    let bond_order_to_endpoint = if edge.4 {
+    let bond_order_to_endpoint = if edge.is_aromatic() {
         1
     } else {
-        match edge.2 {
+        match edge.bond() {
             Bond::Single | Bond::Up | Bond::Down => 1,
             Bond::Double => 2,
             Bond::Triple => 3,

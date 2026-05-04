@@ -244,7 +244,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
 #[inline]
 #[must_use]
 fn edge_descriptor(edge: BondEdge) -> BondDescriptor {
-    if edge.4 { BondDescriptor::aromatic(edge.2) } else { edge.2.into() }
+    if edge.is_aromatic() { BondDescriptor::aromatic(edge.bond()) } else { edge.bond().into() }
 }
 
 #[cfg(test)]

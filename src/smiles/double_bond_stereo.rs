@@ -104,7 +104,8 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     ) -> Option<DoubleBondStereoConfig> {
         let edge_key = crate::smiles::edge_key(node_a, node_b);
         self.double_bond_stereo_records().into_iter().find_map(|record| {
-            (crate::smiles::edge_key(record.double_bond.0, record.double_bond.1) == edge_key)
+            (crate::smiles::edge_key(record.double_bond.source(), record.double_bond.target())
+                == edge_key)
                 .then_some(record.config())
         })
     }
@@ -479,7 +480,7 @@ fn substituent_priority_key(
     let atom = smiles.node_by_id(neighbor).unwrap_or_else(|| unreachable!());
     let atomic_number = atom.element().map_or(0, u8::from);
     let edge = smiles.edge_for_node_pair((endpoint, neighbor)).unwrap_or_else(|| unreachable!());
-    let bond_order_to_endpoint = if edge.4 { 1 } else { bond_priority(edge.2) };
+    let bond_order_to_endpoint = if edge.is_aromatic() { 1 } else { bond_priority(edge.bond()) };
 
     SubstituentPriorityKey {
         atomic_number,

@@ -309,10 +309,10 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> RingSearchState<'a, AtomPolicy> {
 
         for incident_bonds in ordered_incident_bonds.iter().take(atom_count) {
             for edge in incident_bonds {
-                let key = edge_key(edge.0, edge.1);
+                let key = edge_key(edge.source(), edge.target());
                 if active_edges.insert(key) {
-                    atom_degrees[edge.0] += 1;
-                    atom_degrees[edge.1] += 1;
+                    atom_degrees[edge.source()] += 1;
+                    atom_degrees[edge.target()] += 1;
                 }
             }
         }
@@ -439,7 +439,7 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> RingSearchState<'a, AtomPolicy> {
         let bond_count = fragment
             .iter()
             .flat_map(|&atom_id| self.ordered_incident_bonds[atom_id].iter())
-            .map(|edge| edge_key(edge.0, edge.1))
+            .map(|edge| edge_key(edge.source(), edge.target()))
             .collect::<HashSet<_>>()
             .len();
         let expected_rings = cyclomatic_ring_count(bond_count, fragment.len());
@@ -486,7 +486,7 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> RingSearchState<'a, AtomPolicy> {
     }
     fn trim_bonds(&mut self, cand: usize, changed: &mut VecDeque<usize>) {
         for edge in &self.ordered_incident_bonds[cand] {
-            let key = edge_key(edge.0, edge.1);
+            let key = edge_key(edge.source(), edge.target());
             if !self.active_edges.remove(&key) {
                 continue;
             }
@@ -519,7 +519,7 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> RingSearchState<'a, AtomPolicy> {
         active_edges: &HashSet<[usize; 2]>,
     ) {
         for edge in &ordered_incident_bonds[root] {
-            let key = edge_key(edge.0, edge.1);
+            let key = edge_key(edge.source(), edge.target());
             if !active_edges.contains(&key) {
                 continue;
             }
@@ -655,7 +655,7 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> RingSearchState<'a, AtomPolicy> {
         active_edges: &mut HashSet<[usize; 2]>,
     ) {
         for edge in &self.ordered_incident_bonds[cand] {
-            let key = edge_key(edge.0, edge.1);
+            let key = edge_key(edge.source(), edge.target());
             if !active_edges.remove(&key) {
                 continue;
             }
@@ -733,7 +733,7 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> RingSearchState<'a, AtomPolicy> {
             .iter()
             .copied()
             .filter_map(|edge| {
-                let key = edge_key(edge.0, edge.1);
+                let key = edge_key(edge.source(), edge.target());
                 self.active_edges.contains(&key).then(|| bond_edge_other(edge, atom_id)).flatten()
             })
             .collect()
@@ -861,7 +861,7 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> RingSearchState<'a, AtomPolicy> {
             }
 
             for edge in &ordered_incident_bonds[curr] {
-                let key = edge_key(edge.0, edge.1);
+                let key = edge_key(edge.source(), edge.target());
                 if !active_edges.contains(&key) {
                     continue;
                 }
@@ -1687,7 +1687,7 @@ mod tests {
         let bond_count = fragment
             .iter()
             .flat_map(|&atom_id| super::ordered_edges_for_node(smiles, atom_id))
-            .map(|edge| super::edge_key(edge.0, edge.1))
+            .map(|edge| super::edge_key(edge.source(), edge.target()))
             .collect::<HashSet<_>>()
             .len();
         let expected_rings = cyclomatic_ring_count(bond_count, fragment.len());
@@ -1761,7 +1761,7 @@ mod tests {
         let bond_count = fragment
             .iter()
             .flat_map(|&atom_id| super::ordered_edges_for_node(smiles, atom_id))
-            .map(|edge| super::edge_key(edge.0, edge.1))
+            .map(|edge| super::edge_key(edge.source(), edge.target()))
             .collect::<HashSet<_>>()
             .len();
         let expected_rings = cyclomatic_ring_count(bond_count, fragment.len());

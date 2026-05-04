@@ -447,7 +447,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
             return None;
         }
 
-        let bond = self.edge_for_node_pair((node_id, parent))?.2;
+        let bond = self.edge_for_node_pair((node_id, parent))?.bond();
         if !matches!(bond, Bond::Single | Bond::Up | Bond::Down) {
             return None;
         }

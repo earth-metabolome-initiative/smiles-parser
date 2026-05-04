@@ -25,7 +25,7 @@ macro_rules! define_policy_roundtrip_runner {
                 || smiles.number_of_bonds() > MAX_FUZZ_BONDS
                 || smiles.nodes().iter().any(|atom| atom.aromatic())
                 || smiles.nodes().iter().enumerate().any(|(atom_id, _)| {
-                    smiles.edges_for_node(atom_id).any(|edge| edge.4)
+                    smiles.edges_for_node(atom_id).any(|edge| edge.is_aromatic())
                 })
             {
                 return;
