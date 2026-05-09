@@ -64,3 +64,16 @@ assert_eq!(smiles.render(), "CCO");
 let formula: ChemicalFormula<u32, i32> = ChemicalFormula::from(&smiles);
 assert_eq!(formula.to_string(), "C₂H₆O");
 ```
+
+## Dataset Downloads
+
+With the `datasets` feature enabled, the crate can cache and stream public SMILES corpora without storing large fixtures in the repository. `PUBCHEM_SMILES` streams the PubChem `CID-SMILES.gz` file. `ZINC20_SMILES` streams the ZINC20-ML SMILES chunks from [files.docking.org](https://files.docking.org/zinc20-ML/smiles/); ZINC iteration extracts the cached `tar.gz` chunks before reading their `smiles_all_*.txt` members.
+
+```text
+use smiles_parser::prelude::{SmilesDatasetSource, PUBCHEM_SMILES, ZINC20_SMILES};
+
+let mut pubchem = PUBCHEM_SMILES.iter_smiles()?;
+let mut zinc20 = ZINC20_SMILES.iter_smiles()?;
+```
+
+Full-corpus validation is intentionally kept in ignored release-mode tests because PubChem and ZINC20 are large external datasets. Use `ZINC20_VALIDATE_CHUNKS=1` or `ZINC20_VALIDATE_LIMIT=100000` for smaller ZINC sweeps.

@@ -16,7 +16,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use molecular_formulas::prelude::ChemicalFormula;
 use rayon::prelude::*;
 use smiles_parser::prelude::{
-    DatasetFetchOptions, DatasetSource, GzipMode, PUBCHEM_SMILES, Smiles, WildcardSmiles,
+    CacheMode, DatasetFetchOptions, DatasetSource, GzipMode, PUBCHEM_SMILES, Smiles, WildcardSmiles,
 };
 
 #[test]
@@ -145,6 +145,7 @@ fn pubchem_corpus_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
     }
 
     let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
+        cache_mode: cache_mode_from_env("PUBCHEM_VALIDATE_REDOWNLOAD"),
         gzip_mode: GzipMode::Decompress,
         ..DatasetFetchOptions::default()
     })?;
@@ -292,6 +293,15 @@ fn open_pubchem_corpus(path: &Path) -> Result<PubchemCorpusReader, io::Error> {
 
 fn env_usize(name: &str) -> Option<usize> {
     env::var(name).ok().and_then(|raw| raw.parse().ok())
+}
+
+fn cache_mode_from_env(name: &str) -> CacheMode {
+    env::var(name).map_or(CacheMode::UseCache, |raw| {
+        match raw.as_str() {
+            "1" | "true" | "TRUE" | "yes" | "YES" => CacheMode::Redownload,
+            _ => CacheMode::UseCache,
+        }
+    })
 }
 
 fn require_release_build() -> Result<(), io::Error> {

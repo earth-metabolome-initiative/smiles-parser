@@ -21,9 +21,12 @@ pub mod token;
 
 #[cfg(feature = "datasets")]
 pub use crate::datasets::{
-    CacheMode, DatasetArtifact, DatasetCompression, DatasetError, DatasetFetchOptions,
-    DatasetSmilesIter, DatasetSource, GzipMode, MASS_SPEC_GYM_SMILES, MassSpecGymSmiles,
-    PUBCHEM_SMILES, PubChemSmiles, SmilesDatasetSource, default_dataset_cache_dir,
+    CacheMode, DatasetArtifact, DatasetCollectionArtifact, DatasetCollectionSource,
+    DatasetCompression, DatasetError, DatasetFetchOptions, DatasetFile, DatasetSmilesIter,
+    DatasetSmilesRecord, DatasetSmilesRecordIter, DatasetSource, GzipMode, MASS_SPEC_GYM_SMILES,
+    MassSpecGymSmiles, PUBCHEM_SMILES, PubChemSmiles, SmilesDatasetRecordSource,
+    SmilesDatasetSource, ZINC20_EXPECTED_RECORD_COUNT, ZINC20_SMILES, Zinc20Smiles,
+    default_dataset_cache_dir,
 };
 pub use crate::{
     errors::{SmilesError, SmilesErrorWithSpan},
@@ -51,8 +54,11 @@ pub mod prelude {
     };
     #[cfg(feature = "datasets")]
     pub use crate::{
-        CacheMode, DatasetArtifact, DatasetCompression, DatasetError, DatasetFetchOptions,
-        DatasetSmilesIter, DatasetSource, GzipMode, MASS_SPEC_GYM_SMILES, MassSpecGymSmiles,
-        PUBCHEM_SMILES, PubChemSmiles, SmilesDatasetSource, default_dataset_cache_dir,
+        CacheMode, DatasetArtifact, DatasetCollectionArtifact, DatasetCollectionSource,
+        DatasetCompression, DatasetError, DatasetFetchOptions, DatasetFile, DatasetSmilesIter,
+        DatasetSmilesRecord, DatasetSmilesRecordIter, DatasetSource, GzipMode,
+        MASS_SPEC_GYM_SMILES, MassSpecGymSmiles, PUBCHEM_SMILES, PubChemSmiles,
+        SmilesDatasetRecordSource, SmilesDatasetSource, ZINC20_EXPECTED_RECORD_COUNT,
+        ZINC20_SMILES, Zinc20Smiles, default_dataset_cache_dir,
     };
 }
