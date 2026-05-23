@@ -97,3 +97,43 @@ fn test_parse_tribenzo_annulene_variant() {
 fn has_edge(smiles: &Smiles, a: usize, b: usize, bond: Bond) -> bool {
     smiles.edge_for_node_pair((a, b)).is_some_and(|edge| edge.bond() == bond)
 }
+
+/// Adversarial input: a single carbon with 300 single-bond branches.
+///
+/// Before the explicit-valence widening, this panicked during parse via a
+/// debug-mode `Sum<u8>` overflow inside `explicit_valence`. After the fix,
+/// the input must parse and the downstream valence helpers must saturate
+/// instead of panicking.
+#[test]
+fn test_high_degree_single_bond_carbon_does_not_panic() {
+    let mut input = String::from("C");
+    for _ in 0..300 {
+        input.push_str("(C)");
+    }
+
+    let smiles =
+        Smiles::from_str(&input).expect("300-branch carbon must parse, not panic, after widening");
+
+    assert_eq!(smiles.edge_count_for_node(0), 300);
+    assert_eq!(smiles.total_valence(0), u8::MAX);
+    assert_eq!(smiles.connectivity_count(0), u8::MAX);
+}
+
+/// Adversarial input: a single carbon with many quadruple-bond branches.
+///
+/// 64 branches at bond order 4 sum to 256, which overflows `u8` by 1 and
+/// previously panicked during parse. After the fix, parse succeeds and
+/// `total_valence` saturates at `u8::MAX`.
+#[test]
+fn test_high_degree_quadruple_bond_carbon_does_not_panic() {
+    let mut input = String::from("C");
+    for _ in 0..64 {
+        input.push_str("($C)");
+    }
+
+    let smiles = Smiles::from_str(&input)
+        .expect("64 quadruple-bonded neighbors must parse, not panic, after widening");
+
+    assert_eq!(smiles.edge_count_for_node(0), 64);
+    assert_eq!(smiles.total_valence(0), u8::MAX);
+}

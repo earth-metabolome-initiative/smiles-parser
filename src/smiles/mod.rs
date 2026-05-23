@@ -547,9 +547,12 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// This is the local RDKit-style count used by this crate:
     /// `degree + explicit hydrogens + implicit hydrogens`.
     ///
+    /// The result saturates at `u8::MAX` for adversarial inputs whose true
+    /// connectivity does not fit into `u8`. Real-chemistry connectivities
+    /// always fit comfortably below the saturation point.
+    ///
     /// # Panics
-    /// Panics if `id` is not a valid atom index in this graph, or if the
-    /// resulting count does not fit into `u8`.
+    /// Panics if `id` is not a valid atom index in this graph.
     ///
     /// # Examples
     ///
@@ -570,9 +573,7 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
             .edge_count_for_node(id)
             .saturating_add(usize::from(atom.hydrogen_count()))
             .saturating_add(usize::from(self.implicit_hydrogen_count(id)));
-        u8::try_from(connectivity).unwrap_or_else(|_| {
-            panic!("connectivity count {connectivity} for atom {id} does not fit into u8")
-        })
+        u8::try_from(connectivity).unwrap_or(u8::MAX)
     }
 
     /// Returns the total valence for the provided atom id.
@@ -580,9 +581,13 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// This is the local RDKit-style total valence used by this crate:
     /// `bond-order sum + explicit hydrogens + implicit hydrogens`.
     ///
+    /// The result saturates at `u8::MAX` for adversarial inputs whose true
+    /// valence does not fit into `u8` (e.g., very high-degree atoms with many
+    /// quadruple bonds). Real-chemistry valences always fit comfortably below
+    /// the saturation point.
+    ///
     /// # Panics
-    /// Panics if `id` is not a valid atom index in this graph, or if the
-    /// resulting valence does not fit into `u8`.
+    /// Panics if `id` is not a valid atom index in this graph.
     ///
     /// # Examples
     ///
@@ -602,9 +607,7 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
         let valence = usize::from(explicit_valence(self, id))
             .saturating_add(usize::from(atom.hydrogen_count()))
             .saturating_add(usize::from(self.implicit_hydrogen_count(id)));
-        u8::try_from(valence).unwrap_or_else(|_| {
-            panic!("total valence {valence} for atom {id} does not fit into u8")
-        })
+        u8::try_from(valence).unwrap_or(u8::MAX)
     }
 
     /// Returns the RDKit-style SMARTS total valence for the provided atom id

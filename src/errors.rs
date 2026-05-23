@@ -57,6 +57,15 @@ pub enum SmilesError {
     /// Error indicating invalid Element name
     #[error("Invalid element name: {0}")]
     InvalidElementName(char),
+    /// A bracket atom's explicit hydrogen count exceeds the maximum supported
+    /// value (15).
+    ///
+    /// The cap mirrors the magnitude cap on bracket-atom charges and prevents
+    /// downstream `u8` valence math (`explicit_valence + hydrogen_count +
+    /// implicit_hydrogen_count`) from overflowing for adversarial inputs.
+    /// Real chemistry SMILES never need an explicit `H` count above this bound.
+    #[error("Hydrogen count overflow: {0}")]
+    HydrogenCountOverflow(u8),
     /// A hydrogen bracket atom has an unsupported explicit hydrogen count
     #[error("Hydrogen found as bracketed atom with an unsupported explicit hydrogen count")]
     InvalidHydrogenWithExplicitHydrogensFound,
@@ -300,6 +309,7 @@ mod tests {
                 SmilesError::IncompleteBond(BondDescriptor::aromatic(Bond::Single)),
                 "Bond: : missing atom index(es)".to_string(),
             ),
+            (SmilesError::HydrogenCountOverflow(16), "Hydrogen count overflow: 16".to_string()),
             (
                 SmilesError::InvalidAromaticElement(Element::Ac),
                 format!("Invalid aromatic element: {}", Element::Ac),

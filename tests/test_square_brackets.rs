@@ -113,3 +113,37 @@ fn test_hydrogen_hcount_gt_one_stays_invalid() {
     let err = Smiles::from_str("[HH2]").unwrap_err();
     assert_eq!(err.smiles_error(), SmilesError::InvalidHydrogenWithExplicitHydrogensFound);
 }
+
+#[test]
+fn test_bracket_hydrogen_count_at_cap_parses() {
+    let smiles = Smiles::from_str("[CH15]").unwrap_or_else(|_| panic!("Failed to parse [CH15]"));
+
+    assert_eq!(smiles.nodes().len(), 1);
+    assert_eq!(smiles.nodes()[0].hydrogen_count(), 15);
+}
+
+#[test]
+fn test_bracket_hydrogen_count_just_over_cap_is_rejected() {
+    let err = Smiles::from_str("[CH16]").unwrap_err();
+
+    assert_eq!(err.smiles_error(), SmilesError::HydrogenCountOverflow(16));
+}
+
+#[test]
+fn test_bracket_hydrogen_count_far_over_cap_is_rejected() {
+    let err = Smiles::from_str("[HoH254]").unwrap_err();
+
+    assert_eq!(err.smiles_error(), SmilesError::HydrogenCountOverflow(254));
+}
+
+/// Regression test for the bug where bracket atoms with extreme hydrogen
+/// counts parsed successfully and then panicked inside `total_valence` when
+/// `explicit_valence + hydrogen_count + implicit_hydrogen_count` exceeded
+/// the `u8` ceiling.
+#[test]
+fn test_extreme_hydrogen_count_does_not_panic_downstream() {
+    let result = Smiles::from_str("S85II5OINS8[HoH254]9NN9NCC");
+
+    let err = result.expect_err("input with [HoH254] must not parse successfully");
+    assert_eq!(err.smiles_error(), SmilesError::HydrogenCountOverflow(254));
+}

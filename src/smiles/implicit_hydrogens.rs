@@ -121,7 +121,7 @@ fn implicit_hydrogens_for_node<AtomPolicy: SmilesAtomPolicy>(
     node_id: usize,
     node: &Atom,
 ) -> u8 {
-    let explicit_valence = explicit_valence(smiles, node_id);
+    let explicit_valence = saturated_explicit_valence(smiles, node_id);
     match node.syntax() {
         AtomSyntax::Bracket => 0,
         AtomSyntax::OrganicSubset => {
@@ -145,7 +145,7 @@ pub(super) fn implicit_hydrogens_if_written_unbracketed(
     node_id: usize,
     node: &Atom,
 ) -> u8 {
-    let explicit_valence = explicit_valence(smiles, node_id);
+    let explicit_valence = saturated_explicit_valence(smiles, node_id);
     match node.symbol() {
         AtomSymbol::WildCard => 0,
         AtomSymbol::Element(element) => {
@@ -166,9 +166,30 @@ pub(super) fn implicit_hydrogens_if_written_unbracketed(
 ///
 /// This split also mirrors raw `RDKit`: bracket hydrogens stay explicit instead
 /// of being folded back into a later implicit-hydrogen completion step.
+///
+/// The return type is `u16` because adversarial SMILES inputs (very large
+/// degree, all quadruple bonds, ...) can drive the sum past 255. Real chemistry
+/// values are tiny, but the wider arithmetic keeps the parser from panicking on
+/// pathological inputs. Callers that need the value in `u8` should saturate.
 #[inline]
-pub(crate) fn explicit_valence(smiles: &Smiles<impl SmilesAtomPolicy>, node_id: usize) -> u8 {
-    smiles.bond_matrix().sparse_row_values_ref(node_id).map(|entry| bond_order(entry.bond())).sum()
+pub(crate) fn explicit_valence(smiles: &Smiles<impl SmilesAtomPolicy>, node_id: usize) -> u16 {
+    smiles
+        .bond_matrix()
+        .sparse_row_values_ref(node_id)
+        .map(|entry| u16::from(bond_order(entry.bond())))
+        .sum()
+}
+
+/// Returns [`explicit_valence`] saturated into `u8`.
+///
+/// The internal valence-completion helpers (`aliphatic_implicit_hydrogens` and
+/// friends) operate on `u8` because every element's chemistry-scale valence
+/// table fits in `u8`. Saturating here is safe: when the parsed graph already
+/// exceeds any element's maximum valence, no completion candidate exists and
+/// implicit-hydrogen counting returns zero either way.
+#[inline]
+fn saturated_explicit_valence(smiles: &Smiles<impl SmilesAtomPolicy>, node_id: usize) -> u8 {
+    u8::try_from(explicit_valence(smiles, node_id)).unwrap_or(u8::MAX)
 }
 
 /// Maps parsed bond syntax to the local bond-order contribution used for raw
@@ -303,6 +324,20 @@ mod tests {
         assert_eq!(explicit_valence(&smiles, 0), 4);
         assert_eq!(explicit_valence(&smiles, 1), 4);
         assert_eq!(smiles.implicit_hydrogen_counts(), &[0, 0]);
+    }
+
+    /// `explicit_valence` must return the true sum even when it exceeds `u8`.
+    ///
+    /// Before widening to `u16`, this case panicked at parse time on a debug
+    /// `Sum<u8>` overflow when implicit-H counts were computed.
+    #[test]
+    fn explicit_valence_reports_u16_sum_for_high_degree_atoms() {
+        let mut input = alloc::string::String::from("C");
+        for _ in 0..300 {
+            input.push_str("(C)");
+        }
+        let smiles = Smiles::from_str(&input).unwrap();
+        assert_eq!(explicit_valence(&smiles, 0), 300);
     }
 
     #[test]
