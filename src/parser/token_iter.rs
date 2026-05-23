@@ -451,14 +451,25 @@ where
     Some(B::try_from(amount).map_err(|_| SmilesError::IntegerOverflow))
 }
 
+/// Maximum bracket-atom explicit hydrogen count accepted by the parser.
+///
+/// Chosen to mirror the magnitude cap on bracket-atom charges. Real chemistry
+/// SMILES do not require explicit hydrogen counts above this bound, and
+/// bounding the value here keeps downstream `u8` valence math from overflowing.
+const MAX_HYDROGEN_COUNT: u8 = 15;
+
 #[inline]
 fn hydrogen_count(stream: &mut TokenIter<'_>) -> Result<u8, SmilesError> {
     if stream.peek_byte() == Some(b'H') {
         let _ = stream.next_byte();
-        match try_fold_number::<u8, 3>(stream) {
-            Some(h) => Ok(h?),
-            None => Ok(1),
+        let count = match try_fold_number::<u8, 3>(stream) {
+            Some(h) => h?,
+            None => 1,
+        };
+        if count > MAX_HYDROGEN_COUNT {
+            return Err(SmilesError::HydrogenCountOverflow(count));
         }
+        Ok(count)
     } else {
         Ok(0)
     }
@@ -882,6 +893,15 @@ mod tests {
 
         let mut stream = TokenIter::from("C");
         assert_eq!(hydrogen_count(&mut stream), Ok(0));
+
+        let mut stream = TokenIter::from("H15");
+        assert_eq!(hydrogen_count(&mut stream), Ok(15));
+
+        let mut stream = TokenIter::from("H16");
+        assert_eq!(hydrogen_count(&mut stream), Err(SmilesError::HydrogenCountOverflow(16)));
+
+        let mut stream = TokenIter::from("H254");
+        assert_eq!(hydrogen_count(&mut stream), Err(SmilesError::HydrogenCountOverflow(254)));
     }
 
     #[test]
