@@ -759,8 +759,12 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> RingSearchState<'a, AtomPolicy> {
     fn atom_search_bfs(&self, start: usize, end: usize, res: &mut Vec<usize>) -> bool {
         let mut bfsq = VecDeque::<Vec<usize>>::new();
         bfsq.push_back(vec![start]);
+        let mut total_ops: usize = 0;
         while let Some(path) = bfsq.pop_front() {
-            if bfsq.len() >= self.bfs_budget.max_queue_size {
+            total_ops = total_ops.saturating_add(1);
+            if total_ops > self.bfs_budget.max_atom_search_bfs_ops
+                || bfsq.len() >= self.bfs_budget.max_queue_size
+            {
                 self.hit_queue_cutoff.set(true);
                 return false;
             }
@@ -947,14 +951,15 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> RingSearchState<'a, AtomPolicy> {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct RdkitBfsBudget {
     // Mirrors RDKit's RingUtils::MAX_BFSQ_SIZE in Code/GraphMol/FindRings.cpp.
-    // RDKit throws once this frontier size is exceeded; we surface the condition in
-    // SymmSssrStatus and keep the search bounded the same way.
     max_queue_size: usize,
+    // Per-call pop cap for atom_search_bfs; its queue holds full paths, so
+    // cumulative pops (not concurrent depth) drive wall-clock cost.
+    max_atom_search_bfs_ops: usize,
 }
 
 impl Default for RdkitBfsBudget {
     fn default() -> Self {
-        Self { max_queue_size: 200_000 }
+        Self { max_queue_size: 200_000, max_atom_search_bfs_ops: 50_000 }
     }
 }
 
@@ -1533,9 +1538,11 @@ mod tests {
     #[test]
     fn symm_sssr_forced_bfs_budget_marks_benzene_incomplete_and_hits_queue_cutoff() {
         let smiles: Smiles = "C1=CC=CC=C1".parse().expect("valid benzene");
-        let result =
-            RingSearchState::new_with_bfs_budget(&smiles, RdkitBfsBudget { max_queue_size: 0 })
-                .symmetrize_sssr_with_status();
+        let result = RingSearchState::new_with_bfs_budget(
+            &smiles,
+            RdkitBfsBudget { max_queue_size: 0, max_atom_search_bfs_ops: usize::MAX },
+        )
+        .symmetrize_sssr_with_status();
 
         assert!(!result.status().is_complete());
         assert!(result.status().used_fallback());

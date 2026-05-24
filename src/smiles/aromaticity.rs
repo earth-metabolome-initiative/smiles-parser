@@ -119,6 +119,13 @@ pub enum AromaticityDiagnostic {
         /// Maximum two-ring frontier size searched exactly.
         max_ring_combination_search: usize,
     },
+    /// Cumulative connected-subsystem visits exceeded the per-family budget.
+    SubsystemVisitBudgetExceeded {
+        /// Number of rings in the fused family.
+        ring_count: usize,
+        /// Configured cap on cumulative subsystem visits per family.
+        budget: usize,
+    },
     /// A ring family was skipped as unsupported by the current model.
     UnsupportedRingFamily {
         /// Ring-family category that was skipped.
