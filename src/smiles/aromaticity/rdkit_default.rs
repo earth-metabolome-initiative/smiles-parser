@@ -1000,6 +1000,8 @@ impl<AtomPolicy: SmilesAtomPolicy> RdkitDefaultContext<'_, AtomPolicy> {
         let mut family_accumulator =
             RdkitFusedFamilyAccumulator::new(prepared.family_bond_edges.len());
         let mut hit_budget_cap = false;
+        let mut hit_visit_budget = false;
+        let mut subsystem_visits: usize = 0;
         let connected_subsystem_search =
             RdkitConnectedSubsystemSearch::new(&prepared.ring_neighbors);
         let max_subsystem_size = ring_count.min(budget.max_fused_subsystem_rings);
@@ -1022,6 +1024,11 @@ impl<AtomPolicy: SmilesAtomPolicy> RdkitDefaultContext<'_, AtomPolicy> {
                             true
                         }
                         RdkitConnectedSubsystemEvent::Visit(_) => {
+                            subsystem_visits = subsystem_visits.saturating_add(1);
+                            if subsystem_visits > budget.max_subsystem_visits {
+                                hit_visit_budget = true;
+                                return false;
+                            }
                             if Self::evaluate_current_subsystem(&mut scratch) {
                                 family_accumulator.record_subsystem(&scratch);
                             }
@@ -1033,6 +1040,10 @@ impl<AtomPolicy: SmilesAtomPolicy> RdkitDefaultContext<'_, AtomPolicy> {
             if !should_continue {
                 break 'subsystem_sizes;
             }
+        }
+
+        if hit_visit_budget {
+            hit_budget_cap = true;
         }
 
         if !hit_budget_cap
@@ -1051,7 +1062,12 @@ impl<AtomPolicy: SmilesAtomPolicy> RdkitDefaultContext<'_, AtomPolicy> {
                     FamilyEvaluationStatus::Supported
                 },
                 evaluation: None,
-                diagnostics: Self::fused_budget_diagnostics(family, budget, hit_budget_cap),
+                diagnostics: Self::fused_budget_diagnostics(
+                    family,
+                    budget,
+                    hit_budget_cap,
+                    hit_visit_budget,
+                ),
             };
         }
 
@@ -1062,7 +1078,12 @@ impl<AtomPolicy: SmilesAtomPolicy> RdkitDefaultContext<'_, AtomPolicy> {
                 FamilyEvaluationStatus::Supported
             },
             evaluation,
-            diagnostics: Self::fused_budget_diagnostics(family, budget, hit_budget_cap),
+            diagnostics: Self::fused_budget_diagnostics(
+                family,
+                budget,
+                hit_budget_cap,
+                hit_visit_budget,
+            ),
         }
     }
 
@@ -1070,9 +1091,17 @@ impl<AtomPolicy: SmilesAtomPolicy> RdkitDefaultContext<'_, AtomPolicy> {
         family: &RdkitDefaultRingFamily,
         budget: RdkitFusedSubsystemBudget,
         hit_budget_cap: bool,
+        hit_visit_budget: bool,
     ) -> Vec<AromaticityDiagnostic> {
         if !hit_budget_cap {
             return Vec::new();
+        }
+
+        if hit_visit_budget {
+            return vec![AromaticityDiagnostic::SubsystemVisitBudgetExceeded {
+                ring_count: family.member_cycles.len(),
+                budget: budget.max_subsystem_visits,
+            }];
         }
 
         vec![AromaticityDiagnostic::FusedSubsystemBudgetExceeded {
@@ -1140,14 +1169,20 @@ impl<AtomPolicy: SmilesAtomPolicy> RdkitDefaultContext<'_, AtomPolicy> {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[allow(clippy::struct_field_names)]
 struct RdkitFusedSubsystemBudget {
     max_fused_subsystem_rings: usize,
     max_ring_combination_search: usize,
+    max_subsystem_visits: usize,
 }
 
 impl Default for RdkitFusedSubsystemBudget {
     fn default() -> Self {
-        Self { max_fused_subsystem_rings: 6, max_ring_combination_search: 300 }
+        Self {
+            max_fused_subsystem_rings: 6,
+            max_ring_combination_search: 300,
+            max_subsystem_visits: 100_000,
+        }
     }
 }
 
@@ -2494,6 +2529,7 @@ mod tests {
             RdkitFusedSubsystemBudget {
                 max_fused_subsystem_rings: 1,
                 max_ring_combination_search: usize::MAX,
+                max_subsystem_visits: usize::MAX,
             },
         );
 
@@ -2527,6 +2563,7 @@ mod tests {
             RdkitFusedSubsystemBudget {
                 max_fused_subsystem_rings: 2,
                 max_ring_combination_search: 1,
+                max_subsystem_visits: usize::MAX,
             },
         );
 
