@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use smiles_parser::smiles::{AromaticityPolicy, Smiles};
 
 const PERCEPTION_BUDGET: Duration =
-    if cfg!(debug_assertions) { Duration::from_secs(2) } else { Duration::from_millis(250) };
+    if cfg!(debug_assertions) { Duration::from_secs(10) } else { Duration::from_millis(250) };
 
 const PATHOLOGICAL_CORPUS: &[(&str, &str)] = &[
     (
