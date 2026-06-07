@@ -833,6 +833,7 @@ pub(crate) fn can_write_unbracketed_aromatic(element: Element) -> bool {
 fn bracket_aromatic_smiles_symbol(element: Element) -> Option<&'static str> {
     match element {
         Element::Te => Some("te"),
+        Element::Si => Some("si"),
         _ => element.aromatic_smiles_symbol(),
     }
 }
@@ -1065,6 +1066,11 @@ mod tests {
         assert_eq!(rendered_symbol_len(ac_symbol(), true, AtomSyntax::OrganicSubset), 2);
         assert_eq!(
             rendered_symbol_len(AtomSymbol::Element(Element::Te), true, AtomSyntax::Bracket,),
+            2
+        );
+        assert_eq!(bracket_aromatic_smiles_symbol(Element::Si), Some("si"));
+        assert_eq!(
+            rendered_symbol_len(AtomSymbol::Element(Element::Si), true, AtomSyntax::Bracket,),
             2
         );
 
