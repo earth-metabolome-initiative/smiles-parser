@@ -1239,12 +1239,18 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
                 .unwrap_or_else(|_| unreachable!("non-isomeric copy preserves a simple graph"));
         }
         let parsed_stereo_neighbors = vec![Vec::new(); atom_nodes.len()];
-        Self::from_bond_matrix_parts_with_parsed_stereo_and_source(
+        let result = Self::from_bond_matrix_parts_with_parsed_stereo_and_source(
             atom_nodes,
             builder.finish(self.atom_nodes.len()),
             parsed_stereo_neighbors,
             None,
-        )
+        );
+        // Clearing isotope and stereo can leave an atom bracketed for a reason
+        // that no longer applies (e.g. `[13CH3]` -> `[CH3]`). Collapse such
+        // atoms to the bare organic-subset form using the same eligibility rule
+        // as canonicalization, so `non_isomeric()` is order-independent with
+        // respect to `canonicalize()`.
+        result.canonicalization_spelling_normal_form()
     }
 
     fn ring_membership_with_packed_bridge_keys(&self, bond_count: usize) -> RingMembership {
