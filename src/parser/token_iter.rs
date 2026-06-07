@@ -211,6 +211,7 @@ fn aromatic_from_element(in_bracket: bool, element: Element) -> Result<bool, Smi
                 | Element::Se
                 | Element::As
                 | Element::Te
+                | Element::Si
         )
     } else {
         matches!(
@@ -761,7 +762,12 @@ mod tests {
         assert_eq!(aromatic_from_element(false, Element::C), Ok(true));
         assert_eq!(aromatic_from_element(true, Element::Se), Ok(true));
         assert_eq!(aromatic_from_element(true, Element::Te), Ok(true));
+        assert_eq!(aromatic_from_element(true, Element::Si), Ok(true));
 
+        assert_eq!(
+            aromatic_from_element(false, Element::Si),
+            Err(SmilesError::InvalidAromaticElement(Element::Si))
+        );
         assert_eq!(
             aromatic_from_element(false, Element::Se),
             Err(SmilesError::InvalidAromaticElement(Element::Se))
