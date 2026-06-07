@@ -36,11 +36,13 @@ use crate::{
 };
 
 mod aromaticity;
+mod atom_environment;
 mod branches;
 mod canonicalization;
 mod connected_components;
 mod double_bond_stereo;
 mod emitter;
+mod fragment;
 mod from_str;
 mod geometric_traits_impl;
 mod implicit_hydrogens;
@@ -64,9 +66,11 @@ pub use self::{
         AromaticityStatus, RdkitDefaultAromaticity, RdkitMdlAromaticity, RdkitSimpleAromaticity,
         WildcardAromaticityPerception,
     },
+    atom_environment::AtomEnvironment,
     canonicalization::SmilesCanonicalLabeling,
     connected_components::{SmilesComponents, WildcardSmilesComponents},
     double_bond_stereo::DoubleBondStereoConfig,
+    fragment::Fragment,
     geometric_traits_impl::{BondEntry, BondMatrix},
     kekulization::{KekulizationError, KekulizationMode},
     molecular_formula::WildcardMolecularFormulaConversionError,
@@ -1157,6 +1161,90 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     #[must_use]
     pub fn render(&self) -> String {
         self::emitter::emit(self)
+    }
+
+    /// Renders this graph as SMILES with the traversal forced to start at
+    /// `root`.
+    ///
+    /// All ordering decisions other than the root are identical to
+    /// [`render`](Self::render), so the output is deterministic and parses back
+    /// to the same molecule. Only the connected component containing `root` is
+    /// re-rooted, leaving any other components on their chosen roots.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `root` is not a valid atom id.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let smiles: Smiles = "CCO".parse()?;
+    /// assert!(smiles.render_rooted(2).starts_with('O'));
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
+    #[must_use]
+    pub fn render_rooted(&self, root: usize) -> String {
+        assert!(root < self.nodes().len(), "render_rooted: root {root} is out of range");
+        self::emitter::emit_rooted(self, root)
+    }
+
+    /// Returns the traversal order used by
+    /// [`render_rooted`](Self::render_rooted) as a [`SmilesCanonicalLabeling`].
+    /// For a connected graph this places `root` at ordinal 0. When the graph
+    /// has several components, `root` leads its own component's run and the
+    /// components keep their render order.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `root` is not a valid atom id.
+    #[must_use]
+    pub fn canonical_labeling_rooted(&self, root: usize) -> SmilesCanonicalLabeling {
+        assert!(root < self.nodes().len(), "canonical_labeling_rooted: root {root} out of range");
+        let order = self.render_plan_with_root(Some(root)).traversal_order();
+        SmilesCanonicalLabeling::from_order(order)
+    }
+
+    /// Returns a copy with isomeric features removed: isotope labels and
+    /// tetrahedral chirality are cleared on every atom, and directional
+    /// (double-bond stereo) bonds are flattened to plain bonds. Implicit
+    /// hydrogen counts are recomputed for the result.
+    ///
+    /// This mirrors RDKit's `isomericSmiles=False`: two graphs that differ only
+    /// in stereochemistry or isotope labeling collapse to the same molecule.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smiles_parser::prelude::Smiles;
+    ///
+    /// let labeled: Smiles = "[13CH3]O".parse()?;
+    /// let plain: Smiles = "[12CH3]O".parse()?;
+    /// assert_eq!(labeled.non_isomeric().render(), plain.non_isomeric().render());
+    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// ```
+    #[must_use]
+    pub fn non_isomeric(&self) -> Self {
+        let atom_nodes: Vec<_> = self.atom_nodes.iter().map(|atom| atom.non_isomeric()).collect();
+        let mut builder = crate::smiles::BondMatrixBuilder::default();
+        for ((row, column), entry) in self.bond_matrix.sparse_entries() {
+            if row >= column {
+                continue;
+            }
+            let descriptor = entry.descriptor();
+            let flattened = descriptor.with_bond(descriptor.bond().without_direction());
+            builder
+                .push_edge_with_descriptor(row, column, flattened, None)
+                .unwrap_or_else(|_| unreachable!("non-isomeric copy preserves a simple graph"));
+        }
+        let parsed_stereo_neighbors = vec![Vec::new(); atom_nodes.len()];
+        Self::from_bond_matrix_parts_with_parsed_stereo_and_source(
+            atom_nodes,
+            builder.finish(self.atom_nodes.len()),
+            parsed_stereo_neighbors,
+            None,
+        )
     }
 
     fn ring_membership_with_packed_bridge_keys(&self, bond_count: usize) -> RingMembership {

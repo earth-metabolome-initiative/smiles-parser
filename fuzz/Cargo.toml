@@ -34,3 +34,10 @@ path = "fuzz_targets/canonicalization.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "rooted_render"
+path = "fuzz_targets/rooted_render.rs"
+test = false
+doc = false
+bench = false

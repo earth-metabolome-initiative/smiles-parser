@@ -15,6 +15,16 @@ pub(crate) fn emit<AtomPolicy: SmilesAtomPolicy>(smiles: &Smiles<AtomPolicy>) ->
     emit_with_plan(smiles, &plan)
 }
 
+/// Renders `smiles` with one component's traversal forced to start at `root`.
+#[must_use]
+pub(crate) fn emit_rooted<AtomPolicy: SmilesAtomPolicy>(
+    smiles: &Smiles<AtomPolicy>,
+    root: usize,
+) -> String {
+    let plan = smiles.render_plan_with_root(Some(root));
+    emit_with_plan(smiles, &plan)
+}
+
 /// Emits a SMILES string from a completed render plan.
 ///
 /// No graph search or ordering work happens here. The emitter only walks

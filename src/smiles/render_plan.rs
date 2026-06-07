@@ -35,6 +35,14 @@ impl RenderPlan {
         self.nodes.get(node_id)
     }
 
+    /// Returns all node ids in final traversal order (components concatenated
+    /// in output order, each in preorder). Each component root is first in
+    /// its run.
+    #[must_use]
+    pub(crate) fn traversal_order(&self) -> Vec<usize> {
+        self.components.iter().flat_map(|component| component.preorder.iter().copied()).collect()
+    }
+
     /// Estimates the final rendered length from the completed plan.
     ///
     /// This is used only to pre-size the output buffer. It mirrors the final
@@ -272,12 +280,35 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// proof that the final plan will always stay below `100`.
     #[must_use]
     pub(crate) fn render_plan(&self) -> RenderPlan {
+        self.render_plan_with_root(None)
+    }
+
+    /// Replaces the chosen root of `forced`'s connected component with
+    /// `forced`, leaving the roots of other components untouched.
+    fn force_component_root(&self, roots: &mut [usize], forced: usize) {
+        let components = self.connected_components();
+        let target = components.component_of_node(forced);
+        for root in roots.iter_mut() {
+            if components.component_of_node(*root) == target {
+                *root = forced;
+                break;
+            }
+        }
+    }
+
+    /// Builds a render plan, optionally forcing the traversal of one connected
+    /// component to start at `forced_root`. Other components keep their
+    /// deterministically chosen roots.
+    pub(crate) fn render_plan_with_root(&self, forced_root: Option<usize>) -> RenderPlan {
         let node_count = self.nodes().len();
         let invariants = self.atom_invariants();
         let refined = self.refined_atom_classes_from_invariants(&invariants);
         let refined_classes = refined.classes().to_vec();
         let rooted_classes = self.rooted_symmetry_classes_from_refined(&refined_classes);
-        let roots = self.component_roots_from_planning(&invariants, &rooted_classes);
+        let mut roots = self.component_roots_from_planning(&invariants, &rooted_classes);
+        if let Some(forced) = forced_root {
+            self.force_component_root(&mut roots, forced);
+        }
         let primary = build_render_ordering(
             self,
             self.spanning_forest_with_planning(

@@ -43,6 +43,10 @@ impl SmilesCanonicalLabeling {
         Self { order, new_index_of_old_node }
     }
 
+    pub(crate) fn from_order(order: Vec<usize>) -> Self {
+        Self::new(order)
+    }
+
     /// Returns original node ids in canonical order.
     ///
     /// # Examples
