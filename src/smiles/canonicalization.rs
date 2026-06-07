@@ -216,7 +216,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
         self.stereo_normal_form().exact_canonicalize().canonicalization_spelling_normal_form()
     }
 
-    fn canonicalization_spelling_normal_form(&self) -> Self {
+    pub(super) fn canonicalization_spelling_normal_form(&self) -> Self {
         let atom_nodes = self
             .atom_nodes
             .iter()
