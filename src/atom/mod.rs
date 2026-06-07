@@ -472,6 +472,32 @@ impl Atom {
         self.chirality
     }
 
+    /// Returns a copy with isomeric features (isotope label and tetrahedral
+    /// chirality) cleared.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use elements_rs::Element;
+    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol, bracketed::chirality::Chirality};
+    ///
+    /// let atom = Atom::builder()
+    ///     .with_symbol(AtomSymbol::Element(Element::C))
+    ///     .with_isotope(13)
+    ///     .with_chirality(Chirality::At)
+    ///     .build()
+    ///     .non_isomeric();
+    /// assert_eq!(atom.isotope_mass_number(), None);
+    /// assert_eq!(atom.chirality(), None);
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn non_isomeric(mut self) -> Self {
+        self.isotope_mass_number = None;
+        self.chirality = None;
+        self
+    }
+
     #[cfg(test)]
     #[inline]
     #[must_use]

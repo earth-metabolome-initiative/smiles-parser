@@ -52,9 +52,9 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
 name = "elements_rs"
-version = "0.2.6"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bd188e809697c6ab48177f32792f1d29f41451e7956336b0ba939adfde120aa"
+checksum = "1ee1cc8038a8b7ac1ab9fd940d5a20c99e01defa3bd982057e62017ea4e5402e"
 dependencies = [
  "serde",
  "strum",
@@ -98,7 +98,7 @@ version = "0.1.0"
 source = "git+https://github.com/earth-metabolome-initiative/geometric-traits?branch=main#846307120e95cd25a8dc4fd29b7e91d0e1757ed7"
 dependencies = [
  "bitvec",
- "hashbrown",
+ "hashbrown 0.16.1",
  "lender",
  "multi_ranged",
  "num-traits",
@@ -126,6 +126,16 @@ checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
 dependencies = [
  "allocator-api2",
  "equivalent",
+ "foldhash",
+ "rustc-std-workspace-alloc",
+]
+
+[[package]]
+name = "hashbrown"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
+dependencies = [
  "foldhash",
  "rustc-std-workspace-alloc",
 ]
@@ -174,9 +184,9 @@ dependencies = [
 
 [[package]]
 name = "molecular-formulas"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f50760a98089095da7db7c128617b704d2e257ac942dd37b44387d138b63c24e"
+checksum = "2157428e33c26e3e5b856371a3be0c2de365d95f968604be07ca05b4bd690adb"
 dependencies = [
  "elements_rs",
  "num-traits",
@@ -302,7 +312,7 @@ version = "0.1.0"
 dependencies = [
  "elements_rs",
  "geometric-traits",
- "hashbrown",
+ "hashbrown 0.17.1",
  "molecular-formulas",
  "smallvec",
  "thiserror",

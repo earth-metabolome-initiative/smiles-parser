@@ -276,6 +276,28 @@ impl fmt::Display for SmilesErrorWithSpan {
     }
 }
 
+/// Error returned when carving a [`Fragment`](crate::smiles::Fragment) out of a
+/// parent graph fails.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum SubgraphError {
+    /// An atom id in the input is not a valid atom of the parent graph.
+    #[error("Atom id {0} is out of range for the parent graph")]
+    AtomOutOfRange(usize),
+    /// A bond in the input references an atom that is not part of the fragment.
+    #[error("Bond references atom {0}, which is not in the fragment")]
+    BondReferencesUnknownAtom(usize),
+}
+
+/// Error returned when rendering a fragment anchored at a chosen parent atom.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum RootError {
+    /// The requested root atom is not part of the fragment.
+    #[error("Atom {0} is not in the fragment")]
+    AtomNotInFragment(usize),
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::string::ToString;
