@@ -85,6 +85,16 @@ pub(super) fn canonicalization_state_key<AtomPolicy: SmilesAtomPolicy>(
 }
 
 pub(super) const fn canonical_bond_label(entry: BondEntry) -> CanonicalBondLabel {
+    // The aromatic flag fully determines an aromatic bond: the single/double
+    // kekule order retained alongside the flag is non-semantic. Collapse every
+    // aromatic bond to one canonical code so that two graphs which differ only
+    // in the kekule assignment of their aromatic bonds (e.g. a raw aromatic
+    // parse versus its kekulize-then-reperceive round-trip) canonicalize
+    // identically, including on broken-ring fragments where the order would
+    // otherwise leak into the rendered label.
+    if entry.aromatic() {
+        return CanonicalBondLabel(8);
+    }
     let bond_code = match entry.bond() {
         crate::bond::Bond::Single => 0,
         crate::bond::Bond::Double => 1,
@@ -93,7 +103,7 @@ pub(super) const fn canonical_bond_label(entry: BondEntry) -> CanonicalBondLabel
         crate::bond::Bond::Up => 4,
         crate::bond::Bond::Down => 5,
     };
-    CanonicalBondLabel(bond_code + if entry.aromatic() { 8 } else { 0 })
+    CanonicalBondLabel(bond_code)
 }
 
 pub(crate) const fn canonical_chirality_key(chirality: Option<Chirality>) -> (u8, u8) {

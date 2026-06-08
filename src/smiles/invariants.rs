@@ -17,9 +17,15 @@ pub(crate) struct BondKindHistogram {
 impl BondKindHistogram {
     #[inline]
     pub(crate) fn record(&mut self, entry: BondEntry) {
-        self.counts[bond_kind_index(entry.bond())] += 1;
+        // The single/double kekule order retained on an aromatic bond is
+        // non-semantic, so an aromatic bond is counted only as aromatic and
+        // never under its kekule kind. This keeps the histogram (and every
+        // ordering derived from it) identical for two representations that
+        // differ only in the kekule assignment of their aromatic bonds.
         if entry.aromatic() {
             self.aromatic_count += 1;
+        } else {
+            self.counts[bond_kind_index(entry.bond())] += 1;
         }
     }
 
@@ -100,7 +106,12 @@ pub(crate) const fn bond_kind_code(bond: Bond) -> u8 {
 
 #[inline]
 pub(crate) const fn bond_descriptor_code(descriptor: BondDescriptor) -> u8 {
-    bond_kind_code(descriptor.bond()) + if descriptor.is_aromatic() { 8 } else { 0 }
+    // An aromatic bond collapses to a single canonical code: its kekule order
+    // must not influence ordering or signatures (see `BondKindHistogram`).
+    if descriptor.is_aromatic() {
+        return 8;
+    }
+    bond_kind_code(descriptor.bond())
 }
 
 #[inline]
@@ -110,7 +121,12 @@ pub(crate) const fn bond_descriptor_index(descriptor: BondDescriptor) -> usize {
 
 #[inline]
 pub(crate) const fn bond_entry_code(entry: BondEntry) -> u8 {
-    bond_kind_code(entry.bond()) + if entry.aromatic() { 8 } else { 0 }
+    // An aromatic bond collapses to a single canonical code: its kekule order
+    // must not influence ordering or signatures (see `BondKindHistogram`).
+    if entry.aromatic() {
+        return 8;
+    }
+    bond_kind_code(entry.bond())
 }
 
 #[inline]
@@ -236,7 +252,9 @@ mod tests {
 
         let invariant = smiles.atom_invariant(0).unwrap();
         assert_eq!(invariant.degree, 3);
-        assert_eq!(invariant.bond_kind_histogram.count(Bond::Single), 2);
+        // The aromatic bond is counted only as aromatic, never under its kekule
+        // kind, so the plain single bond is the only one in the Single bucket.
+        assert_eq!(invariant.bond_kind_histogram.count(Bond::Single), 1);
         assert_eq!(invariant.bond_kind_histogram.count(Bond::Double), 1);
         assert_eq!(invariant.bond_kind_histogram.aromatic_count(), 1);
     }
