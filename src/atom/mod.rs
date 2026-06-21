@@ -1028,6 +1028,11 @@ mod tests {
         assert!(atom_type.aromatic());
         assert_eq!(atom_type.isotope_mass_number(), Some(80));
         assert_eq!(atom_type.formal_charge(), -1);
+
+        // The accessor must report the stored flag rather than a constant, so an
+        // aliphatic atom reads back as non-aromatic.
+        let aliphatic = Atom::new_organic_subset(AtomSymbol::Element(Element::C), false);
+        assert!(!aliphatic.node_type().aromatic());
     }
 
     #[test]
@@ -1112,6 +1117,46 @@ mod tests {
         atom.write_smiles(&mut rendered).unwrap();
 
         assert_eq!(rendered, "[*]");
+    }
+
+    #[test]
+    fn can_write_unbracketed_aromatic_accepts_only_the_organic_aromatic_subset() {
+        for element in [Element::B, Element::C, Element::N, Element::O, Element::P, Element::S] {
+            assert!(can_write_unbracketed_aromatic(element), "{element} should be unbracketed");
+        }
+        for element in [Element::Si, Element::Se, Element::Te, Element::As, Element::F, Element::Cl]
+        {
+            assert!(!can_write_unbracketed_aromatic(element), "{element} should need brackets");
+        }
+    }
+
+    #[test]
+    fn rendered_len_hint_matches_actual_length_across_bracket_fields() {
+        // The capacity hint must equal the rendered length so the render buffer
+        // is sized exactly. A one-character symbol breaks the coincidence where
+        // adding the two bracket characters equals doubling a two-character
+        // symbol, and the isotope and chirality cases exercise the per-field
+        // additions that no other hint assertion reaches.
+        let cases = [
+            Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).build(),
+            Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).with_isotope(13).build(),
+            Atom::builder()
+                .with_symbol(AtomSymbol::Element(Element::C))
+                .with_chirality(Chirality::At)
+                .build(),
+            Atom::builder()
+                .with_symbol(AtomSymbol::Element(Element::C))
+                .with_isotope(13)
+                .with_chirality(Chirality::TH(2))
+                .with_hydrogens(2)
+                .with_charge(Charge::try_new(-1).unwrap())
+                .with_class(7)
+                .build(),
+        ];
+        for atom in cases {
+            let rendered = atom.rendered_string();
+            assert_eq!(atom.rendered_len_hint(), rendered.len(), "hint mismatch for {rendered}");
+        }
     }
 
     #[test]

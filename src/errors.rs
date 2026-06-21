@@ -414,6 +414,19 @@ mod tests {
     }
 
     #[test]
+    fn render_marks_zero_width_and_multi_character_spans() {
+        // A zero-width span (start == end) must still produce exactly one caret,
+        // which only holds because the end is raised to at least start + 1.
+        let zero_width = SmilesErrorWithSpan::new(SmilesError::UnexpectedEndOfString, 2, 2);
+        assert_eq!(zero_width.render("CCO"), "CCO\n  ^\nUnexpected end of string");
+
+        // A multi-character span draws one caret per covered position, so the
+        // caret run width is end minus start rather than any other combination.
+        let two_wide = SmilesErrorWithSpan::new(SmilesError::UnexpectedCharacter('x'), 1, 3);
+        assert_eq!(two_wide.render("CCCC"), "CCCC\n ^^\nUnexpected character: x");
+    }
+
+    #[test]
     fn test_smiles_error_with_unicode_span() {
         let error = SmilesErrorWithSpan::new(SmilesError::UnexpectedUnicodeCharacter, 2, 4);
 

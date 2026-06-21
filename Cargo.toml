@@ -58,6 +58,17 @@ pedantic = { level = "deny", priority = -1 }
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+# Optimize dependencies in dev and test builds so the graph algorithms (notably
+# the NP-hard MCES from geometric-traits) do not run unoptimized. This cuts the
+# unit-test suite from about 18s to about 6s while leaving this crate at the
+# default opt-level 0, so per-mutant rebuilds under cargo-mutants stay fast.
+# Optimizing this crate too would drop tests to under 1s but make every
+# incremental rebuild far slower, which is a net loss for the build-bound
+# mutation workflow. The dependency build is a one-time, cacheable cost.
+[profile.dev.package."*"]
+opt-level = 3
+
 [dev-dependencies]
 criterion = { version = "0.8.2", default-features = false, features = ["cargo_bench_support"] }
 flate2 = "1.1.9"
