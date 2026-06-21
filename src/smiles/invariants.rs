@@ -149,8 +149,8 @@ mod tests {
     use elements_rs::Element;
 
     use super::{
-        AtomInvariant, BondKindHistogram, Smiles, bond_kind_code, bond_kind_index,
-        planning_chirality_key,
+        AtomInvariant, BondEntry, BondKindHistogram, Smiles, bond_entry_code, bond_kind_code,
+        bond_kind_index, planning_chirality_key,
     };
     use crate::{
         atom::{
@@ -159,7 +159,7 @@ mod tests {
             bracketed::{charge::Charge, chirality::Chirality},
         },
         bond::{
-            Bond,
+            Bond, BondDescriptor,
             bond_edge::{BondEdge, bond_edge},
         },
         smiles::BondMatrixBuilder,
@@ -311,6 +311,25 @@ mod tests {
         assert_eq!(bond_kind_index(Bond::Up), bond_kind_index(Bond::Down));
         assert_ne!(bond_kind_index(Bond::Single), bond_kind_index(Bond::Double));
         assert_ne!(bond_kind_index(Bond::Triple), bond_kind_index(Bond::Quadruple));
+    }
+
+    #[test]
+    fn bond_entry_code_collapses_aromatic_and_separates_kekule_kinds() {
+        // An aromatic bond collapses to code 8 regardless of its kekule order,
+        // so an aromatic single and an aromatic double share one code and never
+        // collide with a plain single (0) or double (1).
+        let aromatic_single =
+            BondEntry::from_descriptor(BondDescriptor::aromatic(Bond::Single), None, 0);
+        let aromatic_double =
+            BondEntry::from_descriptor(BondDescriptor::aromatic(Bond::Double), None, 0);
+        assert_eq!(bond_entry_code(aromatic_single), 8);
+        assert_eq!(bond_entry_code(aromatic_double), 8);
+
+        // Non-aromatic bonds keep their distinct kekule codes.
+        assert_eq!(bond_entry_code(BondEntry::new(Bond::Single, None, 0)), 0);
+        assert_eq!(bond_entry_code(BondEntry::new(Bond::Double, None, 0)), 1);
+        assert_eq!(bond_entry_code(BondEntry::new(Bond::Triple, None, 0)), 2);
+        assert_eq!(bond_entry_code(BondEntry::new(Bond::Quadruple, None, 0)), 3);
     }
 
     #[test]

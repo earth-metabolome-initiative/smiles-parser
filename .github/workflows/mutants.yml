@@ -1,0 +1,31 @@
+name: Mutation Testing
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  mutants:
+    name: cargo-mutants (PR diff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache build artifacts
+        uses: Swatinem/rust-cache@v2
+      - name: Install cargo-mutants
+        uses: taiki-e/install-action@cargo-mutants
+      - name: Compute diff against base branch
+        run: git diff origin/${{ github.base_ref }} > pr.diff
+      - name: Run cargo-mutants on changed lines
+        run: cargo mutants --no-shuffle -vV --in-diff pr.diff
+      - name: Upload mutation results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutants.out
+          path: mutants.out
