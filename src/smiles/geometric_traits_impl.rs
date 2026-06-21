@@ -156,7 +156,16 @@ impl BondEntry {
 impl PartialEq for BondEntry {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.bond == other.bond && self.aromatic == other.aromatic
+        // Aromaticity must agree, and the kekule order (single/double) only
+        // matters for non-aromatic bonds. smiles-parser stores aromatic rings
+        // with an alternating Single/Double kekule order, while RDKit gives
+        // every aromatic bond one uniform type, so requiring the kekule order
+        // to match would make an aromatic bond stored as Single in one molecule
+        // compare unequal to the same bond stored as Double in another. MCES
+        // edge compatibility reads this equality, so collapsing the kekule order
+        // for aromatic bonds is what lets two aromatic rings match regardless of
+        // how their double bonds happen to fall.
+        self.aromatic == other.aromatic && (self.aromatic || self.bond == other.bond)
     }
 }
 
@@ -165,8 +174,13 @@ impl Eq for BondEntry {}
 impl Hash for BondEntry {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.bond.hash(state);
+        // Mirror `eq`: the kekule order is only part of the identity for
+        // non-aromatic bonds, so it must be dropped from the hash whenever the
+        // bond is aromatic to keep equal values hashing equally.
         self.aromatic.hash(state);
+        if !self.aromatic {
+            self.bond.hash(state);
+        }
     }
 }
 
@@ -485,10 +499,23 @@ mod tests {
         hash::{Hash, Hasher},
     };
 
+    use elements_rs::Element;
     use geometric_traits::traits::{Graph, GraphSimilarities, McesBuilder};
 
     use super::*;
-    use crate::bond::ring_num::RingNum;
+    use crate::{atom::atom_symbol::AtomSymbol, bond::ring_num::RingNum};
+
+    /// Builds a two-atom aromatic carbon/nitrogen graph whose single bond is
+    /// stored with the given kekule order. The aromatic flag is always set.
+    fn aromatic_cn_bond(kekule: Bond) -> Smiles {
+        let atoms = alloc::vec![
+            Atom::new_organic_subset(AtomSymbol::Element(Element::C), true),
+            Atom::new_organic_subset(AtomSymbol::Element(Element::N), true),
+        ];
+        let mut builder = BondMatrixBuilder::with_capacity(1);
+        builder.push_edge_with_descriptor(0, 1, BondDescriptor::aromatic(kekule), None).unwrap();
+        Smiles::from_bond_matrix_parts(atoms, builder.finish(2))
+    }
 
     fn assert_similarity_close(actual: impl Into<f64>, expected: f64) {
         let actual = actual.into();
@@ -498,6 +525,23 @@ mod tests {
             difference < 1.0e-6,
             "expected Johnson similarity {expected}, got {actual} (diff {difference})"
         );
+    }
+
+    #[test]
+    fn mces_matches_aromatic_bonds_across_differing_kekule_orders() {
+        // The same aromatic carbon/nitrogen bond stored as Single in one
+        // molecule and as Double in another must still be a compatible edge for
+        // labeled MCES, since aromatization in smiles-parser leaves an arbitrary
+        // kekule order on aromatic bonds while RDKit treats every aromatic bond
+        // as one uniform type. Without collapsing the kekule order the two edges
+        // would compare unequal and no edge would match.
+        let stored_single = aromatic_cn_bond(Bond::Single);
+        let stored_double = aromatic_cn_bond(Bond::Double);
+
+        let result = McesBuilder::new(&stored_single, &stored_double).compute_labeled();
+
+        assert_eq!(result.matched_edges().len(), 1);
+        assert_similarity_close(result.johnson_similarity(), 1.0);
     }
 
     #[test]
@@ -516,6 +560,16 @@ mod tests {
         assert_eq!(first, third);
         assert_ne!(first, fourth);
         assert_ne!(first, aromatic);
+
+        // Aromatic bonds ignore the kekule order, so an aromatic single and an
+        // aromatic double compare equal, while non-aromatic bonds still keep the
+        // single/double distinction.
+        let aromatic_single =
+            BondEntry::from_descriptor(BondDescriptor::aromatic(Bond::Single), None, 0);
+        let aromatic_double =
+            BondEntry::from_descriptor(BondDescriptor::aromatic(Bond::Double), None, 0);
+        assert_eq!(aromatic_single, aromatic_double);
+        assert_ne!(fourth, aromatic_single);
     }
 
     #[test]
@@ -537,6 +591,18 @@ mod tests {
 
         assert_eq!(first_hasher.finish(), second_hasher.finish());
         assert_ne!(first_hasher.finish(), aromatic_hasher.finish());
+
+        // Equal aromatic bonds must hash equally even when their kekule order
+        // differs, mirroring the equality that ignores it.
+        let aromatic_single =
+            BondEntry::from_descriptor(BondDescriptor::aromatic(Bond::Single), None, 0);
+        let aromatic_double =
+            BondEntry::from_descriptor(BondDescriptor::aromatic(Bond::Double), None, 0);
+        let mut aromatic_single_hasher = DefaultHasher::new();
+        let mut aromatic_double_hasher = DefaultHasher::new();
+        aromatic_single.hash(&mut aromatic_single_hasher);
+        aromatic_double.hash(&mut aromatic_double_hasher);
+        assert_eq!(aromatic_single_hasher.finish(), aromatic_double_hasher.finish());
     }
 
     #[test]
