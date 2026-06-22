@@ -276,6 +276,7 @@ impl<'g> SmilesMces<'g> {
 mod tests {
     use geometric_traits::traits::GraphSimilarities;
 
+    use super::{InitialProductVertexOrdering, LargestFragmentMetric, McesSearchMode};
     use crate::smiles::Smiles;
 
     fn smiles(input: &str) -> Smiles {
@@ -335,5 +336,98 @@ mod tests {
 
         assert_eq!(result.matched_edges().len(), 0);
         assert_eq!(result.search_nodes(), 0);
+    }
+
+    #[test]
+    fn distance_threshold_short_circuits_when_edit_distance_bound_is_exceeded() {
+        // Hexane and pentane share a four-edge carbon path, so an unbounded
+        // search matches four bonds. The degree-sequence edit-distance lower
+        // bound for the pair sits between 0.5 and 1.0.
+        let hexane = smiles("CCCCCC");
+        let pentane = smiles("CCCCC");
+
+        // A threshold below the bound skips the search entirely.
+        let skipped = hexane.mces_with(&pentane).distance_threshold(0.0).compute();
+        assert_eq!(skipped.matched_edges().len(), 0);
+        assert_eq!(skipped.search_nodes(), 0);
+
+        // A threshold above the bound runs and reaches the full four-bond match.
+        let run = hexane.mces_with(&pentane).distance_threshold(100.0).compute();
+        assert_eq!(run.matched_edges().len(), 4);
+        assert!(run.search_nodes() > 0);
+        assert_eq!(hexane.mces(&pentane).matched_edges().len(), 4);
+    }
+
+    #[test]
+    fn delta_y_filters_the_whitney_triangle_versus_claw_false_positive() {
+        // Cyclopropane is a triangle (K3) and isobutane is a claw (K1,3). Their
+        // line graphs are both triangles, so without Delta-Y filtering the
+        // search reports a spurious three-bond match. Delta-Y rejects it because
+        // the matched edge subgraphs have different degree sequences.
+        let cyclopropane = smiles("C1CC1");
+        let isobutane = smiles("CC(C)C");
+
+        let filtered = cyclopropane.mces_with(&isobutane).delta_y(true).compute();
+        let unfiltered = cyclopropane.mces_with(&isobutane).delta_y(false).compute();
+
+        assert_eq!(filtered.matched_edges().len(), 2);
+        assert_eq!(unfiltered.matched_edges().len(), 3);
+    }
+
+    #[test]
+    fn all_best_search_mode_enumerates_more_tied_cliques() {
+        // Benzene against itself has many symmetry-equivalent maximum matches.
+        // PartialEnumeration retains a single best clique, while AllBest
+        // enumerates every tied maximum. Both agree on the matched-edge count.
+        let benzene = smiles("c1ccccc1");
+
+        let partial = benzene.mces_with(&smiles("c1ccccc1")).compute();
+        let all_best =
+            benzene.mces_with(&smiles("c1ccccc1")).search_mode(McesSearchMode::AllBest).compute();
+
+        assert_eq!(partial.matched_edges().len(), 6);
+        assert_eq!(all_best.matched_edges().len(), 6);
+        assert_eq!(partial.all_cliques().len(), 1);
+        assert!(all_best.all_cliques().len() > partial.all_cliques().len());
+    }
+
+    #[test]
+    fn search_path_tuning_knobs_preserve_the_optimum() {
+        // Partitioning, the fragment-size tie-break metric, and the product
+        // vertex ordering steer how the search runs but must not change the
+        // optimal matched-edge count.
+        let acid = smiles("c1ccccc1C(=O)O");
+        let amide = smiles("c1ccccc1CC(=O)N");
+        let optimum = acid.mces(&amide).matched_edges().len();
+        assert_eq!(optimum, 7);
+
+        assert_eq!(
+            acid.mces_with(&amide).partition(false).compute().matched_edges().len(),
+            optimum
+        );
+        assert_eq!(
+            acid.mces_with(&amide)
+                .largest_fragment_metric(LargestFragmentMetric::Atoms)
+                .compute()
+                .matched_edges()
+                .len(),
+            optimum
+        );
+
+        for ordering in [
+            InitialProductVertexOrdering::None,
+            InitialProductVertexOrdering::EdgeSignature,
+            InitialProductVertexOrdering::LineGraphWL,
+            InitialProductVertexOrdering::Degree,
+            InitialProductVertexOrdering::PageRank,
+        ] {
+            let matched = acid
+                .mces_with(&amide)
+                .product_vertex_ordering(ordering)
+                .compute()
+                .matched_edges()
+                .len();
+            assert_eq!(matched, optimum, "ordering {ordering:?} changed the optimum");
+        }
     }
 }
