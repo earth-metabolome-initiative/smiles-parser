@@ -48,6 +48,7 @@ mod geometric_traits_impl;
 mod implicit_hydrogens;
 mod invariants;
 mod kekulization;
+mod mces;
 mod molecular_formula;
 mod neighbors;
 mod rdkit_symm_sssr;
@@ -73,6 +74,10 @@ pub use self::{
     fragment::Fragment,
     geometric_traits_impl::{BondEntry, BondMatrix},
     kekulization::{KekulizationError, KekulizationMode},
+    mces::{
+        GraphSimilarities, InitialProductVertexOrdering, LargestFragmentMetric, McesBuilder,
+        McesResult, McesSearchMode, SmilesMces,
+    },
     molecular_formula::WildcardMolecularFormulaConversionError,
 };
 pub(crate) use self::{
