@@ -1,4 +1,9 @@
-use alloc::{borrow::ToOwned, boxed::Box, string::String, vec::Vec};
+use alloc::{
+    borrow::ToOwned,
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
 use std::{
     fs::File,
     io::{BufRead, BufReader},
@@ -26,6 +31,7 @@ pub struct DatasetSmilesRecordIter {
     parser: DatasetSmilesParser,
     line_number: usize,
     line_buffer: String,
+    csv: Option<CsvReader>,
 }
 
 struct DatasetReader {
@@ -33,11 +39,18 @@ struct DatasetReader {
     reader: Box<dyn BufRead + Send>,
 }
 
+struct CsvReader {
+    path: PathBuf,
+    reader: csv::Reader<File>,
+    record: csv::StringRecord,
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum DatasetSmilesParser {
     PubChem,
     MassSpecGym { smiles_column: usize },
     Zinc20,
+    Coconut { id_column: usize, smiles_column: usize },
 }
 
 impl DatasetSmilesIter {
@@ -95,6 +108,7 @@ impl DatasetSmilesRecordIter {
             parser: DatasetSmilesParser::MassSpecGym { smiles_column },
             line_number: 1,
             line_buffer: String::new(),
+            csv: None,
         })
     }
 
@@ -119,7 +133,112 @@ impl DatasetSmilesRecordIter {
             parser: DatasetSmilesParser::Zinc20,
             line_number: 0,
             line_buffer: String::new(),
+            csv: None,
         })
+    }
+
+    pub(crate) fn for_coconut(artifact: &DatasetArtifact) -> Result<Self, DatasetError> {
+        let dataset_id = artifact.dataset_id();
+        let path = artifact.path();
+        let file = File::open(path)
+            .map_err(|source| DatasetError::Io { path: path.to_path_buf(), source })?;
+        let mut reader = csv::ReaderBuilder::new().has_headers(true).from_reader(file);
+        let (id_column, smiles_column) = {
+            let headers =
+                reader.headers().map_err(|error| csv_error(dataset_id, path, 1, error))?;
+            let id_column = headers
+                .iter()
+                .position(|field| field.eq_ignore_ascii_case("identifier"))
+                .ok_or_else(|| {
+                    DatasetError::Format {
+                        dataset_id,
+                        line_number: 1,
+                        message: "expected a CSV header containing an identifier column".into(),
+                    }
+                })?;
+            let smiles_column = headers
+                .iter()
+                .position(|field| field.eq_ignore_ascii_case("canonical_smiles"))
+                .ok_or_else(|| {
+                    DatasetError::Format {
+                        dataset_id,
+                        line_number: 1,
+                        message: "expected a CSV header containing a canonical_smiles column"
+                            .into(),
+                    }
+                })?;
+            (id_column, smiles_column)
+        };
+        Ok(Self {
+            dataset_id,
+            paths: Vec::new(),
+            next_path_index: 0,
+            current: None,
+            parser: DatasetSmilesParser::Coconut { id_column, smiles_column },
+            line_number: 1,
+            line_buffer: String::new(),
+            csv: Some(CsvReader {
+                path: path.to_path_buf(),
+                reader,
+                record: csv::StringRecord::new(),
+            }),
+        })
+    }
+
+    fn next_coconut_record(
+        &mut self,
+        id_column: usize,
+        smiles_column: usize,
+    ) -> Option<Result<DatasetSmilesRecord, DatasetError>> {
+        let fallback_line = self.line_number.saturating_add(1);
+        let state =
+            self.csv.as_mut().unwrap_or_else(|| unreachable!("COCONUT CSV reader is initialized"));
+        match state.reader.read_record(&mut state.record) {
+            Ok(false) => None,
+            Ok(true) => {
+                let line_number = state
+                    .record
+                    .position()
+                    .and_then(|position| usize::try_from(position.line()).ok())
+                    .unwrap_or(fallback_line);
+                self.line_number = line_number;
+                let id = state.record.get(id_column).filter(|field| !field.is_empty()).ok_or_else(
+                    || {
+                        DatasetError::Format {
+                            dataset_id: self.dataset_id,
+                            line_number,
+                            message: "expected a COCONUT CSV row with an identifier".into(),
+                        }
+                    },
+                );
+                let smiles =
+                    state.record.get(smiles_column).filter(|field| !field.is_empty()).ok_or_else(
+                        || {
+                            DatasetError::Format {
+                                dataset_id: self.dataset_id,
+                                line_number,
+                                message: "expected a COCONUT CSV row with a canonical_smiles value"
+                                    .into(),
+                            }
+                        },
+                    );
+                match (id, smiles) {
+                    (Ok(id), Ok(smiles)) => {
+                        Some(Ok(DatasetSmilesRecord::new(id.to_owned(), smiles.to_owned())))
+                    }
+                    (Err(error), _) | (_, Err(error)) => Some(Err(error)),
+                }
+            }
+
+            Err(error) => {
+                let line_number = error
+                    .position()
+                    .and_then(|position| usize::try_from(position.line()).ok())
+                    .unwrap_or(fallback_line);
+                self.line_number = line_number;
+                Some(Err(csv_error(self.dataset_id, &state.path, line_number, error)))
+            }
+        }
     }
 
     fn from_artifact(
@@ -138,6 +257,7 @@ impl DatasetSmilesRecordIter {
             parser,
             line_number: 0,
             line_buffer: String::new(),
+            csv: None,
         })
     }
 
@@ -159,6 +279,9 @@ impl Iterator for DatasetSmilesRecordIter {
     type Item = Result<DatasetSmilesRecord, DatasetError>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if let DatasetSmilesParser::Coconut { id_column, smiles_column } = self.parser {
+            return self.next_coconut_record(id_column, smiles_column);
+        }
         loop {
             if self.current.is_none() {
                 match self.open_next_reader()? {
@@ -253,6 +376,9 @@ fn parse_smiles_record(
             }
             Ok(DatasetSmilesRecord::new(id.to_owned(), smiles.to_owned()))
         }
+        DatasetSmilesParser::Coconut { .. } => {
+            unreachable!("COCONUT records are parsed by csv::Reader")
+        }
     }
 }
 
@@ -269,4 +395,21 @@ fn open_text_reader(path: &Path) -> Result<Box<dyn BufRead + Send>, DatasetError
 
 fn tsv_field(line: &str, column_index: usize) -> Option<&str> {
     line.split('\t').nth(column_index)
+}
+
+fn csv_error(
+    dataset_id: &'static str,
+    path: &Path,
+    fallback_line: usize,
+    error: csv::Error,
+) -> DatasetError {
+    let line_number = error
+        .position()
+        .and_then(|position| usize::try_from(position.line()).ok())
+        .unwrap_or(fallback_line);
+    let message = error.to_string();
+    match error.into_kind() {
+        csv::ErrorKind::Io(source) => DatasetError::Io { path: path.to_path_buf(), source },
+        _ => DatasetError::Format { dataset_id, line_number, message },
+    }
 }
