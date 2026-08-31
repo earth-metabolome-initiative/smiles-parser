@@ -11,9 +11,10 @@ readme = "README.md"
 [features]
 default = []
 fuzzing = []
-datasets = ["dep:flate2", "dep:indicatif", "dep:reqwest", "dep:tar", "dep:zip"]
+datasets = ["dep:flate2", "dep:indicatif", "dep:reqwest", "dep:tar", "dep:csv", "dep:csv"]
 
 [dependencies]
+csv = {version = "1.4.0", optional = true}
 elements_rs = "0.2.7"
 flate2 = { version = "1.1.9", optional = true, default-features = false, features = ["rust_backend"] }
 geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", branch = "main", default-features = false, features = ["alloc"] }
