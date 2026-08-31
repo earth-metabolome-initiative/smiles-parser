@@ -198,17 +198,6 @@ pub struct DatasetCollectionArtifact {
 }
 
 impl DatasetCollectionArtifact {
-    /// generates a new instance of `DatasetCollectionArtifact`
-    #[must_use]
-    pub(crate) fn new(
-        dataset_id: &'static str,
-        paths: Vec<PathBuf>,
-        compressed_paths: Vec<PathBuf>,
-        was_downloaded: bool,
-        was_extracted: bool,
-    ) -> Self {
-        Self { dataset_id, paths, compressed_paths, was_downloaded, was_extracted }
-    }
     /// Returns the dataset identifier that produced this artifact collection.
     #[must_use]
     pub fn dataset_id(&self) -> &'static str {
