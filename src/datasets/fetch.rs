@@ -65,28 +65,28 @@ pub(crate) fn fetch_dataset<D: DatasetSource + ?Sized>(
     match dataset.compression() {
         DatasetCompression::None => {
             let was_downloaded = ensure_downloaded(dataset, &compressed_path, options.cache_mode)?;
-            Ok(DatasetArtifact::new(
-                dataset.id(),
-                compressed_path.clone(),
-                Some(compressed_path),
-                None,
+            Ok(DatasetArtifact{
+                dataset_id: dataset.id(),
+                path: compressed_path.clone(),
+                compressed_path: Some(compressed_path),
+                decompressed_path: None,
                 was_downloaded,
-                false,
-            ))
+                was_decompressed: false,
+        })
         }
         DatasetCompression::Gzip => {
             match options.gzip_mode {
                 GzipMode::KeepCompressed => {
                     let was_downloaded =
                         ensure_downloaded(dataset, &compressed_path, options.cache_mode)?;
-                    Ok(DatasetArtifact::new(
-                        dataset.id(),
-                        compressed_path.clone(),
-                        Some(compressed_path),
-                        None,
+                    Ok(DatasetArtifact {
+                        dataset_id: dataset.id(),
+                        path: compressed_path.clone(),
+                        compressed_path: Some(compressed_path),
+                        decompressed_path: None,
                         was_downloaded,
-                        false,
-                    ))
+                        was_decompressed: false,
+                })
                 }
                 GzipMode::Decompress | GzipMode::KeepBoth => {
                     let (was_downloaded, was_decompressed) = ensure_decompressed(
@@ -95,14 +95,14 @@ pub(crate) fn fetch_dataset<D: DatasetSource + ?Sized>(
                         &decompressed_path,
                         options.cache_mode,
                     )?;
-                    Ok(DatasetArtifact::new(
-                        dataset.id(),
-                        decompressed_path.clone(),
-                        compressed_path.is_file().then_some(compressed_path),
-                        Some(decompressed_path),
+                    Ok(DatasetArtifact{
+                        dataset_id: dataset.id(),
+                        path: decompressed_path.clone(),
+                        compressed_path: compressed_path.is_file().then_some(compressed_path),
+                        decompressed_path: Some(decompressed_path),
                         was_downloaded,
                         was_decompressed,
-                    ))
+                })
                 }
             }
         }
@@ -111,14 +111,14 @@ pub(crate) fn fetch_dataset<D: DatasetSource + ?Sized>(
                 GzipMode::KeepCompressed => {
                     let was_downloaded =
                         ensure_downloaded(dataset, &compressed_path, options.cache_mode)?;
-                    Ok(DatasetArtifact::new(
-                        dataset.id(),
-                        compressed_path.clone(),
-                        Some(compressed_path),
-                        None,
+                    Ok(DatasetArtifact {
+                        dataset_id: dataset.id(),
+                        path: compressed_path.clone(),
+                        compressed_path: Some(compressed_path),
+                        decompressed_path: None,
                         was_downloaded,
-                        false,
-                    ))
+                        was_decompressed: false,
+                })
                 }
                 GzipMode::Decompress | GzipMode::KeepBoth => {
                     let (was_downloaded, was_extracted) = ensure_extracted_tar_gzip(
@@ -127,14 +127,14 @@ pub(crate) fn fetch_dataset<D: DatasetSource + ?Sized>(
                         &decompressed_path,
                         options.cache_mode,
                     )?;
-                    Ok(DatasetArtifact::new(
-                        dataset.id(),
-                        decompressed_path.clone(),
-                        compressed_path.is_file().then_some(compressed_path),
-                        Some(decompressed_path),
+                    Ok(DatasetArtifact {
+                        dataset_id: dataset.id(),
+                        path: decompressed_path.clone(),
+                        compressed_path: compressed_path.is_file().then_some(compressed_path),
+                        decompressed_path: Some(decompressed_path),
                         was_downloaded,
-                        was_extracted,
-                    ))
+                        was_decompressed: was_extracted,
+                })
                 }
             }
         }
