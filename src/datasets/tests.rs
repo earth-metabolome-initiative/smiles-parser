@@ -8,13 +8,15 @@ use std::{
 
 use flate2::{Compression, write::GzEncoder};
 
-use crate::{
-    CacheMode, DatasetArtifact, DatasetCollectionArtifact, DatasetCollectionSource,
-    DatasetCompression, DatasetError, DatasetFetchOptions, DatasetSmilesIter,
-    DatasetSmilesRecordIter, DatasetSource, GzipMode, MASS_SPEC_GYM_SMILES, PUBCHEM_SMILES,
-    PubChemSmiles, ZINC20_EXPECTED_RECORD_COUNT, ZINC20_SMILES, Zinc20Smiles,
-    datasets::fetch::{gunzip_file, untar_gzip_file},
-    default_dataset_cache_dir,
+use super::{
+    CacheMode, DatasetFetchOptions, GzipMode, ZINC20_EXPECTED_RECORD_COUNT, Zinc20Smiles,
+    fetch::{default_dataset_cache_dir, gunzip_file, untar_gzip_file},
+    massspecgym::MASS_SPEC_GYM_SMILES,
+    pubchem::{PUBCHEM_SMILES, PubChemSmiles},
+    reader::{DatasetSmilesIter, DatasetSmilesRecordIter},
+    source::{DatasetCollectionSource, DatasetSource},
+    types::{DatasetArtifact, DatasetCollectionArtifact, DatasetCompression, DatasetError},
+    zinc20::ZINC20_SMILES,
 };
 
 fn temporary_directory(name: &str) -> PathBuf {

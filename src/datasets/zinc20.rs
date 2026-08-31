@@ -4,10 +4,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{
-    DatasetCollectionSource, DatasetCompression, DatasetError, DatasetFetchOptions, DatasetFile,
-    GzipMode, SmilesDatasetRecordSource, SmilesDatasetSource,
-    datasets::reader::{DatasetSmilesIter, DatasetSmilesRecordIter},
+use super::{
+    reader::{DatasetSmilesIter, DatasetSmilesRecordIter},
+    source::{DatasetCollectionSource, SmilesDatasetRecordSource, SmilesDatasetSource},
+    types::{DatasetCompression, DatasetError, DatasetFetchOptions, DatasetFile, GzipMode},
 };
 
 /// Number of rows reported by the ZINC20-ML `smiles_count.txt` manifest.

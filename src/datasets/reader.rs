@@ -7,9 +7,9 @@ use std::{
 
 use flate2::read::GzDecoder;
 
-use crate::{
-    DatasetArtifact, DatasetCollectionArtifact, DatasetError, DatasetSmilesRecord,
-    datasets::zinc20::collect_zinc20_smiles_paths,
+use super::{
+    types::{DatasetArtifact, DatasetCollectionArtifact, DatasetError, DatasetSmilesRecord},
+    zinc20::collect_zinc20_smiles_paths,
 };
 
 /// A streaming iterator over SMILES strings extracted from a dataset file.
