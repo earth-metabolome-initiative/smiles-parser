@@ -66,7 +66,7 @@ impl DatasetSmilesRecordIter {
         let mut header = String::new();
         let bytes_read = reader
             .read_line(&mut header)
-            .map_err(|source| DatasetError::Io { path: path.to_path_buf().clone(), source })?;
+            .map_err(|source| DatasetError::Io { path: path.to_path_buf(), source })?;
         if bytes_read == 0 {
             return Err(DatasetError::Format {
                 dataset_id,
@@ -132,7 +132,7 @@ impl DatasetSmilesRecordIter {
             paths: Vec::new(),
             next_path_index: 0,
             current: Some(DatasetReader {
-                path: path.to_path_buf().clone(),
+                path: path.to_path_buf(),
                 reader: open_text_reader(path)?,
             }),
             parser,
