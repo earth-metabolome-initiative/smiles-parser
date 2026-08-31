@@ -73,24 +73,6 @@ pub struct DatasetArtifact {
 }
 
 impl DatasetArtifact {
-    #[must_use]
-    pub(crate) fn new(
-        dataset_id: &'static str,
-        path: PathBuf,
-        compressed_path: Option<PathBuf>,
-        decompressed_path: Option<PathBuf>,
-        was_downloaded: bool,
-        was_decompressed: bool,
-    ) -> Self {
-        Self {
-            dataset_id,
-            path,
-            compressed_path,
-            decompressed_path,
-            was_downloaded,
-            was_decompressed,
-        }
-    }
     /// Returns the dataset identifier that produced this artifact.
     ///
     /// # Examples
