@@ -15,6 +15,8 @@ pub enum DatasetCompression {
     Gzip,
     /// The upstream file is a gzip-compressed tar archive.
     TarGzip,
+    /// The upstream file is a zip-compressed archive
+    Zip,
 }
 
 /// Cache behavior for dataset fetches.
