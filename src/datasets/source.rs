@@ -1,11 +1,11 @@
 use alloc::vec::Vec;
 
-use crate::{
-    DatasetArtifact, DatasetCollectionArtifact, DatasetCompression, DatasetError,
-    DatasetFetchOptions, DatasetFile,
-    datasets::{
-        fetch::{fetch_dataset, fetch_dataset_collection},
-        reader::{DatasetSmilesIter, DatasetSmilesRecordIter},
+use super::{
+    fetch::{fetch_dataset, fetch_dataset_collection},
+    reader::{DatasetSmilesIter, DatasetSmilesRecordIter},
+    types::{
+        DatasetArtifact, DatasetCollectionArtifact, DatasetCompression, DatasetError,
+        DatasetFetchOptions, DatasetFile,
     },
 };
 

@@ -1,7 +1,7 @@
-use crate::{
-    DatasetCompression, DatasetError, DatasetFetchOptions, DatasetSource,
-    SmilesDatasetRecordSource, SmilesDatasetSource,
-    datasets::reader::{DatasetSmilesIter, DatasetSmilesRecordIter},
+use super::{
+    reader::{DatasetSmilesIter, DatasetSmilesRecordIter},
+    source::{DatasetSource, SmilesDatasetRecordSource, SmilesDatasetSource},
+    types::{DatasetCompression, DatasetError, DatasetFetchOptions},
 };
 
 /// The official PubChem `CID-SMILES.gz` bulk download.

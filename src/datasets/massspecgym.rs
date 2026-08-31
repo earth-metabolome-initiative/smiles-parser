@@ -1,7 +1,7 @@
-use crate::{
-    DatasetError, DatasetFetchOptions, DatasetSource, SmilesDatasetRecordSource,
-    SmilesDatasetSource,
-    datasets::reader::{DatasetSmilesIter, DatasetSmilesRecordIter},
+use super::{
+    reader::{DatasetSmilesIter, DatasetSmilesRecordIter},
+    source::{DatasetSource, SmilesDatasetRecordSource, SmilesDatasetSource},
+    types::{DatasetError, DatasetFetchOptions},
 };
 
 /// The official MassSpecGym benchmark TSV containing a `smiles` column.

@@ -10,10 +10,13 @@ use flate2::read::GzDecoder;
 use reqwest::blocking::Client;
 use tar::Archive;
 
-use crate::{
-    CacheMode, DatasetArtifact, DatasetCollectionArtifact, DatasetCollectionSource,
-    DatasetCompression, DatasetError, DatasetFetchOptions, DatasetSource, GzipMode,
-    datasets::progress::{ProgressReader, new_byte_progress_bar, progress_label},
+use super::{
+    progress::{ProgressReader, new_byte_progress_bar, progress_label},
+    source::{DatasetCollectionSource, DatasetSource},
+    types::{
+        CacheMode, DatasetArtifact, DatasetCollectionArtifact, DatasetCompression, DatasetError,
+        DatasetFetchOptions, GzipMode,
+    },
 };
 
 const DOWNLOAD_USER_AGENT: &str = concat!("smiles-parser/", env!("CARGO_PKG_VERSION"));
