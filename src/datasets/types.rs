@@ -73,7 +73,6 @@ pub struct DatasetArtifact {
 }
 
 impl DatasetArtifact {
-    /// Generates a new `DatasetArtifact`
     #[must_use]
     pub(crate) fn new(
         dataset_id: &'static str,
