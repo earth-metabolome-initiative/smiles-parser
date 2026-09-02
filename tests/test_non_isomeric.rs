@@ -37,8 +37,9 @@ fn preserves_skeleton_and_is_idempotent() {
 
 #[test]
 fn order_independent_with_canonicalize() {
-    // non_isomeric() must be order-independent with respect to canonicalization:
-    // clearing the isotope must also drop the bracket it forced.
+    // non_isomeric() must be order-independent with respect to
+    // canonicalization: clearing the isotope must also drop the bracket it
+    // forced.
     for s in ["C[13CH3]", "[12CH4]", "C[OH]"] {
         let m: Smiles = s.parse().unwrap();
         assert_eq!(

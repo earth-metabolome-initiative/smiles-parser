@@ -85,7 +85,8 @@ fn labeling_rooted() {
 
 #[test]
 fn labeling_rooted_multi_component_is_valid_permutation() {
-    // With several components, root leads its own run but need not be ordinal 0.
+    // With several components, root leads its own run but need not be ordinal
+    // 0.
     let m: Smiles = "C1CC1.CC".parse().unwrap();
     let l = m.canonical_labeling_rooted(4);
     let mut seen = l.order().to_vec();

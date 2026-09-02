@@ -351,7 +351,8 @@ mod tests {
         assert_eq!(skipped.matched_edges().len(), 0);
         assert_eq!(skipped.search_nodes(), 0);
 
-        // A threshold above the bound runs and reaches the full four-bond match.
+        // A threshold above the bound runs and reaches the full four-bond
+        // match.
         let run = hexane.mces_with(&pentane).distance_threshold(100.0).compute();
         assert_eq!(run.matched_edges().len(), 4);
         assert!(run.search_nodes() > 0);
@@ -362,8 +363,9 @@ mod tests {
     fn delta_y_filters_the_whitney_triangle_versus_claw_false_positive() {
         // Cyclopropane is a triangle (K3) and isobutane is a claw (K1,3). Their
         // line graphs are both triangles, so without Delta-Y filtering the
-        // search reports a spurious three-bond match. Delta-Y rejects it because
-        // the matched edge subgraphs have different degree sequences.
+        // search reports a spurious three-bond match. Delta-Y rejects it
+        // because the matched edge subgraphs have different degree
+        // sequences.
         let cyclopropane = smiles("C1CC1");
         let isobutane = smiles("CC(C)C");
 

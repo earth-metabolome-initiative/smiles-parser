@@ -415,8 +415,9 @@ mod tests {
 
     #[test]
     fn render_marks_zero_width_and_multi_character_spans() {
-        // A zero-width span (start == end) must still produce exactly one caret,
-        // which only holds because the end is raised to at least start + 1.
+        // A zero-width span (start == end) must still produce exactly one
+        // caret, which only holds because the end is raised to at least
+        // start + 1.
         let zero_width = SmilesErrorWithSpan::new(SmilesError::UnexpectedEndOfString, 2, 2);
         assert_eq!(zero_width.render("CCO"), "CCO\n  ^\nUnexpected end of string");
 

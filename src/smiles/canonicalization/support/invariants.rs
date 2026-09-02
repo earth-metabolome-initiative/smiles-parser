@@ -132,10 +132,11 @@ fn assert_same_aromatic_subgraph(
     expected_bond_edges: &[[usize; 2]],
     message: &str,
 ) {
-    // Partial-vs-complete aromaticity status and fused-subsystem diagnostics can
-    // vary across isomorphic reorderings because the bounded ring-family search
-    // is intentionally approximate. The chemical invariant we need here is that
-    // canonicalization preserves the aromatic atom/bond assignment itself.
+    // Partial-vs-complete aromaticity status and fused-subsystem diagnostics
+    // can vary across isomorphic reorderings because the bounded
+    // ring-family search is intentionally approximate. The chemical
+    // invariant we need here is that canonicalization preserves the
+    // aromatic atom/bond assignment itself.
     assert_eq!(actual_atom_ids, expected_atom_ids, "{message}: atom ids differ");
     assert_eq!(actual_bond_edges, expected_bond_edges, "{message}: bond edges differ");
 }
