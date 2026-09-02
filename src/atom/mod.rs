@@ -1029,8 +1029,8 @@ mod tests {
         assert_eq!(atom_type.isotope_mass_number(), Some(80));
         assert_eq!(atom_type.formal_charge(), -1);
 
-        // The accessor must report the stored flag rather than a constant, so an
-        // aliphatic atom reads back as non-aromatic.
+        // The accessor must report the stored flag rather than a constant, so
+        // an aliphatic atom reads back as non-aromatic.
         let aliphatic = Atom::new_organic_subset(AtomSymbol::Element(Element::C), false);
         assert!(!aliphatic.node_type().aromatic());
     }

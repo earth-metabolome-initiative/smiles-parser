@@ -162,9 +162,9 @@ impl PartialEq for BondEntry {
         // every aromatic bond one uniform type, so requiring the kekule order
         // to match would make an aromatic bond stored as Single in one molecule
         // compare unequal to the same bond stored as Double in another. MCES
-        // edge compatibility reads this equality, so collapsing the kekule order
-        // for aromatic bonds is what lets two aromatic rings match regardless of
-        // how their double bonds happen to fall.
+        // edge compatibility reads this equality, so collapsing the kekule
+        // order for aromatic bonds is what lets two aromatic rings
+        // match regardless of how their double bonds happen to fall.
         self.aromatic == other.aromatic && (self.aromatic || self.bond == other.bond)
     }
 }
@@ -531,10 +531,11 @@ mod tests {
     fn mces_matches_aromatic_bonds_across_differing_kekule_orders() {
         // The same aromatic carbon/nitrogen bond stored as Single in one
         // molecule and as Double in another must still be a compatible edge for
-        // labeled MCES, since aromatization in smiles-parser leaves an arbitrary
-        // kekule order on aromatic bonds while RDKit treats every aromatic bond
-        // as one uniform type. Without collapsing the kekule order the two edges
-        // would compare unequal and no edge would match.
+        // labeled MCES, since aromatization in smiles-parser leaves an
+        // arbitrary kekule order on aromatic bonds while RDKit treats
+        // every aromatic bond as one uniform type. Without collapsing
+        // the kekule order the two edges would compare unequal and no
+        // edge would match.
         let stored_single = aromatic_cn_bond(Bond::Single);
         let stored_double = aromatic_cn_bond(Bond::Double);
 
@@ -562,8 +563,8 @@ mod tests {
         assert_ne!(first, aromatic);
 
         // Aromatic bonds ignore the kekule order, so an aromatic single and an
-        // aromatic double compare equal, while non-aromatic bonds still keep the
-        // single/double distinction.
+        // aromatic double compare equal, while non-aromatic bonds still keep
+        // the single/double distinction.
         let aromatic_single =
             BondEntry::from_descriptor(BondDescriptor::aromatic(Bond::Single), None, 0);
         let aromatic_double =
