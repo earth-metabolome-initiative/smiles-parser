@@ -11,7 +11,7 @@ readme = "README.md"
 [features]
 default = []
 fuzzing = []
-datasets = ["dep:flate2", "dep:indicatif", "dep:reqwest", "dep:tar"]
+datasets = ["dep:flate2", "dep:indicatif", "dep:reqwest", "dep:tar", "dep:zip"]
 
 [dependencies]
 elements_rs = "0.2.7"
