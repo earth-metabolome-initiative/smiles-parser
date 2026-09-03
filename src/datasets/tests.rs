@@ -329,7 +329,6 @@ fn massspecgym_smiles_iterator_requires_smiles_header_column() {
     fs::remove_dir_all(directory).unwrap();
 }
 
-
 #[test]
 fn zip_dataset_keep_compressed_and_decompress_use_correct_paths() {
     struct TestZipDataset;
@@ -367,9 +366,7 @@ fn zip_dataset_keep_compressed_and_decompress_use_correct_paths() {
         let file = File::create(&archive_path).unwrap();
         let mut archive = zip::ZipWriter::new(file);
 
-        archive
-            .start_file("payload.txt", zip::write::SimpleFileOptions::default())
-            .unwrap();
+        archive.start_file("payload.txt", zip::write::SimpleFileOptions::default()).unwrap();
         archive.write_all(b"hello from zip\n").unwrap();
         archive.finish().unwrap();
     }
@@ -383,10 +380,7 @@ fn zip_dataset_keep_compressed_and_decompress_use_correct_paths() {
         .unwrap();
 
     assert_eq!(keep_compressed.path(), archive_path);
-    assert_eq!(
-        keep_compressed.compressed_path(),
-        Some(archive_path.as_path())
-    );
+    assert_eq!(keep_compressed.compressed_path(), Some(archive_path.as_path()));
     assert_eq!(keep_compressed.decompressed_path(), None);
 
     let decompressed = TestZipDataset
@@ -398,10 +392,7 @@ fn zip_dataset_keep_compressed_and_decompress_use_correct_paths() {
         .unwrap();
 
     assert_eq!(decompressed.path(), extracted_path);
-    assert_eq!(
-        fs::read(&extracted_path).unwrap(),
-        b"hello from zip\n"
-    );
+    assert_eq!(fs::read(&extracted_path).unwrap(), b"hello from zip\n");
 
     fs::remove_dir_all(directory).unwrap();
 }
