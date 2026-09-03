@@ -15,7 +15,7 @@ use tar::Archive;
 use super::{
     progress::{ProgressReader, new_byte_progress_bar, progress_label},
     source::{DatasetCollectionSource, DatasetSource},
-    types::{
+    types::{DatasetFile,
         CacheMode, DatasetArtifact, DatasetCollectionArtifact, DatasetCompression, DatasetError,
         DatasetFetchOptions, GzipMode,
     },
@@ -196,31 +196,17 @@ pub(crate) fn fetch_dataset_collection<D: DatasetCollectionSource + ?Sized>(
                 }
             }
             DatasetCompression::Zip => {
-                match options.gzip_mode {
-                    GzipMode::KeepCompressed => {
-                        was_downloaded |= ensure_downloaded_url(
-                            file.url(),
-                            &compressed_path,
-                            options.cache_mode,
-                        )?;
-                        paths.push(compressed_path.clone());
-                        compressed_paths.push(compressed_path);
-                    }
-                    GzipMode::Decompress | GzipMode::KeepBoth => {
-                        let (downloaded, extracted) = ensure_extracted_zip(
-                            file.url(),
-                            &compressed_path,
-                            &extracted_path,
-                            options.cache_mode,
-                        )?;
-                        was_downloaded |= downloaded;
-                        was_extracted |= extracted;
-                        paths.push(extracted_path);
-                        if compressed_path.is_file() {
-                            compressed_paths.push(compressed_path);
-                        }
-                    }
-                }
+                let (downloaded, extracted) = fetch_zip_dataset_collection(
+                    options,
+                    compressed_path,
+                    file,
+                    &mut paths,
+                    &mut compressed_paths,
+                    extracted_path,
+
+                )?;
+                was_downloaded |= downloaded;
+                was_extracted |= extracted;
             }
         }
     }
@@ -532,4 +518,37 @@ fn write_parent_dir(path: &Path) -> Result<(), DatasetError> {
 
 fn create_dir_all(path: &Path) -> Result<(), DatasetError> {
     fs::create_dir_all(path).map_err(|source| DatasetError::Io { path: path.to_path_buf(), source })
+}
+
+fn fetch_zip_dataset_collection(
+    options: &DatasetFetchOptions,
+    compressed_path: PathBuf,
+    file: DatasetFile,
+    paths: &mut Vec<PathBuf>,
+    compressed_paths: &mut Vec<PathBuf>,
+    extracted_path: PathBuf,
+) -> Result<(bool, bool), DatasetError> {
+    match options.gzip_mode {
+        GzipMode::KeepCompressed => {
+            let downloaded =
+                ensure_downloaded_url(file.url(), &compressed_path, options.cache_mode)?;
+            paths.push(compressed_path.clone());
+            compressed_paths.push(compressed_path);
+
+            Ok((downloaded, false))
+        }
+        GzipMode::Decompress | GzipMode::KeepBoth => {
+            let (downloaded, extracted) = ensure_extracted_zip(
+                file.url(),
+                &compressed_path,
+                &extracted_path,
+                options.cache_mode,
+            )?;
+            paths.push(extracted_path);
+            if compressed_path.is_file() {
+                compressed_paths.push(compressed_path);
+            }
+            Ok((downloaded, extracted))
+        }
+    }
 }
