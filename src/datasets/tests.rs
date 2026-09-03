@@ -9,7 +9,7 @@ use flate2::{Compression, write::GzEncoder};
 use tempfile::tempdir;
 
 use super::{
-    CacheMode, DatasetFetchOptions, GzipMode, ZINC20_EXPECTED_RECORD_COUNT, Zinc20Smiles,
+    ArchiveMode, CacheMode, DatasetFetchOptions, ZINC20_EXPECTED_RECORD_COUNT, Zinc20Smiles,
     fetch::{default_dataset_cache_dir, gunzip_file, untar_gzip_file},
     massspecgym::MASS_SPEC_GYM_SMILES,
     pubchem::{PUBCHEM_SMILES, PubChemSmiles},
@@ -90,7 +90,7 @@ fn default_fetch_options_keep_compressed_cache_behavior() {
     let options = DatasetFetchOptions::default();
 
     assert_eq!(options.cache_mode, CacheMode::UseCache);
-    assert_eq!(options.gzip_mode, GzipMode::KeepCompressed);
+    assert_eq!(options.archive_mode, ArchiveMode::KeepCompressed);
     assert!(options.cache_dir.is_none());
 }
 
@@ -354,7 +354,7 @@ fn fetch_dataset_reuses_cached_uncompressed_file() {
         .fetch_with_options(&DatasetFetchOptions {
             cache_dir: Some(directory.path().to_path_buf()),
             cache_mode: CacheMode::UseCache,
-            gzip_mode: GzipMode::KeepCompressed,
+            archive_mode: ArchiveMode::KeepCompressed,
         })
         .unwrap();
 
@@ -387,7 +387,7 @@ fn fetch_dataset_decompresses_cached_gzip_file() {
         .fetch_with_options(&DatasetFetchOptions {
             cache_dir: Some(directory.path().to_path_buf()),
             cache_mode: CacheMode::UseCache,
-            gzip_mode: GzipMode::Decompress,
+            archive_mode: ArchiveMode::Decompress,
         })
         .unwrap();
 
@@ -398,4 +398,81 @@ fn fetch_dataset_decompresses_cached_gzip_file() {
     assert!(artifact.was_decompressed());
 
     assert_eq!(fs::read_to_string(decompressed_path).unwrap(), "1\tCCO\n");
+}
+
+
+#[test]
+fn zip_dataset_keep_compressed_and_decompress_use_correct_paths() {
+    struct TestZipDataset;
+
+    impl DatasetSource for TestZipDataset {
+        fn id(&self) -> &'static str {
+            "test-zip"
+        }
+
+        fn url(&self) -> &'static str {
+            "https://example.invalid/archive.zip"
+        }
+
+        fn file_name(&self) -> &'static str {
+            "archive.zip"
+        }
+
+        fn extracted_file_name(&self) -> &'static str {
+            "payload.txt"
+        }
+
+        fn compression(&self) -> DatasetCompression {
+            DatasetCompression::Zip
+        }
+    }
+
+    let directory = temporary_directory("datasets-zip-fetch");
+    let dataset_directory = directory.join("test-zip");
+    fs::create_dir_all(&dataset_directory).unwrap();
+
+    let archive_path = dataset_directory.join("archive.zip");
+    let extracted_path = dataset_directory.join("payload.txt");
+
+    {
+        let file = File::create(&archive_path).unwrap();
+        let mut archive = zip::ZipWriter::new(file);
+
+        archive
+            .start_file("payload.txt", zip::write::SimpleFileOptions::default())
+            .unwrap();
+        archive.write_all(b"hello from zip\n").unwrap();
+        archive.finish().unwrap();
+    }
+
+    let keep_compressed = TestZipDataset
+        .fetch_with_options(&DatasetFetchOptions {
+            cache_dir: Some(directory.clone()),
+            cache_mode: CacheMode::UseCache,
+            archive_mode: ArchiveMode::KeepCompressed,
+        })
+        .unwrap();
+
+    assert_eq!(keep_compressed.path(), archive_path);
+    assert_eq!(
+        keep_compressed.compressed_path(),
+        Some(archive_path.as_path())
+    );
+    assert_eq!(keep_compressed.decompressed_path(), None);
+
+    let decompressed = TestZipDataset
+        .fetch_with_options(&DatasetFetchOptions {
+            cache_dir: Some(directory.clone()),
+            cache_mode: CacheMode::UseCache,
+            archive_mode: ArchiveMode::Decompress,
+        })
+        .unwrap();
+
+    assert_eq!(decompressed.path(), extracted_path);
+    assert_eq!(
+        fs::read(&extracted_path).unwrap(),
+        b"hello from zip\n"
+    );
+
+    fs::remove_dir_all(directory).unwrap();
 }

@@ -15,9 +15,9 @@ use tar::Archive;
 use super::{
     progress::{ProgressReader, new_byte_progress_bar, progress_label},
     source::{DatasetCollectionSource, DatasetSource},
-    types::{DatasetFile,
-        CacheMode, DatasetArtifact, DatasetCollectionArtifact, DatasetCompression, DatasetError,
-        DatasetFetchOptions, GzipMode,
+    types::{
+        ArchiveMode, CacheMode, DatasetArtifact, DatasetCollectionArtifact, DatasetCompression,
+        DatasetError, DatasetFetchOptions, DatasetFile,
     },
 };
 
@@ -59,11 +59,11 @@ pub(crate) fn fetch_dataset<D: DatasetSource + ?Sized>(
     let decompressed_path = dataset_dir.join(dataset.extracted_file_name());
 
     let (path, has_decompressed_path, was_downloaded, was_decompressed) =
-        match (dataset.compression(), options.gzip_mode) {
+        match (dataset.compression(), options.archive_mode) {
             (DatasetCompression::None, _)
             | (
                 DatasetCompression::Gzip | DatasetCompression::TarGzip | DatasetCompression::Zip,
-                GzipMode::KeepCompressed,
+                ArchiveMode::KeepCompressed,
             ) => {
                 let was_downloaded =
                     ensure_downloaded(dataset, &compressed_path, options.cache_mode)?;
@@ -71,7 +71,7 @@ pub(crate) fn fetch_dataset<D: DatasetSource + ?Sized>(
                 (compressed_path.clone(), false, was_downloaded, false)
             }
 
-            (DatasetCompression::Gzip, GzipMode::Decompress | GzipMode::KeepBoth) => {
+            (DatasetCompression::Gzip, ArchiveMode::Decompress | ArchiveMode::KeepBoth) => {
                 let (was_downloaded, was_decompressed) = ensure_decompressed(
                     dataset,
                     &compressed_path,
@@ -82,7 +82,7 @@ pub(crate) fn fetch_dataset<D: DatasetSource + ?Sized>(
                 (decompressed_path.clone(), true, was_downloaded, was_decompressed)
             }
 
-            (DatasetCompression::TarGzip, GzipMode::Decompress | GzipMode::KeepBoth) => {
+            (DatasetCompression::TarGzip, ArchiveMode::Decompress | ArchiveMode::KeepBoth) => {
                 let (was_downloaded, was_extracted) = ensure_extracted_tar_gzip(
                     dataset.url(),
                     &compressed_path,
@@ -93,7 +93,7 @@ pub(crate) fn fetch_dataset<D: DatasetSource + ?Sized>(
                 (decompressed_path.clone(), true, was_downloaded, was_extracted)
             }
 
-            (DatasetCompression::Zip, GzipMode::Decompress | GzipMode::KeepBoth) => {
+            (DatasetCompression::Zip, ArchiveMode::Decompress | ArchiveMode::KeepBoth) => {
                 let (was_downloaded, was_extracted) = ensure_extracted_zip(
                     dataset.url(),
                     &compressed_path,
@@ -142,8 +142,8 @@ pub(crate) fn fetch_dataset_collection<D: DatasetCollectionSource + ?Sized>(
                 compressed_paths.push(compressed_path);
             }
             DatasetCompression::Gzip => {
-                match options.gzip_mode {
-                    GzipMode::KeepCompressed => {
+                match options.archive_mode {
+                    ArchiveMode::KeepCompressed => {
                         was_downloaded |= ensure_downloaded_url(
                             file.url(),
                             &compressed_path,
@@ -152,7 +152,7 @@ pub(crate) fn fetch_dataset_collection<D: DatasetCollectionSource + ?Sized>(
                         paths.push(compressed_path.clone());
                         compressed_paths.push(compressed_path);
                     }
-                    GzipMode::Decompress | GzipMode::KeepBoth => {
+                    ArchiveMode::Decompress | ArchiveMode::KeepBoth => {
                         let (downloaded, decompressed) = ensure_decompressed_url(
                             file.url(),
                             &compressed_path,
@@ -169,8 +169,8 @@ pub(crate) fn fetch_dataset_collection<D: DatasetCollectionSource + ?Sized>(
                 }
             }
             DatasetCompression::TarGzip => {
-                match options.gzip_mode {
-                    GzipMode::KeepCompressed => {
+                match options.archive_mode {
+                    ArchiveMode::KeepCompressed => {
                         was_downloaded |= ensure_downloaded_url(
                             file.url(),
                             &compressed_path,
@@ -179,7 +179,7 @@ pub(crate) fn fetch_dataset_collection<D: DatasetCollectionSource + ?Sized>(
                         paths.push(compressed_path.clone());
                         compressed_paths.push(compressed_path);
                     }
-                    GzipMode::Decompress | GzipMode::KeepBoth => {
+                    ArchiveMode::Decompress | ArchiveMode::KeepBoth => {
                         let (downloaded, extracted) = ensure_extracted_tar_gzip(
                             file.url(),
                             &compressed_path,
@@ -203,7 +203,6 @@ pub(crate) fn fetch_dataset_collection<D: DatasetCollectionSource + ?Sized>(
                     &mut paths,
                     &mut compressed_paths,
                     extracted_path,
-
                 )?;
                 was_downloaded |= downloaded;
                 was_extracted |= extracted;
@@ -520,6 +519,7 @@ fn create_dir_all(path: &Path) -> Result<(), DatasetError> {
     fs::create_dir_all(path).map_err(|source| DatasetError::Io { path: path.to_path_buf(), source })
 }
 
+
 fn fetch_zip_dataset_collection(
     options: &DatasetFetchOptions,
     compressed_path: PathBuf,
@@ -528,8 +528,8 @@ fn fetch_zip_dataset_collection(
     compressed_paths: &mut Vec<PathBuf>,
     extracted_path: PathBuf,
 ) -> Result<(bool, bool), DatasetError> {
-    match options.gzip_mode {
-        GzipMode::KeepCompressed => {
+    match options.archive_mode {
+        ArchiveMode::KeepCompressed => {
             let downloaded =
                 ensure_downloaded_url(file.url(), &compressed_path, options.cache_mode)?;
             paths.push(compressed_path.clone());
@@ -537,7 +537,7 @@ fn fetch_zip_dataset_collection(
 
             Ok((downloaded, false))
         }
-        GzipMode::Decompress | GzipMode::KeepBoth => {
+        ArchiveMode::Decompress | ArchiveMode::KeepBoth => {
             let (downloaded, extracted) = ensure_extracted_zip(
                 file.url(),
                 &compressed_path,
