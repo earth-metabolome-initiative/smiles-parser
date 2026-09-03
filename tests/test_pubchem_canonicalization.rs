@@ -16,7 +16,8 @@ use indicatif::{ProgressBar, ProgressStyle};
 use molecular_formulas::prelude::ChemicalFormula;
 use rayon::prelude::*;
 use smiles_parser::prelude::{
-    CacheMode, DatasetFetchOptions, DatasetSource, GzipMode, PUBCHEM_SMILES, Smiles, WildcardSmiles,
+    ArchiveMode, CacheMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES, Smiles,
+    WildcardSmiles,
 };
 
 #[test]
@@ -146,7 +147,7 @@ fn pubchem_corpus_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
 
     let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
         cache_mode: cache_mode_from_env("PUBCHEM_VALIDATE_REDOWNLOAD"),
-        gzip_mode: GzipMode::Decompress,
+        archive_mode: ArchiveMode::Decompress,
         ..DatasetFetchOptions::default()
     })?;
     Ok(artifact.path().to_path_buf())

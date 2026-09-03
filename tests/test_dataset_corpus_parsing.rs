@@ -12,7 +12,7 @@ use std::{
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use smiles_parser::prelude::{
-    CacheMode, DatasetFetchOptions, DatasetSmilesRecord, GzipMode, PUBCHEM_SMILES, Smiles,
+    ArchiveMode, CacheMode, DatasetFetchOptions, DatasetSmilesRecord, PUBCHEM_SMILES, Smiles,
     SmilesDatasetRecordSource, WildcardSmiles, ZINC20_EXPECTED_RECORD_COUNT, ZINC20_SMILES,
     Zinc20Smiles,
 };
@@ -25,7 +25,7 @@ fn validate_pubchem_parsing_corpus() -> Result<(), Box<dyn std::error::Error>> {
     let limit = env_usize("PUBCHEM_PARSE_VALIDATE_LIMIT");
     let mut options = DatasetFetchOptions {
         cache_mode: cache_mode_from_env("PUBCHEM_VALIDATE_REDOWNLOAD"),
-        gzip_mode: GzipMode::KeepCompressed,
+        archive_mode: ArchiveMode::KeepCompressed,
         ..DatasetFetchOptions::default()
     };
     if let Ok(cache_dir) = env::var("PUBCHEM_VALIDATE_CACHE_DIR") {
@@ -44,7 +44,7 @@ fn validate_zinc20_parsing_corpus() -> Result<(), Box<dyn std::error::Error>> {
     let limit = env_usize("ZINC20_VALIDATE_LIMIT");
     let mut options = DatasetFetchOptions {
         cache_mode: cache_mode_from_env("ZINC20_VALIDATE_REDOWNLOAD"),
-        gzip_mode: GzipMode::Decompress,
+        archive_mode: ArchiveMode::Decompress,
         ..DatasetFetchOptions::default()
     };
     if let Ok(cache_dir) = env::var("ZINC20_VALIDATE_CACHE_DIR") {
