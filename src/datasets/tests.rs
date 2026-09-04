@@ -10,8 +10,9 @@ use flate2::{Compression, write::GzEncoder};
 use zip::write::SimpleFileOptions;
 
 use super::{
-    CacheMode, DatasetFetchOptions, ArchiveMode, ZINC20_EXPECTED_RECORD_COUNT, Zinc20Smiles,
-    fetch::{default_dataset_cache_dir, gunzip_file, untar_gzip_file}, coconut::CoconutSmiles,
+    ArchiveMode, CacheMode, DatasetFetchOptions, ZINC20_EXPECTED_RECORD_COUNT, Zinc20Smiles,
+    coconut::CoconutSmiles,
+    fetch::{default_dataset_cache_dir, gunzip_file, untar_gzip_file},
     massspecgym::MASS_SPEC_GYM_SMILES,
     pubchem::{PUBCHEM_SMILES, PubChemSmiles},
     reader::{DatasetSmilesIter, DatasetSmilesRecordIter},
@@ -407,7 +408,6 @@ fn zip_dataset_keep_compressed_and_decompress_use_correct_paths() {
 
     fs::remove_dir_all(directory).unwrap();
 }
-
 
 #[test]
 fn coconut_smiles_metadata_matches_current_upstream_layout() {
