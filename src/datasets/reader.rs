@@ -64,6 +64,7 @@ enum LineParser {
     PubChem,
     MassSpecGym { smiles_column: usize },
     Zinc20,
+    Lotus,
 }
 
 impl DatasetSmilesIter {
@@ -182,6 +183,10 @@ impl DatasetSmilesRecordIter {
                 line_number: 1,
             }),
         })
+    }
+
+    pub(crate) fn for_lotus(artifact: &DatasetArtifact) -> Result<Self, DatasetError> {
+        Self::from_artifact(artifact, LineParser::Lotus)
     }
 
     fn from_artifact(artifact: &DatasetArtifact, parser: LineParser) -> Result<Self, DatasetError> {
@@ -388,6 +393,16 @@ fn parse_smiles_record(
                     message: "expected exactly two whitespace-separated ZINC20 fields".into(),
                 });
             }
+            Ok(DatasetSmilesRecord::new(id.to_owned(), smiles.to_owned()))
+        }
+        LineParser::Lotus => {
+            let (smiles, id) = line.split_once(' ').ok_or_else(|| {
+                DatasetError::Format {
+                    dataset_id,
+                    line_number,
+                    message: "expected a SMILES ID record".into(),
+                }
+            })?;
             Ok(DatasetSmilesRecord::new(id.to_owned(), smiles.to_owned()))
         }
     }
