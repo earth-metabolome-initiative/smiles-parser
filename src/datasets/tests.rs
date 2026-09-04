@@ -502,7 +502,6 @@ fn unzip_file_rejects_a_directory_named_like_the_payload() {
 
     assert!(!extracted_path.exists());
 }
-
 #[test]
 fn unzip_file_removes_the_partial_output_when_extraction_fails() {
     let directory = tempdir().unwrap();
