@@ -7,9 +7,11 @@ use std::{
 };
 
 use flate2::{Compression, write::GzEncoder};
+use zip::write::SimpleFileOptions;
 
 use super::{
     ArchiveMode, CacheMode, DatasetFetchOptions, ZINC20_EXPECTED_RECORD_COUNT, Zinc20Smiles,
+    coconut::CoconutSmiles,
     fetch::{default_dataset_cache_dir, gunzip_file, untar_gzip_file},
     massspecgym::MASS_SPEC_GYM_SMILES,
     pubchem::{PUBCHEM_SMILES, PubChemSmiles},
@@ -41,6 +43,16 @@ fn write_zinc20_tar_gzip(path: &Path, chunk_dir: &str, contents: &[u8]) {
     builder.append_data(&mut header, format!("{chunk_dir}/smiles_all_01.txt"), contents).unwrap();
     let encoder = builder.into_inner().unwrap();
     encoder.finish().unwrap();
+}
+
+fn write_zip(path: &Path, file_name: &str, contents: &[u8]) {
+    let file = File::create(path).unwrap();
+    let mut archive = zip::ZipWriter::new(file);
+
+    archive.start_file(file_name, SimpleFileOptions::default()).unwrap();
+
+    archive.write_all(contents).unwrap();
+    archive.finish().unwrap();
 }
 
 #[test]
@@ -393,6 +405,96 @@ fn zip_dataset_keep_compressed_and_decompress_use_correct_paths() {
 
     assert_eq!(decompressed.path(), extracted_path);
     assert_eq!(fs::read(&extracted_path).unwrap(), b"hello from zip\n");
+
+    fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn coconut_smiles_metadata_matches_current_upstream_layout() {
+    let dataset = CoconutSmiles;
+
+    assert_eq!(dataset.id(), "coconut-smiles");
+    assert_eq!(dataset.file_name(), "coconut_csv-08-2026.zip");
+    assert_eq!(dataset.extracted_file_name(), "coconut_csv-08-2026.csv");
+    assert_eq!(dataset.compression(), DatasetCompression::Zip);
+    assert!(dataset.url().contains("/2026-08/coconut_csv-08-2026.zip"));
+}
+
+#[test]
+fn unzip_file_materializes_coconut_csv() {
+    let directory = temporary_directory("datasets-coconut-unzip");
+    fs::create_dir_all(&directory).unwrap();
+
+    let compressed_path = directory.join("coconut_csv-08-2026.zip");
+    let extracted_path = directory.join("coconut_csv-08-2026.csv");
+
+    write_zip(&compressed_path, "coconut_csv-08-2026.csv", b"identifier,smiles\nCNP000001,CCO\n");
+
+    unzip_file(&compressed_path, &extracted_path).unwrap();
+
+    assert_eq!(fs::read_to_string(&extracted_path).unwrap(), "identifier,smiles\nCNP000001,CCO\n");
+
+    fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn unzip_file_requires_expected_file_name() {
+    let directory = temporary_directory("datasets-coconut-unzip-missing");
+    fs::create_dir_all(&directory).unwrap();
+
+    let compressed_path = directory.join("coconut_csv-08-2026.zip");
+    let extracted_path = directory.join("coconut_csv-08-2026.csv");
+
+    write_zip(&compressed_path, "something_else.csv", b"identifier,smiles\nCNP000001,CCO\n");
+
+    match unzip_file(&compressed_path, &extracted_path) {
+        Err(DatasetError::Io { path, source }) => {
+            assert_eq!(path, extracted_path);
+            assert_eq!(source.kind(), std::io::ErrorKind::NotFound);
+        }
+        Ok(_) => panic!("expected missing ZIP entry to fail"),
+        Err(error) => panic!("unexpected error: {error}"),
+    }
+
+    fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn coconut_record_iterator_uses_identifier_and_canonical_smiles_columns() {
+    let directory = temporary_directory("datasets-coconut-iter");
+    fs::create_dir_all(&directory).unwrap();
+
+    let dataset_path = directory.join("coconut_csv-08-2026.csv");
+
+    fs::write(
+        &dataset_path,
+        "identifier,canonical_smiles,name\n\
+         CNP000001,CCO,\"ethanol, ethyl alcohol\"\n\
+         CNP000002,c1ccccc1,\"benzene\naromatic compound\"\n",
+    )
+    .unwrap();
+
+    let artifact = DatasetArtifact {
+        dataset_id: "coconut-smiles",
+        path: dataset_path,
+        compressed_path: None,
+        decompressed_path: None,
+        was_downloaded: false,
+        was_decompressed: false,
+    };
+
+    let records = DatasetSmilesRecordIter::for_coconut(&artifact)
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    assert_eq!(records.len(), 2);
+
+    assert_eq!(records[0].id(), "CNP000001");
+    assert_eq!(records[0].smiles(), "CCO");
+
+    assert_eq!(records[1].id(), "CNP000002");
+    assert_eq!(records[1].smiles(), "c1ccccc1");
 
     fs::remove_dir_all(directory).unwrap();
 }
