@@ -62,10 +62,12 @@ pub trait DatasetSource {
     /// # Examples
     ///
     /// ```no_run
-    /// use smiles_parser::datasets::{DatasetFetchOptions, DatasetSource, GzipMode, PUBCHEM_SMILES};
+    /// use smiles_parser::datasets::{
+    ///     ArchiveMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES,
+    /// };
     ///
     /// let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
-    ///     gzip_mode: GzipMode::Decompress,
+    ///     archive_mode: ArchiveMode::Decompress,
     ///     ..DatasetFetchOptions::default()
     /// })?;
     /// assert!(artifact.path().ends_with("CID-SMILES"));
@@ -148,11 +150,11 @@ pub trait SmilesDatasetSource {
     ///
     /// ```no_run
     /// use smiles_parser::datasets::{
-    ///     DatasetFetchOptions, GzipMode, PUBCHEM_SMILES, SmilesDatasetSource,
+    ///     ArchiveMode, DatasetFetchOptions, PUBCHEM_SMILES, SmilesDatasetSource,
     /// };
     ///
     /// let mut smiles = PUBCHEM_SMILES.iter_smiles_with_options(&DatasetFetchOptions {
-    ///     gzip_mode: GzipMode::KeepCompressed,
+    ///     archive_mode: ArchiveMode::KeepCompressed,
     ///     ..DatasetFetchOptions::default()
     /// })?;
     /// if let Some(first) = smiles.next() {

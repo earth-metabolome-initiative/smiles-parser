@@ -7,7 +7,7 @@ use std::{
 use super::{
     reader::{DatasetSmilesIter, DatasetSmilesRecordIter},
     source::{DatasetCollectionSource, SmilesDatasetRecordSource, SmilesDatasetSource},
-    types::{DatasetCompression, DatasetError, DatasetFetchOptions, DatasetFile, GzipMode},
+    types::{ArchiveMode, DatasetCompression, DatasetError, DatasetFetchOptions, DatasetFile},
 };
 
 /// Number of rows reported by the ZINC20-ML `smiles_count.txt` manifest.
@@ -153,8 +153,8 @@ impl SmilesDatasetRecordSource for Zinc20Smiles {
         options: &DatasetFetchOptions,
     ) -> Result<DatasetSmilesRecordIter, DatasetError> {
         let mut options = options.clone();
-        if options.gzip_mode == GzipMode::KeepCompressed {
-            options.gzip_mode = GzipMode::Decompress;
+        if options.archive_mode == ArchiveMode::KeepCompressed {
+            options.archive_mode = ArchiveMode::Decompress;
         }
         let artifact = self.fetch_collection_with_options(&options)?;
         DatasetSmilesRecordIter::for_zinc20(&artifact)

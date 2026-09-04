@@ -15,6 +15,8 @@ pub enum DatasetCompression {
     Gzip,
     /// The upstream file is a gzip-compressed tar archive.
     TarGzip,
+    /// The upstream file is a zip-compressed archive
+    Zip,
 }
 
 /// Cache behavior for dataset fetches.
@@ -27,15 +29,15 @@ pub enum CacheMode {
     Redownload,
 }
 
-/// How gzip-compressed datasets should be materialized locally.
+/// How compressed datasets should be materialized locally.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
-pub enum GzipMode {
-    /// Keep the cached gzip file as-is.
+pub enum ArchiveMode {
+    /// Keep the cached archive file as-is.
     #[default]
     KeepCompressed,
     /// Materialize and return a decompressed copy.
     Decompress,
-    /// Keep the gzip cache and also materialize a decompressed copy.
+    /// Keep the archive cache and also materialize a decompressed copy.
     KeepBoth,
 }
 
@@ -47,8 +49,8 @@ pub struct DatasetFetchOptions {
     pub cache_dir: Option<PathBuf>,
     /// Whether to reuse existing cached files or redownload them.
     pub cache_mode: CacheMode,
-    /// How gzip-compressed datasets should be stored locally.
-    pub gzip_mode: GzipMode,
+    /// How compressed datasets should be stored locally.
+    pub archive_mode: ArchiveMode,
 }
 
 impl Default for DatasetFetchOptions {
@@ -56,7 +58,7 @@ impl Default for DatasetFetchOptions {
         Self {
             cache_dir: None,
             cache_mode: CacheMode::UseCache,
-            gzip_mode: GzipMode::KeepCompressed,
+            archive_mode: ArchiveMode::KeepCompressed,
         }
     }
 }
@@ -113,10 +115,12 @@ impl DatasetArtifact {
     /// # Examples
     ///
     /// ```no_run
-    /// use smiles_parser::datasets::{DatasetFetchOptions, DatasetSource, GzipMode, PUBCHEM_SMILES};
+    /// use smiles_parser::datasets::{
+    ///     ArchiveMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES,
+    /// };
     ///
     /// let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
-    ///     gzip_mode: GzipMode::KeepBoth,
+    ///     archive_mode: ArchiveMode::KeepBoth,
     ///     ..DatasetFetchOptions::default()
     /// })?;
     /// assert!(artifact.compressed_path().is_some());
@@ -132,10 +136,12 @@ impl DatasetArtifact {
     /// # Examples
     ///
     /// ```no_run
-    /// use smiles_parser::datasets::{DatasetFetchOptions, DatasetSource, GzipMode, PUBCHEM_SMILES};
+    /// use smiles_parser::datasets::{
+    ///     ArchiveMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES,
+    /// };
     ///
     /// let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
-    ///     gzip_mode: GzipMode::Decompress,
+    ///     archive_mode: ArchiveMode::Decompress,
     ///     ..DatasetFetchOptions::default()
     /// })?;
     /// assert!(artifact.decompressed_path().is_some());
@@ -172,10 +178,12 @@ impl DatasetArtifact {
     /// # Examples
     ///
     /// ```no_run
-    /// use smiles_parser::datasets::{DatasetFetchOptions, DatasetSource, GzipMode, PUBCHEM_SMILES};
+    /// use smiles_parser::datasets::{
+    ///     ArchiveMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES,
+    /// };
     ///
     /// let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
-    ///     gzip_mode: GzipMode::Decompress,
+    ///     archive_mode: ArchiveMode::Decompress,
     ///     ..DatasetFetchOptions::default()
     /// })?;
     /// let _decompressed = artifact.was_decompressed();

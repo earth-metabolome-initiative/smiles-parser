@@ -21,9 +21,9 @@ pub mod token;
 
 #[cfg(feature = "datasets")]
 pub use crate::datasets::{
-    CacheMode, DatasetArtifact, DatasetCollectionArtifact, DatasetCollectionSource,
+    ArchiveMode, CacheMode, DatasetArtifact, DatasetCollectionArtifact, DatasetCollectionSource,
     DatasetCompression, DatasetError, DatasetFetchOptions, DatasetFile, DatasetSmilesIter,
-    DatasetSmilesRecord, DatasetSmilesRecordIter, DatasetSource, GzipMode, MASS_SPEC_GYM_SMILES,
+    DatasetSmilesRecord, DatasetSmilesRecordIter, DatasetSource, MASS_SPEC_GYM_SMILES,
     MassSpecGymSmiles, PUBCHEM_SMILES, PubChemSmiles, SmilesDatasetRecordSource,
     SmilesDatasetSource, ZINC20_EXPECTED_RECORD_COUNT, ZINC20_SMILES, Zinc20Smiles,
     default_dataset_cache_dir,
@@ -45,6 +45,15 @@ pub use crate::{
 
 /// Common imports for working with this crate.
 pub mod prelude {
+    #[cfg(feature = "datasets")]
+    pub use crate::{
+        ArchiveMode, CacheMode, DatasetArtifact, DatasetCollectionArtifact,
+        DatasetCollectionSource, DatasetCompression, DatasetError, DatasetFetchOptions,
+        DatasetFile, DatasetSmilesIter, DatasetSmilesRecord, DatasetSmilesRecordIter,
+        DatasetSource, MASS_SPEC_GYM_SMILES, MassSpecGymSmiles, PUBCHEM_SMILES, PubChemSmiles,
+        SmilesDatasetRecordSource, SmilesDatasetSource, ZINC20_EXPECTED_RECORD_COUNT,
+        ZINC20_SMILES, Zinc20Smiles, default_dataset_cache_dir,
+    };
     pub use crate::{
         AromaticityAssignment, AromaticityAssignmentApplicationError, AromaticityDiagnostic,
         AromaticityModel, AromaticityPerception, AromaticityPolicy, AromaticityRingFamilyKind,
@@ -55,14 +64,5 @@ pub mod prelude {
         RootError, Smiles, SmilesComponents, SmilesError, SmilesErrorWithSpan, SmilesMces,
         SubgraphError, SymmSssrResult, SymmSssrStatus, WildcardAromaticityPerception,
         WildcardMolecularFormulaConversionError, WildcardSmiles, WildcardSmilesComponents,
-    };
-    #[cfg(feature = "datasets")]
-    pub use crate::{
-        CacheMode, DatasetArtifact, DatasetCollectionArtifact, DatasetCollectionSource,
-        DatasetCompression, DatasetError, DatasetFetchOptions, DatasetFile, DatasetSmilesIter,
-        DatasetSmilesRecord, DatasetSmilesRecordIter, DatasetSource, GzipMode,
-        MASS_SPEC_GYM_SMILES, MassSpecGymSmiles, PUBCHEM_SMILES, PubChemSmiles,
-        SmilesDatasetRecordSource, SmilesDatasetSource, ZINC20_EXPECTED_RECORD_COUNT,
-        ZINC20_SMILES, Zinc20Smiles, default_dataset_cache_dir,
     };
 }
