@@ -10,7 +10,9 @@
 //!   decompressed, or both
 //!
 //! ```no_run
-//! use smiles_parser::datasets::{DatasetFetchOptions, DatasetSource, ArchiveMode, PUBCHEM_SMILES};
+//! use smiles_parser::datasets::{
+//!     ArchiveMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES,
+//! };
 //!
 //! let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
 //!     archive_mode: ArchiveMode::Decompress,
