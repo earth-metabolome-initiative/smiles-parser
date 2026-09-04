@@ -10,9 +10,10 @@ use flate2::{Compression, write::GzEncoder};
 use zip::write::SimpleFileOptions;
 
 use super::{
-    ArchiveMode, CacheMode, DatasetFetchOptions, ZINC20_EXPECTED_RECORD_COUNT, Zinc20Smiles,
+    ArchiveMode, CacheMode, DatasetFetchOptions, LotusSmiles, ZINC20_EXPECTED_RECORD_COUNT,
+    Zinc20Smiles,
     coconut::CoconutSmiles,
-    fetch::{default_dataset_cache_dir, gunzip_file, untar_gzip_file},
+    fetch::{default_dataset_cache_dir, gunzip_file, untar_gzip_file, unzip_file},
     massspecgym::MASS_SPEC_GYM_SMILES,
     pubchem::{PUBCHEM_SMILES, PubChemSmiles},
     reader::{DatasetSmilesIter, DatasetSmilesRecordIter},
@@ -495,6 +496,76 @@ fn coconut_record_iterator_uses_identifier_and_canonical_smiles_columns() {
 
     assert_eq!(records[1].id(), "CNP000002");
     assert_eq!(records[1].smiles(), "c1ccccc1");
+
+    fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn lotus_smiles_metadata_matches_current_upstream_layout() {
+    let dataset = LotusSmiles;
+
+    assert_eq!(dataset.id(), "lotus-smiles");
+    assert_eq!(dataset.file_name(), "Lotus.smi");
+    assert_eq!(dataset.extracted_file_name(), "Lotus.smi");
+    assert_eq!(dataset.compression(), DatasetCompression::None);
+    assert!(dataset.url().contains("/download/smiles"));
+}
+
+#[test]
+fn lotus_record_iterator_streams_smiles_and_identifiers() {
+    let directory = temporary_directory("datasets-lotus-iter");
+    fs::create_dir_all(&directory).unwrap();
+
+    let dataset_path = directory.join("Lotus.smi");
+
+    fs::write(&dataset_path, "CCO LTS0000001\nc1ccccc1 LTS0000002\n").unwrap();
+
+    let artifact = DatasetArtifact {
+        dataset_id: "lotus-smiles",
+        path: dataset_path,
+        compressed_path: None,
+        decompressed_path: None,
+        was_downloaded: false,
+        was_decompressed: false,
+    };
+
+    let records = DatasetSmilesRecordIter::for_lotus(&artifact)
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    assert_eq!(records.len(), 2);
+
+    assert_eq!(records[0].smiles(), "CCO");
+    assert_eq!(records[0].id(), "LTS0000001");
+
+    assert_eq!(records[1].smiles(), "c1ccccc1");
+    assert_eq!(records[1].id(), "LTS0000002");
+
+    fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn lotus_record_iterator_rejects_malformed_rows() {
+    let directory = temporary_directory("datasets-lotus-malformed");
+    fs::create_dir_all(&directory).unwrap();
+
+    let dataset_path = directory.join("Lotus.smi");
+    fs::write(&dataset_path, "CCO\n").unwrap();
+
+    let artifact = DatasetArtifact {
+        dataset_id: "lotus-smiles",
+        path: dataset_path,
+        compressed_path: None,
+        decompressed_path: None,
+        was_downloaded: false,
+        was_decompressed: false,
+    };
+
+    match DatasetSmilesRecordIter::for_lotus(&artifact).unwrap().next() {
+        Some(Err(DatasetError::Format { dataset_id: "lotus-smiles", line_number: 1, .. })) => {}
+        other => panic!("unexpected result: {other:?}"),
+    }
 
     fs::remove_dir_all(directory).unwrap();
 }

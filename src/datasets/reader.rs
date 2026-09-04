@@ -51,6 +51,7 @@ enum DatasetSmilesParser {
     MassSpecGym { smiles_column: usize },
     Zinc20,
     Coconut { id_column: usize, smiles_column: usize },
+    Lotus,
 }
 
 impl DatasetSmilesIter {
@@ -241,6 +242,10 @@ impl DatasetSmilesRecordIter {
         }
     }
 
+    pub(crate) fn for_lotus(artifact: &DatasetArtifact) -> Result<Self, DatasetError> {
+        Self::from_artifact(artifact, DatasetSmilesParser::Lotus)
+    }
+
     fn from_artifact(
         artifact: &DatasetArtifact,
         parser: DatasetSmilesParser,
@@ -378,6 +383,17 @@ fn parse_smiles_record(
         }
         DatasetSmilesParser::Coconut { .. } => {
             unreachable!("COCONUT records are parsed by csv::Reader")
+        }
+        DatasetSmilesParser::Lotus => {
+            // still use split_once to avoid iterator use (only one space)
+            let (smiles, id) = line.split_once(' ').ok_or_else(|| {
+                DatasetError::Format {
+                    dataset_id,
+                    line_number,
+                    message: "expected a SMILES ID record".into(),
+                }
+            })?;
+            Ok(DatasetSmilesRecord::new(id.to_owned(), smiles.to_owned()))
         }
     }
 }
