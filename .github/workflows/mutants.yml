@@ -4,19 +4,22 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   mutants:
     name: cargo-mutants (PR diff)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Cache build artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Install cargo-mutants
         uses: taiki-e/install-action@cargo-mutants
       - name: Compute diff against base branch
@@ -25,7 +28,7 @@ jobs:
         run: cargo mutants --no-shuffle -vV --in-diff pr.diff
       - name: Upload mutation results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: mutants.out
           path: mutants.out
