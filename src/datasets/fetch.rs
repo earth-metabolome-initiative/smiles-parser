@@ -9,6 +9,7 @@ use std::{
 use flate2::read::GzDecoder;
 use reqwest::blocking::Client;
 use tar::Archive;
+use dirs::cache_dir;
 
 use super::{
     progress::{ProgressReader, new_byte_progress_bar, progress_label},
@@ -38,24 +39,20 @@ const DOWNLOAD_USER_AGENT: &str = concat!("smiles-parser/", env!("CARGO_PKG_VERS
 /// assert!(default_dataset_cache_dir().ends_with("smiles-parser/datasets"));
 /// ```
 #[must_use]
-pub fn default_dataset_cache_dir() -> PathBuf {
-    if let Some(path) = env::var_os("XDG_CACHE_HOME") {
-        return PathBuf::from(path).join("smiles-parser").join("datasets");
-    }
-    if let Some(path) = env::var_os("LOCALAPPDATA") {
-        return PathBuf::from(path).join("smiles-parser").join("datasets");
-    }
-    if let Some(path) = env::var_os("HOME") {
-        return PathBuf::from(path).join(".cache").join("smiles-parser").join("datasets");
-    }
-    env::temp_dir().join("smiles-parser").join("datasets")
+pub fn default_dataset_cache_dir() -> Result<PathBuf, DatasetError> {
+    cache_dir()
+        .map(|path| path.join("smiles-parser").join("datasets"))
+        .ok_or(DatasetError::CacheDirectoryUnavailable)
 }
 
 pub(crate) fn fetch_dataset<D: DatasetSource + ?Sized>(
     dataset: &D,
     options: &DatasetFetchOptions,
 ) -> Result<DatasetArtifact, DatasetError> {
-    let cache_root = options.cache_dir.clone().unwrap_or_else(default_dataset_cache_dir);
+    let cache_root = match &options.cache_dir {
+        Some(path) => path.clone(),
+        None => default_dataset_cache_dir()?,
+    };
     let dataset_dir = cache_root.join(dataset.id());
     create_dir_all(&dataset_dir)?;
 
@@ -145,7 +142,10 @@ pub(crate) fn fetch_dataset_collection<D: DatasetCollectionSource + ?Sized>(
     dataset: &D,
     options: &DatasetFetchOptions,
 ) -> Result<DatasetCollectionArtifact, DatasetError> {
-    let cache_root = options.cache_dir.clone().unwrap_or_else(default_dataset_cache_dir);
+    let cache_root = match &options.cache_dir {
+        Some(path) => path.clone(),
+        None => default_dataset_cache_dir()?,
+    };
     let dataset_dir = cache_root.join(dataset.id());
     create_dir_all(&dataset_dir)?;
 

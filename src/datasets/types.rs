@@ -1,4 +1,5 @@
 use alloc::{string::String, vec::Vec};
+use core::error;
 use std::{
     io,
     path::{Path, PathBuf},
@@ -317,6 +318,9 @@ pub enum DatasetError {
         /// A human-readable explanation of the invalid selection.
         message: String,
     },
+    /// The cache directory could not be determined.
+    #[error("failed to determine a suitable cache directory")]
+    CacheDirectoryUnavailable,
 }
 
 /// One SMILES record from a dataset.
