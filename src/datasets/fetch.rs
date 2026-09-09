@@ -37,17 +37,11 @@ const DOWNLOAD_USER_AGENT: &str = concat!("smiles-parser/", env!("CARGO_PKG_VERS
 /// ```
 /// use smiles_parser::datasets::default_dataset_cache_dir;
 ///
-/// assert!(
-///     default_dataset_cache_dir()
-///         .ends_with("smiles-parser/datasets")
-/// );
+/// assert!(default_dataset_cache_dir().ends_with("smiles-parser/datasets"));
 /// ```
 #[must_use]
 pub fn default_dataset_cache_dir() -> PathBuf {
-    cache_dir()
-        .unwrap_or_else(env::temp_dir)
-        .join("smiles-parser")
-        .join("datasets")
+    cache_dir().unwrap_or_else(env::temp_dir).join("smiles-parser").join("datasets")
 }
 
 pub(crate) fn fetch_dataset<D: DatasetSource + ?Sized>(
