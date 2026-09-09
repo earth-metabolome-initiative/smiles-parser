@@ -254,10 +254,10 @@ fn download_to_path(url: &'static str, target_path: &Path) -> Result<(), Dataset
     let progress_bar = new_byte_progress_bar(response.content_length(), &file_label);
     let mut response = ProgressReader::new(response, progress_bar.clone());
 
-    let temporary_path = temporary_download_path(target_path);
     write_parent_dir(target_path)?;
-    let file = File::create(&temporary_path)
-        .map_err(|source| DatasetError::Io { path: temporary_path.clone(), source })?;
+    let partial = PartialPath::new(target_path);
+    let file = File::create(partial.path())
+        .map_err(|source| DatasetError::Io { path: partial.path().to_path_buf(), source })?;
     let mut writer = BufWriter::new(file);
     if let Err(source) = io::copy(&mut response, &mut writer) {
         progress_bar.abandon();
@@ -268,7 +268,7 @@ fn download_to_path(url: &'static str, target_path: &Path) -> Result<(), Dataset
         .map_err(|source| DatasetError::Io { path: target_path.to_path_buf(), source })?;
     progress_bar.finish_and_clear();
 
-    fs::rename(&temporary_path, target_path)
+    fs::rename(partial.path(), target_path)
         .map_err(|source| DatasetError::Io { path: target_path.to_path_buf(), source })?;
     Ok(())
 }
@@ -286,9 +286,9 @@ pub(crate) fn gunzip_file(
     );
     let source_file = ProgressReader::new(source_file, progress_bar.clone());
     let mut decoder = GzDecoder::new(source_file);
-    let temporary_path = temporary_download_path(decompressed_path);
-    let target_file = File::create(&temporary_path)
-        .map_err(|source| DatasetError::Io { path: temporary_path.clone(), source })?;
+    let partial = PartialPath::new(decompressed_path);
+    let target_file = File::create(partial.path())
+        .map_err(|source| DatasetError::Io { path: partial.path().to_path_buf(), source })?;
     let mut writer = BufWriter::new(target_file);
     if let Err(source) = io::copy(&mut decoder, &mut writer) {
         progress_bar.abandon();
@@ -299,11 +299,8 @@ pub(crate) fn gunzip_file(
         .map_err(|source| DatasetError::Io { path: decompressed_path.to_path_buf(), source })?;
     progress_bar.finish_and_clear();
 
-    if decompressed_path.exists() {
-        fs::remove_file(decompressed_path)
-            .map_err(|source| DatasetError::Io { path: decompressed_path.to_path_buf(), source })?;
-    }
-    fs::rename(&temporary_path, decompressed_path)
+    remove_path_if_exists(decompressed_path)?;
+    fs::rename(partial.path(), decompressed_path)
         .map_err(|source| DatasetError::Io { path: decompressed_path.to_path_buf(), source })?;
     Ok(true)
 }
@@ -338,12 +335,11 @@ pub(crate) fn untar_gzip_file(
     let decoder = GzDecoder::new(source_file);
     let mut archive = Archive::new(decoder);
 
-    let temporary_path = temporary_download_path(extracted_path);
-    remove_path_if_exists(&temporary_path)?;
-    create_dir_all(&temporary_path)?;
-    if let Err(source) = archive.unpack(&temporary_path) {
+    let partial = PartialPath::new(extracted_path);
+    remove_path_if_exists(partial.path())?;
+    create_dir_all(partial.path())?;
+    if let Err(source) = archive.unpack(partial.path()) {
         progress_bar.abandon();
-        remove_path_if_exists(&temporary_path)?;
         return Err(DatasetError::Io { path: extracted_path.to_path_buf(), source });
     }
     progress_bar.finish_and_clear();
@@ -351,9 +347,8 @@ pub(crate) fn untar_gzip_file(
     let extracted_name = extracted_path
         .file_name()
         .unwrap_or_else(|| unreachable!("extracted path has a file name"));
-    let unpacked_path = temporary_path.join(extracted_name);
+    let unpacked_path = partial.path().join(extracted_name);
     if !unpacked_path.exists() {
-        remove_path_if_exists(&temporary_path)?;
         return Err(DatasetError::Io {
             path: extracted_path.to_path_buf(),
             source: io::Error::new(
@@ -366,7 +361,6 @@ pub(crate) fn untar_gzip_file(
     remove_path_if_exists(extracted_path)?;
     fs::rename(&unpacked_path, extracted_path)
         .map_err(|source| DatasetError::Io { path: extracted_path.to_path_buf(), source })?;
-    remove_path_if_exists(&temporary_path)?;
     Ok(true)
 }
 
@@ -383,6 +377,28 @@ fn temporary_download_path(target_path: &Path) -> PathBuf {
         .file_name()
         .map_or_else(|| "download".into(), |name| name.to_string_lossy().into_owned());
     target_path.with_file_name(format!("{file_name}.part"))
+}
+
+/// Path a download or extraction writes to before it is renamed into place.
+///
+/// Dropping the guard deletes whatever is still there, so a failed transfer
+/// leaves no partial file or directory behind.
+struct PartialPath(PathBuf);
+
+impl PartialPath {
+    fn new(target_path: &Path) -> Self {
+        Self(temporary_download_path(target_path))
+    }
+
+    fn path(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for PartialPath {
+    fn drop(&mut self) {
+        let _ = remove_path_if_exists(&self.0);
+    }
 }
 
 fn write_parent_dir(path: &Path) -> Result<(), DatasetError> {
