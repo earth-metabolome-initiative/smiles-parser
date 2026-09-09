@@ -2,9 +2,9 @@
 [![crates.io](https://img.shields.io/crates/v/smiles-rs.svg)](https://crates.io/crates/smiles-rs)
 [![docs.rs](https://img.shields.io/docsrs/smiles-rs)](https://docs.rs/smiles-rs)
 [![downloads](https://img.shields.io/crates/d/smiles-rs.svg)](https://crates.io/crates/smiles-rs)
-[![Rust CI](https://github.com/earth-metabolome-initiative/smiles-parser/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/earth-metabolome-initiative/smiles-parser/actions/workflows/rust.yml)
-[![codecov](https://codecov.io/gh/earth-metabolome-initiative/smiles-parser/graph/badge.svg)](https://codecov.io/gh/earth-metabolome-initiative/smiles-parser)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/earth-metabolome-initiative/smiles-parser/blob/main/LICENSE)
+[![Rust CI](https://github.com/earth-metabolome-initiative/smiles-rs/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/earth-metabolome-initiative/smiles-rs/actions/workflows/rust.yml)
+[![codecov](https://codecov.io/gh/earth-metabolome-initiative/smiles-rs/graph/badge.svg)](https://codecov.io/gh/earth-metabolome-initiative/smiles-rs)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/earth-metabolome-initiative/smiles-rs/blob/main/LICENSE)
 [![MSRV](https://img.shields.io/badge/rustc-1.92%2B-orange.svg)](https://blog.rust-lang.org/)
 
 Parses SMILES strings into molecular graphs, following the [OpenSMILES specification](http://opensmiles.org/opensmiles.html). `no_std` with `alloc`, no unsafe code.
