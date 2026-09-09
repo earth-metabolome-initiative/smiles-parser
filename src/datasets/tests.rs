@@ -11,12 +11,12 @@ use zip::write::SimpleFileOptions;
 
 use super::{
     ArchiveMode, CacheMode, DatasetFetchOptions, ZINC20_EXPECTED_RECORD_COUNT, Zinc20Smiles,
-    coconut::CoconutSmiles,
+    coconut::{COCONUT_SMILES, CoconutSmiles},
     fetch::{default_dataset_cache_dir, gunzip_file, untar_gzip_file, unzip_file},
     massspecgym::MASS_SPEC_GYM_SMILES,
     pubchem::{PUBCHEM_SMILES, PubChemSmiles},
     reader::{DatasetSmilesIter, DatasetSmilesRecordIter},
-    source::{DatasetCollectionSource, DatasetSource},
+    source::{DatasetCollectionSource, DatasetSource, SmilesDatasetRecordSource},
     types::{DatasetArtifact, DatasetCollectionArtifact, DatasetCompression, DatasetError},
     zinc20::ZINC20_SMILES,
 };
@@ -611,4 +611,56 @@ fn coconut_record_iterator_uses_identifier_and_canonical_smiles_columns() {
 
     assert_eq!(records[1].id(), "CNP000002");
     assert_eq!(records[1].smiles(), "c1ccccc1");
+}
+
+#[test]
+fn coconut_record_iterator_requires_the_expected_header_columns() {
+    let directory = tempdir().unwrap();
+    let dataset_path = directory.path().join("coconut_csv-08-2026.csv");
+
+    fs::write(&dataset_path, "identifier,smiles,name\nCNP000001,CCO,ethanol\n").unwrap();
+
+    let artifact = DatasetArtifact {
+        dataset_id: "coconut-smiles",
+        path: dataset_path,
+        compressed_path: None,
+        decompressed_path: None,
+        was_downloaded: false,
+        was_decompressed: false,
+    };
+
+    match DatasetSmilesRecordIter::for_coconut(&artifact) {
+        Err(DatasetError::Format { dataset_id: "coconut-smiles", line_number: 1, message }) => {
+            assert!(message.contains("canonical_smiles"), "unexpected message: {message}");
+        }
+        Ok(_) => panic!("expected a header without canonical_smiles to fail"),
+        Err(error) => panic!("unexpected error: {error}"),
+    }
+}
+
+#[test]
+fn coconut_records_reject_an_archive_that_was_kept_compressed() {
+    let directory = tempdir().unwrap();
+    let dataset_directory = directory.path().join("coconut-smiles");
+
+    fs::create_dir_all(&dataset_directory).unwrap();
+
+    let compressed_path = dataset_directory.join("coconut_csv-08-2026.zip");
+    write_zip(
+        &compressed_path,
+        "coconut_csv-08-2026.csv",
+        b"identifier,canonical_smiles\nCNP000001,CCO\n",
+    );
+
+    match COCONUT_SMILES.iter_records_with_options(&DatasetFetchOptions {
+        cache_dir: Some(directory.path().to_path_buf()),
+        cache_mode: CacheMode::UseCache,
+        archive_mode: ArchiveMode::KeepCompressed,
+    }) {
+        Err(DatasetError::InvalidSelection { dataset_id: "coconut-smiles", message }) => {
+            assert!(message.contains("Decompress"), "unexpected message: {message}");
+        }
+        Ok(_) => panic!("expected reading records from the archive to be refused"),
+        Err(error) => panic!("unexpected error: {error}"),
+    }
 }
