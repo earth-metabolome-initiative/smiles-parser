@@ -1,5 +1,4 @@
 use alloc::{string::String, vec::Vec};
-use core::error;
 use std::{
     io,
     path::{Path, PathBuf},

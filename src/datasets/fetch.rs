@@ -37,7 +37,11 @@ const DOWNLOAD_USER_AGENT: &str = concat!("smiles-parser/", env!("CARGO_PKG_VERS
 /// ```
 /// use smiles_parser::datasets::default_dataset_cache_dir;
 ///
-/// assert!(default_dataset_cache_dir().ends_with("smiles-parser/datasets"));
+/// assert!(
+///     default_dataset_cache_dir()
+///         .expect("need system cache dir")
+///         .ends_with("smiles-parser/datasets")
+/// );
 /// ```
 #[must_use]
 pub fn default_dataset_cache_dir() -> Result<PathBuf, DatasetError> {
@@ -273,10 +277,6 @@ fn download_to_path(url: &'static str, target_path: &Path) -> Result<(), Dataset
         .map_err(|source| DatasetError::Io { path: target_path.to_path_buf(), source })?;
     progress_bar.finish_and_clear();
 
-    if target_path.exists() {
-        fs::remove_file(target_path)
-            .map_err(|source| DatasetError::Io { path: target_path.to_path_buf(), source })?;
-    }
     fs::rename(&temporary_path, target_path)
         .map_err(|source| DatasetError::Io { path: target_path.to_path_buf(), source })?;
     Ok(())
