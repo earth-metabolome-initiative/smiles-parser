@@ -426,8 +426,8 @@ fn zip_dataset_keep_compressed_and_decompress_use_correct_paths() {
         }
     }
 
-    let directory = temporary_directory("datasets-zip-fetch");
-    let dataset_directory = directory.join("test-zip");
+    let directory = tempdir().unwrap();
+    let dataset_directory = directory.path().join("test-zip");
     fs::create_dir_all(&dataset_directory).unwrap();
 
     let archive_path = dataset_directory.join("archive.zip");
@@ -444,7 +444,7 @@ fn zip_dataset_keep_compressed_and_decompress_use_correct_paths() {
 
     let keep_compressed = TestZipDataset
         .fetch_with_options(&DatasetFetchOptions {
-            cache_dir: Some(directory.clone()),
+            cache_dir: Some(directory.path().to_path_buf()),
             cache_mode: CacheMode::UseCache,
             archive_mode: ArchiveMode::KeepCompressed,
         })
@@ -456,7 +456,7 @@ fn zip_dataset_keep_compressed_and_decompress_use_correct_paths() {
 
     let decompressed = TestZipDataset
         .fetch_with_options(&DatasetFetchOptions {
-            cache_dir: Some(directory.clone()),
+            cache_dir: Some(directory.path().to_path_buf()),
             cache_mode: CacheMode::UseCache,
             archive_mode: ArchiveMode::Decompress,
         })
@@ -464,6 +464,4 @@ fn zip_dataset_keep_compressed_and_decompress_use_correct_paths() {
 
     assert_eq!(decompressed.path(), extracted_path);
     assert_eq!(fs::read(&extracted_path).unwrap(), b"hello from zip\n");
-
-    fs::remove_dir_all(directory).unwrap();
 }

@@ -519,7 +519,6 @@ fn create_dir_all(path: &Path) -> Result<(), DatasetError> {
     fs::create_dir_all(path).map_err(|source| DatasetError::Io { path: path.to_path_buf(), source })
 }
 
-
 fn fetch_zip_dataset_collection(
     options: &DatasetFetchOptions,
     compressed_path: PathBuf,
