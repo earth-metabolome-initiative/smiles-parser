@@ -130,7 +130,7 @@ impl BondEdge {
 /// # Examples
 ///
 /// ```
-/// use smiles_parser::bond::{Bond, bond_edge::bond_edge};
+/// use smiles_rs::bond::{Bond, bond_edge::bond_edge};
 ///
 /// let edge = bond_edge(0, 1, Bond::Double, None);
 /// assert_eq!(edge.source(), 0);
@@ -179,7 +179,7 @@ pub const fn bond_edge_from_descriptor(
 /// # Examples
 ///
 /// ```
-/// use smiles_parser::bond::{
+/// use smiles_rs::bond::{
 ///     Bond,
 ///     bond_edge::{bond_edge, bond_edge_other},
 /// };
@@ -199,7 +199,7 @@ pub const fn bond_edge_other(edge: BondEdge, node_id: usize) -> Option<usize> {
 /// # Examples
 ///
 /// ```
-/// use smiles_parser::bond::{
+/// use smiles_rs::bond::{
 ///     Bond,
 ///     bond_edge::{bond_edge, bond_edge_ring_num_val},
 ///     ring_num::RingNum,
@@ -207,7 +207,7 @@ pub const fn bond_edge_other(edge: BondEdge, node_id: usize) -> Option<usize> {
 ///
 /// let edge = bond_edge(0, 1, Bond::Single, Some(RingNum::try_new(7)?));
 /// assert_eq!(bond_edge_ring_num_val(edge), Some(7));
-/// # Ok::<(), smiles_parser::SmilesError>(())
+/// # Ok::<(), smiles_rs::SmilesError>(())
 /// ```
 #[inline]
 #[must_use]

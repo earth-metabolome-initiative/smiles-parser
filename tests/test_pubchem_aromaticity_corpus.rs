@@ -1,7 +1,7 @@
 //! Exact validation checks against frozen PubChem aromaticity records.
 
 use serde::Deserialize;
-use smiles_parser::prelude::{AromaticityPolicy, AromaticityStatus, Smiles};
+use smiles_rs::prelude::{AromaticityPolicy, AromaticityStatus, Smiles};
 
 #[derive(Debug, Deserialize)]
 struct PubChemAromaticRecord {

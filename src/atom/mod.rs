@@ -65,7 +65,7 @@ impl McesAtomType {
     /// ```
     /// use elements_rs::Element;
     /// use geometric_traits::traits::TypedNode;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol};
     ///
     /// let atom = Atom::builder().with_symbol(AtomSymbol::Element(Element::N)).build();
     /// assert_eq!(atom.node_type().symbol(), AtomSymbol::Element(Element::N));
@@ -83,7 +83,7 @@ impl McesAtomType {
     /// ```
     /// use elements_rs::Element;
     /// use geometric_traits::traits::TypedNode;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol};
     ///
     /// let atom = Atom::new_organic_subset(AtomSymbol::Element(Element::C), true);
     /// assert!(atom.node_type().aromatic());
@@ -101,7 +101,7 @@ impl McesAtomType {
     /// ```
     /// use elements_rs::Element;
     /// use geometric_traits::traits::TypedNode;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol};
     ///
     /// let atom =
     ///     Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).with_isotope(13).build();
@@ -120,7 +120,7 @@ impl McesAtomType {
     /// ```
     /// use elements_rs::Element;
     /// use geometric_traits::traits::TypedNode;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol, bracketed::charge::Charge};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol, bracketed::charge::Charge};
     ///
     /// let atom = Atom::builder()
     ///     .with_symbol(AtomSymbol::Element(Element::N))
@@ -141,7 +141,7 @@ impl Atom {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::atom::Atom;
+    /// use smiles_rs::atom::Atom;
     ///
     /// let atom = Atom::builder().build();
     /// assert!(atom.is_bracket_atom());
@@ -169,7 +169,7 @@ impl Atom {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol};
     ///
     /// let atom = Atom::new_organic_subset(AtomSymbol::Element(Element::C), true);
     /// assert!(atom.is_organic_subset_atom());
@@ -219,7 +219,7 @@ impl Atom {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::atom::{Atom, AtomSyntax};
+    /// use smiles_rs::atom::{Atom, AtomSyntax};
     ///
     /// assert_eq!(Atom::builder().build().syntax(), AtomSyntax::Bracket);
     /// ```
@@ -234,7 +234,7 @@ impl Atom {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::atom::Atom;
+    /// use smiles_rs::atom::Atom;
     ///
     /// assert!(Atom::builder().build().is_bracket_atom());
     /// ```
@@ -250,7 +250,7 @@ impl Atom {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol};
     ///
     /// let atom = Atom::new_organic_subset(AtomSymbol::Element(Element::O), false);
     /// assert!(atom.is_organic_subset_atom());
@@ -267,7 +267,7 @@ impl Atom {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol};
     ///
     /// let atom = Atom::builder().with_symbol(AtomSymbol::Element(Element::Cl)).build();
     /// assert_eq!(atom.symbol(), AtomSymbol::Element(Element::Cl));
@@ -284,7 +284,7 @@ impl Atom {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol};
     ///
     /// let atom = Atom::builder().with_symbol(AtomSymbol::Element(Element::Br)).build();
     /// assert_eq!(atom.element(), Some(Element::Br));
@@ -304,7 +304,7 @@ impl Atom {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol};
     ///
     /// let atom =
     ///     Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).with_isotope(13).build();
@@ -326,7 +326,7 @@ impl Atom {
     ///
     /// ```
     /// use elements_rs::{Element, Isotope};
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol};
     ///
     /// let atom =
     ///     Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).with_isotope(13).build();
@@ -350,7 +350,7 @@ impl Atom {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol};
     ///
     /// let atom = Atom::new_organic_subset(AtomSymbol::Element(Element::C), true);
     /// assert!(atom.aromatic());
@@ -383,7 +383,7 @@ impl Atom {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol};
     ///
     /// let atom =
     ///     Atom::builder().with_symbol(AtomSymbol::Element(Element::N)).with_hydrogens(2).build();
@@ -401,7 +401,7 @@ impl Atom {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol, bracketed::charge::Charge};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol, bracketed::charge::Charge};
     ///
     /// let atom = Atom::builder()
     ///     .with_symbol(AtomSymbol::Element(Element::N))
@@ -421,7 +421,7 @@ impl Atom {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol, bracketed::charge::Charge};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol, bracketed::charge::Charge};
     ///
     /// let atom = Atom::builder()
     ///     .with_symbol(AtomSymbol::Element(Element::O))
@@ -441,7 +441,7 @@ impl Atom {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol};
     ///
     /// let atom = Atom::builder().with_symbol(AtomSymbol::Element(Element::C)).with_class(7).build();
     /// assert_eq!(atom.class(), 7);
@@ -458,7 +458,7 @@ impl Atom {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol, bracketed::chirality::Chirality};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol, bracketed::chirality::Chirality};
     ///
     /// let atom = Atom::builder()
     ///     .with_symbol(AtomSymbol::Element(Element::C))
@@ -479,7 +479,7 @@ impl Atom {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol, bracketed::chirality::Chirality};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol, bracketed::chirality::Chirality};
     ///
     /// let atom = Atom::builder()
     ///     .with_symbol(AtomSymbol::Element(Element::C))
@@ -622,7 +622,7 @@ impl AtomBuilder {
     /// # Examples
     ///
     /// ```
-    /// let atom = smiles_parser::atom::Atom::builder().with_isotope(13).build();
+    /// let atom = smiles_rs::atom::Atom::builder().with_isotope(13).build();
     /// assert_eq!(atom.isotope_mass_number(), Some(13));
     /// ```
     #[inline]
@@ -638,7 +638,7 @@ impl AtomBuilder {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol};
     ///
     /// let atom = Atom::builder().with_symbol(AtomSymbol::Element(Element::S)).build();
     /// assert_eq!(atom.element(), Some(Element::S));
@@ -655,7 +655,7 @@ impl AtomBuilder {
     /// # Examples
     ///
     /// ```
-    /// let atom = smiles_parser::atom::Atom::builder().with_aromatic(true).build();
+    /// let atom = smiles_rs::atom::Atom::builder().with_aromatic(true).build();
     /// assert!(atom.aromatic());
     /// ```
     #[inline]
@@ -670,7 +670,7 @@ impl AtomBuilder {
     /// # Examples
     ///
     /// ```
-    /// let atom = smiles_parser::atom::Atom::builder().with_hydrogens(3).build();
+    /// let atom = smiles_rs::atom::Atom::builder().with_hydrogens(3).build();
     /// assert_eq!(atom.hydrogen_count(), 3);
     /// ```
     #[inline]
@@ -685,7 +685,7 @@ impl AtomBuilder {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::atom::{Atom, bracketed::charge::Charge};
+    /// use smiles_rs::atom::{Atom, bracketed::charge::Charge};
     ///
     /// let atom = Atom::builder().with_charge(Charge::try_new(-1).expect("valid charge")).build();
     /// assert_eq!(atom.charge_value(), -1);
@@ -702,7 +702,7 @@ impl AtomBuilder {
     /// # Examples
     ///
     /// ```
-    /// let atom = smiles_parser::atom::Atom::builder().with_class(5).build();
+    /// let atom = smiles_rs::atom::Atom::builder().with_class(5).build();
     /// assert_eq!(atom.class(), 5);
     /// ```
     #[inline]
@@ -717,7 +717,7 @@ impl AtomBuilder {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::atom::{Atom, bracketed::chirality::Chirality};
+    /// use smiles_rs::atom::{Atom, bracketed::chirality::Chirality};
     ///
     /// let atom = Atom::builder().with_chirality(Chirality::AtAt).build();
     /// assert_eq!(atom.chirality(), Some(Chirality::AtAt));
@@ -735,7 +735,7 @@ impl AtomBuilder {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol};
     ///
     /// let builder = Atom::builder().with_symbol(AtomSymbol::Element(Element::P));
     /// assert_eq!(builder.element(), Some(Element::P));
@@ -752,7 +752,7 @@ impl AtomBuilder {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::{Atom, atom_symbol::AtomSymbol};
+    /// use smiles_rs::atom::{Atom, atom_symbol::AtomSymbol};
     ///
     /// let builder = Atom::builder().with_symbol(AtomSymbol::Element(Element::F));
     /// assert_eq!(builder.symbol(), AtomSymbol::Element(Element::F));
@@ -768,7 +768,7 @@ impl AtomBuilder {
     /// # Examples
     ///
     /// ```
-    /// let atom = smiles_parser::atom::Atom::builder().build();
+    /// let atom = smiles_rs::atom::Atom::builder().build();
     /// assert!(atom.is_bracket_atom());
     /// ```
     #[inline]

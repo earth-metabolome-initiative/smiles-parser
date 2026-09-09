@@ -59,7 +59,7 @@ impl TokenWithSpan {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{
+    /// use smiles_rs::{
     ///     bond::Bond,
     ///     token::{Token, TokenWithSpan},
     /// };
@@ -76,7 +76,7 @@ impl TokenWithSpan {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{
+    /// use smiles_rs::{
     ///     bond::Bond,
     ///     token::{Token, TokenWithSpan},
     /// };
@@ -93,7 +93,7 @@ impl TokenWithSpan {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::token::{Token, TokenKind, TokenWithSpan};
+    /// use smiles_rs::token::{Token, TokenKind, TokenWithSpan};
     ///
     /// let token = TokenWithSpan::new(Token::LeftParentheses, 2, 3);
     /// assert_eq!(token.token_kind(), TokenKind::LeftParentheses);
@@ -107,7 +107,7 @@ impl TokenWithSpan {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::token::{Token, TokenWithSpan};
+    /// use smiles_rs::token::{Token, TokenWithSpan};
     ///
     /// let token = TokenWithSpan::new(Token::RightParentheses, 4, 5);
     /// assert_eq!(token.span(), 4..5);
@@ -121,7 +121,7 @@ impl TokenWithSpan {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::token::{Token, TokenWithSpan};
+    /// use smiles_rs::token::{Token, TokenWithSpan};
     ///
     /// let token = TokenWithSpan::new(Token::NonBond, 6, 7);
     /// assert_eq!(token.start(), 6);
@@ -135,7 +135,7 @@ impl TokenWithSpan {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::token::{Token, TokenWithSpan};
+    /// use smiles_rs::token::{Token, TokenWithSpan};
     ///
     /// let token = TokenWithSpan::new(Token::NonBond, 6, 7);
     /// assert_eq!(token.end(), 7);
@@ -149,7 +149,7 @@ impl TokenWithSpan {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{
+    /// use smiles_rs::{
     ///     bond::Bond,
     ///     token::{Token, TokenWithSpan},
     /// };
@@ -172,7 +172,7 @@ impl Token {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{
+    /// use smiles_rs::{
     ///     bond::Bond,
     ///     token::{Token, TokenKind},
     /// };

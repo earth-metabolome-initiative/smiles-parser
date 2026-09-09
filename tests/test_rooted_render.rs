@@ -1,5 +1,5 @@
 //! Root-anchored rendering tests.
-use smiles_parser::prelude::Smiles;
+use smiles_rs::prelude::Smiles;
 
 fn canon(s: &str) -> String {
     s.parse::<Smiles>().unwrap().canonicalize().render()

@@ -5,7 +5,7 @@ use std::io::{BufRead, BufReader, Cursor, Read};
 use elements_rs::Element;
 use flate2::read::GzDecoder;
 use molecular_formulas::{ChargedMolecularFormula, MolecularFormula, prelude::ChemicalFormula};
-use smiles_parser::prelude::{Smiles, WildcardMolecularFormulaConversionError, WildcardSmiles};
+use smiles_rs::prelude::{Smiles, WildcardMolecularFormulaConversionError, WildcardSmiles};
 
 const RDKIT_MOLECULAR_FORMULA_FIXTURE: &[u8] =
     include_bytes!("fixtures/rdkit_molecular_formula.csv.gz");

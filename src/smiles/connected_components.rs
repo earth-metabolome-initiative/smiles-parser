@@ -36,11 +36,11 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> SmilesComponents<'a, AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "CC.O".parse()?;
     /// assert_eq!(smiles.connected_components().number_of_components(), 2);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -53,11 +53,11 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> SmilesComponents<'a, AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "CC.O".parse()?;
     /// assert_eq!(smiles.connected_components().largest_component_size(), 2);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -70,11 +70,11 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> SmilesComponents<'a, AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "CC.O".parse()?;
     /// assert_eq!(smiles.connected_components().smallest_component_size(), 1);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -87,14 +87,14 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> SmilesComponents<'a, AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "CC.O".parse()?;
     /// let components = smiles.connected_components();
     ///
     /// assert_eq!(components.component_of_node(0), components.component_of_node(1));
     /// assert_ne!(components.component_of_node(0), components.component_of_node(2));
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -108,13 +108,13 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> SmilesComponents<'a, AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "CC.O".parse()?;
     /// let identifiers = smiles.connected_components().component_identifiers().collect::<Vec<_>>();
     ///
     /// assert_eq!(identifiers.len(), smiles.nodes().len());
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     pub fn component_identifiers(&self) -> impl Iterator<Item = usize> + '_ {
@@ -126,14 +126,14 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> SmilesComponents<'a, AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "CC.O".parse()?;
     /// let components = smiles.connected_components();
     /// let first_component = components.component_of_node(0);
     ///
     /// assert_eq!(components.node_ids_of_component(first_component).collect::<Vec<_>>(), vec![0, 1]);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     pub fn node_ids_of_component(
@@ -149,7 +149,7 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> SmilesComponents<'a, AtomPolicy> {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "CC.O".parse()?;
     /// let components = smiles.connected_components();
@@ -162,7 +162,7 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> SmilesComponents<'a, AtomPolicy> {
     ///         .collect::<Vec<_>>(),
     ///     vec![Some(Element::O)]
     /// );
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     pub fn nodes_of_component(
@@ -249,12 +249,12 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "CC.O".parse()?;
     /// let components = smiles.connected_components();
     /// assert_eq!(components.number_of_components(), 2);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]

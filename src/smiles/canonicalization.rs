@@ -52,11 +52,11 @@ impl SmilesCanonicalLabeling {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let labeling = "OC".parse::<Smiles>()?.canonical_labeling();
     /// assert_eq!(labeling.order(), &[1, 0]);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -69,11 +69,11 @@ impl SmilesCanonicalLabeling {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let labeling = "OC".parse::<Smiles>()?.canonical_labeling();
     /// assert_eq!(labeling.new_index_of_old_node(), &[1, 0]);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -254,11 +254,11 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let labeling = "OC".parse::<Smiles>()?.canonical_labeling();
     /// assert_eq!(labeling.order().len(), 2);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[must_use]
     pub fn canonical_labeling(&self) -> SmilesCanonicalLabeling {
@@ -273,11 +273,11 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let canonical = "CO".parse::<Smiles>()?.canonicalize();
     /// assert!(canonical.is_canonical());
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[must_use]
     pub fn is_canonical(&self) -> bool {
@@ -294,11 +294,11 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let canonical = "OC".parse::<Smiles>()?.canonicalize();
     /// assert_eq!(canonical.to_string(), "CO");
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[must_use]
     pub fn canonicalize(&self) -> Self {

@@ -28,13 +28,13 @@ pub trait AromaticityModel {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::{AromaticityModel, RdkitDefaultAromaticity, Smiles};
+    /// use smiles_rs::prelude::{AromaticityModel, RdkitDefaultAromaticity, Smiles};
     ///
     /// let model = RdkitDefaultAromaticity;
     /// let smiles: Smiles = "C1=CC=CC=C1".parse()?;
     /// let assignment = model.assignment(&smiles);
     /// assert!(assignment.contains_atom(0));
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     fn assignment<AtomPolicy: SmilesAtomPolicy>(
         &self,
@@ -223,7 +223,7 @@ impl AromaticityAssignment {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::{AromaticityAssignment, AromaticityStatus};
+    /// use smiles_rs::prelude::{AromaticityAssignment, AromaticityStatus};
     ///
     /// let assignment =
     ///     AromaticityAssignment::new(AromaticityStatus::Complete, vec![1, 0], vec![[1, 0]]);
@@ -244,7 +244,7 @@ impl AromaticityAssignment {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::{AromaticityAssignment, AromaticityDiagnostic, AromaticityStatus};
+    /// use smiles_rs::prelude::{AromaticityAssignment, AromaticityDiagnostic, AromaticityStatus};
     ///
     /// let assignment = AromaticityAssignment::new_with_diagnostics(
     ///     AromaticityStatus::Partial,
@@ -280,11 +280,11 @@ impl AromaticityAssignment {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let assignment = "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment();
-    /// assert_eq!(assignment.status(), smiles_parser::AromaticityStatus::Complete);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// assert_eq!(assignment.status(), smiles_rs::AromaticityStatus::Complete);
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -297,11 +297,11 @@ impl AromaticityAssignment {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let assignment = "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment();
     /// assert_eq!(assignment.atom_ids(), &[0, 1, 2, 3, 4, 5]);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -314,11 +314,11 @@ impl AromaticityAssignment {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let assignment = "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment();
     /// assert!(assignment.bond_edges().contains(&[0, 1]));
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -331,11 +331,11 @@ impl AromaticityAssignment {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let assignment = "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment();
     /// assert!(assignment.diagnostics().is_empty());
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -348,12 +348,12 @@ impl AromaticityAssignment {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let assignment = "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment();
     /// assert!(assignment.contains_atom(0));
     /// assert!(!assignment.contains_atom(99));
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -366,12 +366,12 @@ impl AromaticityAssignment {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let assignment = "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment();
     /// assert!(assignment.contains_edge(0, 1));
     /// assert!(!assignment.contains_edge(0, 42));
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -394,12 +394,12 @@ impl AromaticityAssignment {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "C1=CC=CC=C1".parse()?;
     /// let assignment = smiles.aromaticity_assignment();
     /// assert!(assignment.validate_for(&smiles).is_ok());
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     pub fn validate_for(
         &self,
@@ -487,7 +487,7 @@ impl<AtomPolicy: SmilesAtomPolicy> AromaticityPerception<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let perception = "C1=CC=CC=C1"
     ///     .parse::<Smiles>()
@@ -507,14 +507,14 @@ impl<AtomPolicy: SmilesAtomPolicy> AromaticityPerception<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let perception = "C1=CC=CC=C1"
     ///     .parse::<Smiles>()
     ///     .expect("valid Kekule benzene")
     ///     .perceive_aromaticity()
     ///     .expect("aromaticity perception should succeed");
-    /// assert_eq!(perception.status(), smiles_parser::AromaticityStatus::Complete);
+    /// assert_eq!(perception.status(), smiles_rs::AromaticityStatus::Complete);
     /// ```
     #[inline]
     #[must_use]
@@ -527,7 +527,7 @@ impl<AtomPolicy: SmilesAtomPolicy> AromaticityPerception<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let perception = "C1=CC=CC=C1"
     ///     .parse::<Smiles>()
@@ -547,7 +547,7 @@ impl<AtomPolicy: SmilesAtomPolicy> AromaticityPerception<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let perception = "C1=CC=CC=C1"
     ///     .parse::<Smiles>()
@@ -573,7 +573,7 @@ impl<AtomPolicy: SmilesAtomPolicy> AromaticityPerception<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{
+    /// use smiles_rs::{
     ///     bond::Bond,
     ///     prelude::{AromaticityPolicy, Smiles},
     /// };
@@ -603,7 +603,7 @@ impl<AtomPolicy: SmilesAtomPolicy> AromaticityPerception<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let assignment = "C1=CC=CC=C1"
     ///     .parse::<Smiles>()
@@ -624,7 +624,7 @@ impl<AtomPolicy: SmilesAtomPolicy> AromaticityPerception<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let aromaticized = "C1=CC=CC=C1"
     ///     .parse::<Smiles>()
@@ -672,7 +672,7 @@ impl<AtomPolicy: SmilesAtomPolicy> AromaticityPerception<AtomPolicy> {
     /// ```rust
     /// use core::str::FromStr;
     ///
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let original = Smiles::from_str("C1=CN=CN1").expect("valid Kekule imidazole");
     /// let perception = original.perceive_aromaticity().expect("perception should succeed");
@@ -695,7 +695,7 @@ impl<AtomPolicy: SmilesAtomPolicy> AromaticityPerception<AtomPolicy> {
     /// ```rust
     /// use core::str::FromStr;
     ///
-    /// use smiles_parser::prelude::{KekulizationMode, Smiles};
+    /// use smiles_rs::prelude::{KekulizationMode, Smiles};
     ///
     /// let perception = Smiles::from_str("C1=CC=CC=C1")
     ///     .expect("valid Kekule benzene")
@@ -735,7 +735,7 @@ impl<AtomPolicy: SmilesAtomPolicy> AromaticityPerception<AtomPolicy> {
     /// ```rust
     /// use core::str::FromStr;
     ///
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let perception = Smiles::from_str("C1=CC=CC=C1")
     ///     .expect("valid Kekule benzene")
@@ -906,11 +906,11 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let assignment = "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment();
     /// assert!(assignment.contains_atom(0));
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -924,12 +924,12 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::{AromaticityPolicy, Smiles};
+    /// use smiles_rs::prelude::{AromaticityPolicy, Smiles};
     ///
     /// let assignment =
     ///     "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment_for(AromaticityPolicy::RdkitSimple);
     /// assert!(assignment.contains_edge(0, 1));
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -942,12 +942,12 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::{RdkitDefaultAromaticity, Smiles};
+    /// use smiles_rs::prelude::{RdkitDefaultAromaticity, Smiles};
     ///
     /// let model = RdkitDefaultAromaticity;
     /// let assignment = "C1=CC=CC=C1".parse::<Smiles>()?.aromaticity_assignment_with(&model);
     /// assert!(assignment.contains_atom(3));
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -972,7 +972,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles = "C1=CC=CC=C1".parse::<Smiles>().expect("valid Kekule benzene");
     /// let perception = smiles.perceive_aromaticity().expect("aromaticity perception should succeed");
@@ -995,7 +995,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::{AromaticityPolicy, Smiles};
+    /// use smiles_rs::prelude::{AromaticityPolicy, Smiles};
     ///
     /// let perception = "C1=CC=CC=C1"
     ///     .parse::<Smiles>()
@@ -1022,7 +1022,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::{RdkitDefaultAromaticity, Smiles};
+    /// use smiles_rs::prelude::{RdkitDefaultAromaticity, Smiles};
     ///
     /// let model = RdkitDefaultAromaticity;
     /// let smiles = "C1=CC=CC=C1".parse::<Smiles>().expect("valid Kekule benzene");
@@ -1059,7 +1059,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "C1=CC=CC=C1".parse().expect("valid Kekule benzene");
     /// let assignment = smiles.aromaticity_assignment();

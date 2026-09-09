@@ -1,7 +1,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use smiles_parser::prelude::{AromaticityPolicy, AromaticityStatus, Smiles, WildcardSmiles};
+use smiles_rs::prelude::{AromaticityPolicy, AromaticityStatus, Smiles, WildcardSmiles};
 
 // Keep this target in the small-molecule regime so fuzz time goes into
 // roundtrip invariants instead of a few pathological giant graphs.

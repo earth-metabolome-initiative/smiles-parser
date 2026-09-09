@@ -80,11 +80,11 @@ impl DatasetArtifact {
     /// # Examples
     ///
     /// ```no_run
-    /// use smiles_parser::datasets::{DatasetSource, MASS_SPEC_GYM_SMILES};
+    /// use smiles_rs::datasets::{DatasetSource, MASS_SPEC_GYM_SMILES};
     ///
     /// let artifact = MASS_SPEC_GYM_SMILES.fetch()?;
     /// assert_eq!(artifact.dataset_id(), "massspecgym-smiles");
-    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// # Ok::<(), smiles_rs::DatasetError>(())
     /// ```
     #[must_use]
     pub fn dataset_id(&self) -> &'static str {
@@ -99,11 +99,11 @@ impl DatasetArtifact {
     /// # Examples
     ///
     /// ```no_run
-    /// use smiles_parser::datasets::{DatasetSource, MASS_SPEC_GYM_SMILES};
+    /// use smiles_rs::datasets::{DatasetSource, MASS_SPEC_GYM_SMILES};
     ///
     /// let artifact = MASS_SPEC_GYM_SMILES.fetch()?;
     /// println!("{}", artifact.path().display());
-    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// # Ok::<(), smiles_rs::DatasetError>(())
     /// ```
     #[must_use]
     pub fn path(&self) -> &Path {
@@ -115,16 +115,14 @@ impl DatasetArtifact {
     /// # Examples
     ///
     /// ```no_run
-    /// use smiles_parser::datasets::{
-    ///     ArchiveMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES,
-    /// };
+    /// use smiles_rs::datasets::{ArchiveMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES};
     ///
     /// let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
     ///     archive_mode: ArchiveMode::KeepBoth,
     ///     ..DatasetFetchOptions::default()
     /// })?;
     /// assert!(artifact.compressed_path().is_some());
-    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// # Ok::<(), smiles_rs::DatasetError>(())
     /// ```
     #[must_use]
     pub fn compressed_path(&self) -> Option<&Path> {
@@ -136,16 +134,14 @@ impl DatasetArtifact {
     /// # Examples
     ///
     /// ```no_run
-    /// use smiles_parser::datasets::{
-    ///     ArchiveMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES,
-    /// };
+    /// use smiles_rs::datasets::{ArchiveMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES};
     ///
     /// let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
     ///     archive_mode: ArchiveMode::Decompress,
     ///     ..DatasetFetchOptions::default()
     /// })?;
     /// assert!(artifact.decompressed_path().is_some());
-    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// # Ok::<(), smiles_rs::DatasetError>(())
     /// ```
     #[must_use]
     pub fn decompressed_path(&self) -> Option<&Path> {
@@ -157,7 +153,7 @@ impl DatasetArtifact {
     /// # Examples
     ///
     /// ```no_run
-    /// use smiles_parser::datasets::{
+    /// use smiles_rs::datasets::{
     ///     CacheMode, DatasetFetchOptions, DatasetSource, MASS_SPEC_GYM_SMILES,
     /// };
     ///
@@ -166,7 +162,7 @@ impl DatasetArtifact {
     ///     ..DatasetFetchOptions::default()
     /// })?;
     /// let _downloaded = artifact.was_downloaded();
-    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// # Ok::<(), smiles_rs::DatasetError>(())
     /// ```
     #[must_use]
     pub fn was_downloaded(&self) -> bool {
@@ -178,16 +174,14 @@ impl DatasetArtifact {
     /// # Examples
     ///
     /// ```no_run
-    /// use smiles_parser::datasets::{
-    ///     ArchiveMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES,
-    /// };
+    /// use smiles_rs::datasets::{ArchiveMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES};
     ///
     /// let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
     ///     archive_mode: ArchiveMode::Decompress,
     ///     ..DatasetFetchOptions::default()
     /// })?;
     /// let _decompressed = artifact.was_decompressed();
-    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// # Ok::<(), smiles_rs::DatasetError>(())
     /// ```
     #[must_use]
     pub fn was_decompressed(&self) -> bool {

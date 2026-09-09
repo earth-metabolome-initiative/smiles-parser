@@ -1,7 +1,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use smiles_parser::prelude::Smiles;
+use smiles_rs::prelude::Smiles;
 
 // Keep this target in the small-molecule regime so fuzz time goes into the
 // invariants rather than a few pathological giant graphs. Rooted rendering

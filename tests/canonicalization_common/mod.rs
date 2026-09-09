@@ -1,4 +1,4 @@
-use smiles_parser::smiles::{Smiles, WildcardSmiles};
+use smiles_rs::smiles::{Smiles, WildcardSmiles};
 
 pub fn canonical_string(source: &str) -> String {
     let canonicalized = Smiles::from_str(source).unwrap().canonicalize();

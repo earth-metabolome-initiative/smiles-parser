@@ -1,5 +1,5 @@
 //! Radius-N atom environment tests (RDKit FindAtomEnvironmentOfRadiusN).
-use smiles_parser::prelude::Smiles;
+use smiles_rs::prelude::Smiles;
 
 fn canon(s: &str) -> String {
     s.parse::<Smiles>().unwrap().canonicalize().render()

@@ -42,11 +42,11 @@ pub trait DatasetSource {
     /// # Examples
     ///
     /// ```no_run
-    /// use smiles_parser::datasets::{DatasetSource, MASS_SPEC_GYM_SMILES};
+    /// use smiles_rs::datasets::{DatasetSource, MASS_SPEC_GYM_SMILES};
     ///
     /// let artifact = MASS_SPEC_GYM_SMILES.fetch()?;
     /// assert!(artifact.path().ends_with("MassSpecGym.tsv"));
-    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// # Ok::<(), smiles_rs::DatasetError>(())
     /// ```
     fn fetch(&self) -> Result<DatasetArtifact, DatasetError> {
         self.fetch_with_options(&DatasetFetchOptions::default())
@@ -62,16 +62,14 @@ pub trait DatasetSource {
     /// # Examples
     ///
     /// ```no_run
-    /// use smiles_parser::datasets::{
-    ///     ArchiveMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES,
-    /// };
+    /// use smiles_rs::datasets::{ArchiveMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES};
     ///
     /// let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
     ///     archive_mode: ArchiveMode::Decompress,
     ///     ..DatasetFetchOptions::default()
     /// })?;
     /// assert!(artifact.path().ends_with("CID-SMILES"));
-    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// # Ok::<(), smiles_rs::DatasetError>(())
     /// ```
     fn fetch_with_options(
         &self,
@@ -126,13 +124,13 @@ pub trait SmilesDatasetSource {
     /// # Examples
     ///
     /// ```no_run
-    /// use smiles_parser::datasets::{PUBCHEM_SMILES, SmilesDatasetSource};
+    /// use smiles_rs::datasets::{PUBCHEM_SMILES, SmilesDatasetSource};
     ///
     /// let mut smiles = PUBCHEM_SMILES.iter_smiles()?;
     /// if let Some(first) = smiles.next() {
     ///     let _ = first?;
     /// }
-    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// # Ok::<(), smiles_rs::DatasetError>(())
     /// ```
     fn iter_smiles(&self) -> Result<DatasetSmilesIter, DatasetError> {
         self.iter_smiles_with_options(&DatasetFetchOptions::default())
@@ -149,7 +147,7 @@ pub trait SmilesDatasetSource {
     /// # Examples
     ///
     /// ```no_run
-    /// use smiles_parser::datasets::{
+    /// use smiles_rs::datasets::{
     ///     ArchiveMode, DatasetFetchOptions, PUBCHEM_SMILES, SmilesDatasetSource,
     /// };
     ///
@@ -160,7 +158,7 @@ pub trait SmilesDatasetSource {
     /// if let Some(first) = smiles.next() {
     ///     let _ = first?;
     /// }
-    /// # Ok::<(), smiles_parser::DatasetError>(())
+    /// # Ok::<(), smiles_rs::DatasetError>(())
     /// ```
     fn iter_smiles_with_options(
         &self,

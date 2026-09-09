@@ -5,7 +5,7 @@ mod canonicalization_common;
 use canonicalization_common::{
     assert_same_canonical_group, canonical_string, wildcard_canonical_string,
 };
-use smiles_parser::smiles::Smiles;
+use smiles_rs::smiles::Smiles;
 
 #[test]
 fn canonical_labeling_inverse_matches_order() {

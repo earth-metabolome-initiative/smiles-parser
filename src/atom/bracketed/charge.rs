@@ -18,10 +18,10 @@ impl Charge {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::atom::bracketed::charge::Charge;
+    /// use smiles_rs::atom::bracketed::charge::Charge;
     ///
     /// assert_eq!(Charge::try_new(2)?.get(), 2);
-    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// # Ok::<(), smiles_rs::SmilesError>(())
     /// ```
     pub fn try_new(num: i8) -> Result<Self, SmilesError> {
         (-15..=15).contains(&num).then_some(Self(num)).ok_or(if num.is_negative() {
@@ -36,10 +36,10 @@ impl Charge {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::atom::bracketed::charge::Charge;
+    /// use smiles_rs::atom::bracketed::charge::Charge;
     ///
     /// assert_eq!(Charge::try_new(-1)?.get(), -1);
-    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// # Ok::<(), smiles_rs::SmilesError>(())
     /// ```
     #[must_use]
     pub fn get(&self) -> i8 {

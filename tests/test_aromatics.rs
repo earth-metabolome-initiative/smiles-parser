@@ -1,7 +1,7 @@
 //! Tests on Elements that should or should not be parsed as aromatic
 
 use elements_rs::Element;
-use smiles_parser::{
+use smiles_rs::{
     atom::{Atom, atom_symbol::AtomSymbol},
     errors::SmilesError,
     smiles::Smiles,

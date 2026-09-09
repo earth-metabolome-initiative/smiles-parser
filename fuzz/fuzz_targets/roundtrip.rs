@@ -3,7 +3,7 @@
 use std::string::ToString;
 
 use libfuzzer_sys::fuzz_target;
-use smiles_parser::smiles::{Smiles, WildcardSmiles};
+use smiles_rs::smiles::{Smiles, WildcardSmiles};
 
 fn assert_strict_roundtrip(data: &str) {
     match data.parse::<Smiles>() {

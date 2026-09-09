@@ -173,7 +173,7 @@ impl SmilesErrorWithSpan {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{SmilesError, SmilesErrorWithSpan};
+    /// use smiles_rs::{SmilesError, SmilesErrorWithSpan};
     ///
     /// let err = SmilesErrorWithSpan::new(SmilesError::UnexpectedEndOfString, 2, 3);
     /// assert_eq!(err.start(), 2);
@@ -189,7 +189,7 @@ impl SmilesErrorWithSpan {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{SmilesError, SmilesErrorWithSpan};
+    /// use smiles_rs::{SmilesError, SmilesErrorWithSpan};
     ///
     /// let err = SmilesErrorWithSpan::new(SmilesError::InvalidNumber, 0, 1);
     /// assert_eq!(err.smiles_error(), SmilesError::InvalidNumber);
@@ -204,7 +204,7 @@ impl SmilesErrorWithSpan {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{SmilesError, SmilesErrorWithSpan};
+    /// use smiles_rs::{SmilesError, SmilesErrorWithSpan};
     ///
     /// let err = SmilesErrorWithSpan::new(SmilesError::InvalidClass, 4, 6);
     /// assert_eq!(err.start(), 4);
@@ -219,7 +219,7 @@ impl SmilesErrorWithSpan {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{SmilesError, SmilesErrorWithSpan};
+    /// use smiles_rs::{SmilesError, SmilesErrorWithSpan};
     ///
     /// let err = SmilesErrorWithSpan::new(SmilesError::InvalidClass, 4, 6);
     /// assert_eq!(err.end(), 6);
@@ -234,7 +234,7 @@ impl SmilesErrorWithSpan {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{SmilesError, SmilesErrorWithSpan};
+    /// use smiles_rs::{SmilesError, SmilesErrorWithSpan};
     ///
     /// let err = SmilesErrorWithSpan::new(SmilesError::UnexpectedLeftBracket, 1, 2);
     /// assert_eq!(err.span(), 1..2);
@@ -249,7 +249,7 @@ impl SmilesErrorWithSpan {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{SmilesError, SmilesErrorWithSpan};
+    /// use smiles_rs::{SmilesError, SmilesErrorWithSpan};
     ///
     /// let err = SmilesErrorWithSpan::new(SmilesError::UnexpectedRightBracket, 1, 2);
     /// let rendered = err.render("C]");

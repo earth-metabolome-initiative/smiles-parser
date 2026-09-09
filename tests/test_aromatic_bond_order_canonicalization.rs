@@ -5,7 +5,7 @@
 //! two representations of the same molecule that differ only in that order must
 //! canonicalize identically and produce identical rooted-environment labels,
 //! including on broken-ring fragments carved by the MAP4 path.
-use smiles_parser::smiles::{AromaticityPolicy, Smiles};
+use smiles_rs::smiles::{AromaticityPolicy, Smiles};
 
 /// Kekulize, then re-perceive RDKit-default aromaticity: an equivalent
 /// representation of the molecule that retains kekule orders on aromatic bonds.

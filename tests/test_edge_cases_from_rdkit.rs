@@ -8,7 +8,7 @@
 //! - report the error at the offending token instead of silently repairing it
 //! - fix the grammar hole, not just these exact strings
 
-use smiles_parser::smiles::Smiles;
+use smiles_rs::smiles::Smiles;
 
 const RD_KIT_PARSER_REJECTS: &[&str] = &[
     "C==O", "C/#N", "C()", "C=(O)N", ".", "C.", "C..O", ".C", "..", "C...O", "C#(N)O", "C/(N)O",

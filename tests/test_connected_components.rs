@@ -1,7 +1,7 @@
 //! Connected-components parity checks against documented `RDKit` fragment
 //! behavior.
 
-use smiles_parser::smiles::{Smiles, WildcardSmiles};
+use smiles_rs::smiles::{Smiles, WildcardSmiles};
 
 struct RdkitFixture {
     smiles: &'static str,

@@ -4,7 +4,7 @@
 
 use std::time::{Duration, Instant};
 
-use smiles_parser::smiles::{AromaticityPolicy, Smiles};
+use smiles_rs::smiles::{AromaticityPolicy, Smiles};
 
 const PERCEPTION_BUDGET: Duration =
     if cfg!(debug_assertions) { Duration::from_secs(10) } else { Duration::from_millis(250) };
