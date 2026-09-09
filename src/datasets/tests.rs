@@ -679,10 +679,9 @@ fn lotus_smiles_metadata_matches_current_upstream_layout() {
 
 #[test]
 fn lotus_record_iterator_streams_smiles_and_identifiers() {
-    let directory = temporary_directory("datasets-lotus-iter");
-    fs::create_dir_all(&directory).unwrap();
+    let directory = tempdir().unwrap();
 
-    let dataset_path = directory.join("Lotus.smi");
+    let dataset_path = directory.path().join("Lotus.smi");
 
     fs::write(&dataset_path, "CCO LTS0000001\nc1ccccc1 LTS0000002\n").unwrap();
 
@@ -707,16 +706,13 @@ fn lotus_record_iterator_streams_smiles_and_identifiers() {
 
     assert_eq!(records[1].smiles(), "c1ccccc1");
     assert_eq!(records[1].id(), "LTS0000002");
-
-    fs::remove_dir_all(directory).unwrap();
 }
 
 #[test]
 fn lotus_record_iterator_rejects_malformed_rows() {
-    let directory = temporary_directory("datasets-lotus-malformed");
-    fs::create_dir_all(&directory).unwrap();
+    let directory = tempdir().unwrap();
 
-    let dataset_path = directory.join("Lotus.smi");
+    let dataset_path = directory.path().join("Lotus.smi");
     fs::write(&dataset_path, "CCO\n").unwrap();
 
     let artifact = DatasetArtifact {
@@ -732,6 +728,4 @@ fn lotus_record_iterator_rejects_malformed_rows() {
         Some(Err(DatasetError::Format { dataset_id: "lotus-smiles", line_number: 1, .. })) => {}
         other => panic!("unexpected result: {other:?}"),
     }
-
-    fs::remove_dir_all(directory).unwrap();
 }
