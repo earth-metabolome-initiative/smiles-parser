@@ -406,17 +406,26 @@ pub(crate) fn unzip_file(
             }
         })?;
 
+        let progress_bar = new_byte_progress_bar(
+            Some(entry.size()),
+            &progress_label("extracting", extracted_path),
+        );
+        let mut entry = ProgressReader::new(&mut entry, progress_bar.clone());
+
         let target_file = File::create(&temporary_path)
             .map_err(|source| DatasetError::Io { path: temporary_path.clone(), source })?;
 
         let mut writer = BufWriter::new(target_file);
 
-        io::copy(&mut entry, &mut writer)
-            .map_err(|source| DatasetError::Io { path: extracted_path.to_path_buf(), source })?;
+        if let Err(source) = io::copy(&mut entry, &mut writer) {
+            progress_bar.abandon();
+            return Err(DatasetError::Io { path: extracted_path.to_path_buf(), source });
+        }
 
         writer
             .flush()
             .map_err(|source| DatasetError::Io { path: extracted_path.to_path_buf(), source })?;
+        progress_bar.finish_and_clear();
     }
 
     remove_path_if_exists(extracted_path)?;
