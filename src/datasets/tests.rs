@@ -31,7 +31,7 @@ fn write_zinc20_tar_gzip(path: &Path, chunk_dir: &str, contents: &[u8]) {
         u64::try_from(contents.len())
             .unwrap_or_else(|_| unreachable!("fixture length fits into u64")),
     );
-    header.set_mode(0o644);
+    header.set_mode(0o600);
     header.set_cksum();
     builder.append_data(&mut header, format!("{chunk_dir}/smiles_all_01.txt"), contents).unwrap();
     let encoder = builder.into_inner().unwrap();
