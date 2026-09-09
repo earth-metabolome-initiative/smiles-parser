@@ -545,28 +545,24 @@ fn coconut_smiles_metadata_matches_current_upstream_layout() {
 
 #[test]
 fn unzip_file_materializes_coconut_csv() {
-    let directory = temporary_directory("datasets-coconut-unzip");
-    fs::create_dir_all(&directory).unwrap();
+    let directory = tempdir().unwrap();
 
-    let compressed_path = directory.join("coconut_csv-08-2026.zip");
-    let extracted_path = directory.join("coconut_csv-08-2026.csv");
+    let compressed_path = directory.path().join("coconut_csv-08-2026.zip");
+    let extracted_path = directory.path().join("coconut_csv-08-2026.csv");
 
     write_zip(&compressed_path, "coconut_csv-08-2026.csv", b"identifier,smiles\nCNP000001,CCO\n");
 
     unzip_file(&compressed_path, &extracted_path).unwrap();
 
     assert_eq!(fs::read_to_string(&extracted_path).unwrap(), "identifier,smiles\nCNP000001,CCO\n");
-
-    fs::remove_dir_all(directory).unwrap();
 }
 
 #[test]
 fn unzip_file_requires_expected_file_name() {
-    let directory = temporary_directory("datasets-coconut-unzip-missing");
-    fs::create_dir_all(&directory).unwrap();
+    let directory = tempdir().unwrap();
 
-    let compressed_path = directory.join("coconut_csv-08-2026.zip");
-    let extracted_path = directory.join("coconut_csv-08-2026.csv");
+    let compressed_path = directory.path().join("coconut_csv-08-2026.zip");
+    let extracted_path = directory.path().join("coconut_csv-08-2026.csv");
 
     write_zip(&compressed_path, "something_else.csv", b"identifier,smiles\nCNP000001,CCO\n");
 
@@ -578,16 +574,13 @@ fn unzip_file_requires_expected_file_name() {
         Ok(_) => panic!("expected missing ZIP entry to fail"),
         Err(error) => panic!("unexpected error: {error}"),
     }
-
-    fs::remove_dir_all(directory).unwrap();
 }
 
 #[test]
 fn coconut_record_iterator_uses_identifier_and_canonical_smiles_columns() {
-    let directory = temporary_directory("datasets-coconut-iter");
-    fs::create_dir_all(&directory).unwrap();
+    let directory = tempdir().unwrap();
 
-    let dataset_path = directory.join("coconut_csv-08-2026.csv");
+    let dataset_path = directory.path().join("coconut_csv-08-2026.csv");
 
     fs::write(
         &dataset_path,
@@ -618,6 +611,4 @@ fn coconut_record_iterator_uses_identifier_and_canonical_smiles_columns() {
 
     assert_eq!(records[1].id(), "CNP000002");
     assert_eq!(records[1].smiles(), "c1ccccc1");
-
-    fs::remove_dir_all(directory).unwrap();
 }
