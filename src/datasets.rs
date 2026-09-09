@@ -34,6 +34,7 @@
 //! ```
 mod coconut;
 mod fetch;
+mod lotus;
 mod massspecgym;
 mod progress;
 mod pubchem;
@@ -46,6 +47,7 @@ mod zinc20;
 
 pub use coconut::{COCONUT_SMILES, CoconutSmiles};
 pub use fetch::default_dataset_cache_dir;
+pub use lotus::{LOTUS_SMILES, LotusSmiles};
 pub use massspecgym::{MASS_SPEC_GYM_SMILES, MassSpecGymSmiles};
 pub use pubchem::{PUBCHEM_SMILES, PubChemSmiles};
 pub use reader::{DatasetSmilesIter, DatasetSmilesRecordIter};
