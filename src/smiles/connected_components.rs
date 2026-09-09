@@ -55,8 +55,8 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> SmilesComponents<'a, AtomPolicy> {
     /// ```
     /// use smiles_rs::prelude::Smiles;
     ///
-    /// let smiles: Smiles = "c1ccccc1.CC".parse()?;
-    /// assert_eq!(smiles.connected_components().largest_component_size(), 6);
+    /// let smiles: Smiles = "CC.O".parse()?;
+    /// assert_eq!(smiles.connected_components().largest_component_size(), 2);
     /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
@@ -72,7 +72,7 @@ impl<'a, AtomPolicy: SmilesAtomPolicy> SmilesComponents<'a, AtomPolicy> {
     /// ```
     /// use smiles_rs::prelude::Smiles;
     ///
-    /// let smiles: Smiles = "CCO.N".parse()?;
+    /// let smiles: Smiles = "CC.O".parse()?;
     /// assert_eq!(smiles.connected_components().smallest_component_size(), 1);
     /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
