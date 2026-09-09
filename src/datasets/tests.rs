@@ -490,3 +490,33 @@ fn unzip_file_rejects_a_directory_named_like_the_payload() {
 
     assert!(!extracted_path.exists());
 }
+
+#[test]
+fn unzip_file_removes_the_partial_output_when_extraction_fails() {
+    let directory = tempdir().unwrap();
+    let archive_path = directory.path().join("archive.zip");
+    let extracted_path = directory.path().join("payload.txt");
+    let partial_path = directory.path().join("payload.txt.part");
+
+    {
+        let file = File::create(&archive_path).unwrap();
+        let mut archive = zip::ZipWriter::new(file);
+        archive.start_file("payload.txt", zip::write::SimpleFileOptions::default()).unwrap();
+        archive.write_all(&vec![b'A'; 64 * 1024]).unwrap();
+        archive.finish().unwrap();
+    }
+
+    let mut bytes = fs::read(&archive_path).unwrap();
+    let corrupted = bytes.len() / 2;
+    bytes[corrupted] ^= 0xff;
+    fs::write(&archive_path, &bytes).unwrap();
+
+    match unzip_file(&archive_path, &extracted_path) {
+        Err(DatasetError::Io { .. }) => {}
+        Ok(_) => panic!("expected a corrupted entry to fail"),
+        Err(error) => panic!("unexpected error: {error}"),
+    }
+
+    assert!(!partial_path.exists());
+    assert!(!extracted_path.exists());
+}

@@ -397,7 +397,7 @@ pub(crate) fn unzip_file(
             ),
         }
     })?;
-    let temporary_path = temporary_download_path(extracted_path);
+    let partial = PartialPath::new(extracted_path);
     {
         let mut entry = archive.by_index(index).map_err(|source| {
             DatasetError::Io {
@@ -412,8 +412,8 @@ pub(crate) fn unzip_file(
         );
         let mut entry = ProgressReader::new(&mut entry, progress_bar.clone());
 
-        let target_file = File::create(&temporary_path)
-            .map_err(|source| DatasetError::Io { path: temporary_path.clone(), source })?;
+        let target_file = File::create(partial.path())
+            .map_err(|source| DatasetError::Io { path: partial.path().to_path_buf(), source })?;
 
         let mut writer = BufWriter::new(target_file);
 
@@ -430,7 +430,7 @@ pub(crate) fn unzip_file(
 
     remove_path_if_exists(extracted_path)?;
 
-    fs::rename(&temporary_path, extracted_path)
+    fs::rename(partial.path(), extracted_path)
         .map_err(|source| DatasetError::Io { path: extracted_path.to_path_buf(), source })?;
 
     Ok(true)
