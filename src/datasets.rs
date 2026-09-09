@@ -10,10 +10,12 @@
 //!   decompressed, or both
 //!
 //! ```no_run
-//! use smiles_parser::datasets::{DatasetFetchOptions, DatasetSource, GzipMode, PUBCHEM_SMILES};
+//! use smiles_parser::datasets::{
+//!     ArchiveMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES,
+//! };
 //!
 //! let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
-//!     gzip_mode: GzipMode::Decompress,
+//!     archive_mode: ArchiveMode::Decompress,
 //!     ..DatasetFetchOptions::default()
 //! })?;
 //!
@@ -49,7 +51,7 @@ pub use source::{
     DatasetCollectionSource, DatasetSource, SmilesDatasetRecordSource, SmilesDatasetSource,
 };
 pub use types::{
-    CacheMode, DatasetArtifact, DatasetCollectionArtifact, DatasetCompression, DatasetError,
-    DatasetFetchOptions, DatasetFile, DatasetSmilesRecord, GzipMode,
+    ArchiveMode, CacheMode, DatasetArtifact, DatasetCollectionArtifact, DatasetCompression,
+    DatasetError, DatasetFetchOptions, DatasetFile, DatasetSmilesRecord,
 };
 pub use zinc20::{ZINC20_EXPECTED_RECORD_COUNT, ZINC20_SMILES, Zinc20Smiles};
