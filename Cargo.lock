@@ -85,6 +85,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "barnes-hut-tree"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dff3e0b77b50cc89e6bf56d36f73c7a6a145831967155a36ff08062a5c78af1e"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -538,8 +547,10 @@ dependencies = [
 [[package]]
 name = "geometric-traits"
 version = "0.1.0"
-source = "git+https://github.com/earth-metabolome-initiative/geometric-traits?branch=main#aa79915e5b7207a2cfe89ce460813a094a1c66bc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55950a4ed39d1ca154edbafaf6c9b31fd5440df9008592d227d90b1695b593dc"
 dependencies = [
+ "barnes-hut-tree",
  "bitvec",
  "hashbrown",
  "lender",
