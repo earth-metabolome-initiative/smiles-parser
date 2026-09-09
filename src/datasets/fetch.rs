@@ -7,10 +7,10 @@ use std::{
     time::Duration,
 };
 
+use dirs::cache_dir;
 use flate2::read::GzDecoder;
 use reqwest::blocking::Client;
 use tar::Archive;
-use dirs::cache_dir;
 
 use super::{
     progress::{ProgressReader, new_byte_progress_bar, progress_label},
@@ -54,89 +54,55 @@ pub(crate) fn fetch_dataset<D: DatasetSource + ?Sized>(
         Some(path) => path.clone(),
         None => default_dataset_cache_dir()?,
     };
+
     let dataset_dir = cache_root.join(dataset.id());
     create_dir_all(&dataset_dir)?;
 
     let compressed_path = dataset_dir.join(dataset.file_name());
     let decompressed_path = dataset_dir.join(dataset.extracted_file_name());
 
-    match dataset.compression() {
-        DatasetCompression::None => {
-            let was_downloaded = ensure_downloaded(dataset, &compressed_path, options.cache_mode)?;
-            Ok(DatasetArtifact {
-                dataset_id: dataset.id(),
-                path: compressed_path.clone(),
-                compressed_path: Some(compressed_path),
-                decompressed_path: None,
-                was_downloaded,
-                was_decompressed: false,
-            })
-        }
-        DatasetCompression::Gzip => {
-            match options.gzip_mode {
-                GzipMode::KeepCompressed => {
-                    let was_downloaded =
-                        ensure_downloaded(dataset, &compressed_path, options.cache_mode)?;
-                    Ok(DatasetArtifact {
-                        dataset_id: dataset.id(),
-                        path: compressed_path.clone(),
-                        compressed_path: Some(compressed_path),
-                        decompressed_path: None,
-                        was_downloaded,
-                        was_decompressed: false,
-                    })
-                }
-                GzipMode::Decompress | GzipMode::KeepBoth => {
-                    let (was_downloaded, was_decompressed) = ensure_decompressed(
-                        dataset,
-                        &compressed_path,
-                        &decompressed_path,
-                        options.cache_mode,
-                    )?;
-                    Ok(DatasetArtifact {
-                        dataset_id: dataset.id(),
-                        path: decompressed_path.clone(),
-                        compressed_path: compressed_path.is_file().then_some(compressed_path),
-                        decompressed_path: Some(decompressed_path),
-                        was_downloaded,
-                        was_decompressed,
-                    })
-                }
+    let (path, has_decompressed_path, was_downloaded, was_decompressed) =
+        match (dataset.compression(), options.gzip_mode) {
+            (DatasetCompression::None, _)
+            | (DatasetCompression::Gzip, GzipMode::KeepCompressed)
+            | (DatasetCompression::TarGzip, GzipMode::KeepCompressed) => {
+                let was_downloaded =
+                    ensure_downloaded(dataset, &compressed_path, options.cache_mode)?;
+
+                (compressed_path.clone(), false, was_downloaded, false)
             }
-        }
-        DatasetCompression::TarGzip => {
-            match options.gzip_mode {
-                GzipMode::KeepCompressed => {
-                    let was_downloaded =
-                        ensure_downloaded(dataset, &compressed_path, options.cache_mode)?;
-                    Ok(DatasetArtifact {
-                        dataset_id: dataset.id(),
-                        path: compressed_path.clone(),
-                        compressed_path: Some(compressed_path),
-                        decompressed_path: None,
-                        was_downloaded,
-                        was_decompressed: false,
-                    })
-                }
-                GzipMode::Decompress | GzipMode::KeepBoth => {
-                    let (was_downloaded, was_extracted) = ensure_extracted_tar_gzip(
-                        dataset.url(),
-                        &compressed_path,
-                        &decompressed_path,
-                        options.cache_mode,
-                    )?;
-                    Ok(DatasetArtifact {
-                        dataset_id: dataset.id(),
-                        path: decompressed_path.clone(),
-                        compressed_path: compressed_path.is_file().then_some(compressed_path),
-                        decompressed_path: Some(decompressed_path),
-                        was_downloaded,
-                        was_decompressed: was_extracted,
-                    })
-                }
+
+            (DatasetCompression::Gzip, GzipMode::Decompress | GzipMode::KeepBoth) => {
+                let (was_downloaded, was_decompressed) = ensure_decompressed(
+                    dataset,
+                    &compressed_path,
+                    &decompressed_path,
+                    options.cache_mode,
+                )?;
+
+                (decompressed_path.clone(), true, was_downloaded, was_decompressed)
             }
-        }
-    }
+
+            (DatasetCompression::TarGzip, GzipMode::Decompress | GzipMode::KeepBoth) => {
+                let (was_downloaded, was_extracted) = ensure_extracted_tar_gzip(
+                    dataset.url(),
+                    &compressed_path,
+                    &decompressed_path,
+                    options.cache_mode,
+                )?;
+
+                (decompressed_path.clone(), true, was_downloaded, was_extracted)
+            }
+        };
+
+    Ok(DatasetArtifact {
+        dataset_id: dataset.id(),
+        path,
+        compressed_path: compressed_path.is_file().then_some(compressed_path),
+        decompressed_path: has_decompressed_path.then_some(decompressed_path),
+        was_downloaded,
+        was_decompressed,
+    })
 }
 
 pub(crate) fn fetch_dataset_collection<D: DatasetCollectionSource + ?Sized>(
