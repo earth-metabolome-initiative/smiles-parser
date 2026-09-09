@@ -1,0 +1,8 @@
+name: CodeQL
+
+queries:
+  - uses: security-extended
+
+paths-ignore:
+  - tests/**
+  - src/**/tests.rs
