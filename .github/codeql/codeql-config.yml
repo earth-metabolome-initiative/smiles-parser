@@ -4,5 +4,5 @@ queries:
   - uses: security-extended
 
 paths-ignore:
-  - tests
-  - "**/tests.rs"
+  - tests/**
+  - src/**/tests.rs
