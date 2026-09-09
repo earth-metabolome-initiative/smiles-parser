@@ -75,6 +75,27 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-targets -- -D warnings
 
+  datasets:
+    name: Datasets Feature
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+          components: clippy
+      - name: Run clippy
+        run: cargo clippy --all-targets --features datasets -- -D warnings
+      - name: Run unit tests
+        run: cargo test --lib --features datasets
+      - name: Run doctests
+        run: cargo test --doc --features datasets
+      - name: Check documentation
+        run: cargo doc --no-deps --document-private-items --features datasets
+        env:
+          RUSTDOCFLAGS: -D warnings
+
   doc:
     name: Documentation
     runs-on: ubuntu-latest
