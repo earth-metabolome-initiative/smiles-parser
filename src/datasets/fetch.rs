@@ -244,8 +244,6 @@ fn download_to_path(url: &'static str, target_path: &Path) -> Result<(), Dataset
     let client = Client::builder()
         .user_agent(DOWNLOAD_USER_AGENT)
         .connect_timeout(Duration::from_secs(30))
-        // timeout set to 1 hour for download time
-        .timeout(Duration::from_secs(3600))
         .build()
         .map_err(|source| DatasetError::Download { url, source })?;
     let response = client
