@@ -59,39 +59,39 @@ pub(crate) fn fetch_dataset<D: DatasetSource + ?Sized>(
     let compressed_path = dataset_dir.join(dataset.file_name());
     let decompressed_path = dataset_dir.join(dataset.extracted_file_name());
 
-    let (path, has_decompressed_path, was_downloaded, was_decompressed) =
-        match (dataset.compression(), options.gzip_mode) {
-            (DatasetCompression::None, _)
-            | (DatasetCompression::Gzip, GzipMode::KeepCompressed)
-            | (DatasetCompression::TarGzip, GzipMode::KeepCompressed) => {
-                let was_downloaded =
-                    ensure_downloaded(dataset, &compressed_path, options.cache_mode)?;
+    let (path, has_decompressed_path, was_downloaded, was_decompressed) = match (
+        dataset.compression(),
+        options.gzip_mode,
+    ) {
+        (DatasetCompression::None, _)
+        | (DatasetCompression::Gzip | DatasetCompression::TarGzip, GzipMode::KeepCompressed) => {
+            let was_downloaded = ensure_downloaded(dataset, &compressed_path, options.cache_mode)?;
 
-                (compressed_path.clone(), false, was_downloaded, false)
-            }
+            (compressed_path.clone(), false, was_downloaded, false)
+        }
 
-            (DatasetCompression::Gzip, GzipMode::Decompress | GzipMode::KeepBoth) => {
-                let (was_downloaded, was_decompressed) = ensure_decompressed(
-                    dataset,
-                    &compressed_path,
-                    &decompressed_path,
-                    options.cache_mode,
-                )?;
+        (DatasetCompression::Gzip, GzipMode::Decompress | GzipMode::KeepBoth) => {
+            let (was_downloaded, was_decompressed) = ensure_decompressed(
+                dataset,
+                &compressed_path,
+                &decompressed_path,
+                options.cache_mode,
+            )?;
 
-                (decompressed_path.clone(), true, was_downloaded, was_decompressed)
-            }
+            (decompressed_path.clone(), true, was_downloaded, was_decompressed)
+        }
 
-            (DatasetCompression::TarGzip, GzipMode::Decompress | GzipMode::KeepBoth) => {
-                let (was_downloaded, was_extracted) = ensure_extracted_tar_gzip(
-                    dataset.url(),
-                    &compressed_path,
-                    &decompressed_path,
-                    options.cache_mode,
-                )?;
+        (DatasetCompression::TarGzip, GzipMode::Decompress | GzipMode::KeepBoth) => {
+            let (was_downloaded, was_extracted) = ensure_extracted_tar_gzip(
+                dataset.url(),
+                &compressed_path,
+                &decompressed_path,
+                options.cache_mode,
+            )?;
 
-                (decompressed_path.clone(), true, was_downloaded, was_extracted)
-            }
-        };
+            (decompressed_path.clone(), true, was_downloaded, was_extracted)
+        }
+    };
 
     Ok(DatasetArtifact {
         dataset_id: dataset.id(),
