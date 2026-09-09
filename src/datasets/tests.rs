@@ -2,11 +2,11 @@ use std::{
     fs::{self, File},
     io::Write,
     path::{Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
     vec::Vec,
 };
 
 use flate2::{Compression, write::GzEncoder};
+use tempfile::tempdir;
 
 use super::{
     CacheMode, DatasetFetchOptions, GzipMode, ZINC20_EXPECTED_RECORD_COUNT, Zinc20Smiles,
@@ -18,14 +18,6 @@ use super::{
     types::{DatasetArtifact, DatasetCollectionArtifact, DatasetCompression, DatasetError},
     zinc20::ZINC20_SMILES,
 };
-
-fn temporary_directory(name: &str) -> PathBuf {
-    let unique = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_else(|_| unreachable!("system time is after unix epoch"))
-        .as_nanos();
-    std::env::temp_dir().join(format!("smiles-parser-{name}-{unique}"))
-}
 
 fn write_zinc20_tar_gzip(path: &Path, chunk_dir: &str, contents: &[u8]) {
     let file = File::create(path).unwrap();
@@ -111,10 +103,9 @@ fn default_dataset_cache_dir_has_stable_suffix() {
 
 #[test]
 fn gunzip_file_materializes_plaintext_copy() {
-    let directory = temporary_directory("datasets-gunzip");
-    fs::create_dir_all(&directory).unwrap();
-    let compressed_path = directory.join("sample.txt.gz");
-    let decompressed_path = directory.join("sample.txt");
+    let directory = tempdir().unwrap();
+    let compressed_path = directory.path().join("sample.txt.gz");
+    let decompressed_path = directory.path().join("sample.txt");
 
     {
         let file = File::create(&compressed_path).unwrap();
@@ -124,9 +115,8 @@ fn gunzip_file_materializes_plaintext_copy() {
     }
 
     gunzip_file(&compressed_path, &decompressed_path).unwrap();
-    assert_eq!(fs::read(&decompressed_path).unwrap(), b"cid\tsmiles\n1\tCCO\n");
 
-    fs::remove_dir_all(directory).unwrap();
+    assert_eq!(fs::read(&decompressed_path).unwrap(), b"cid\tsmiles\n1\tCCO\n");
 }
 
 #[test]
@@ -145,9 +135,8 @@ fn dataset_smiles_iterator_is_send() {
 
 #[test]
 fn pubchem_smiles_iterator_streams_smiles_from_gzip_records() {
-    let directory = temporary_directory("datasets-pubchem-iter");
-    fs::create_dir_all(&directory).unwrap();
-    let compressed_path = directory.join("CID-SMILES.gz");
+    let directory = tempdir().unwrap();
+    let compressed_path = directory.path().join("CID-SMILES.gz");
 
     {
         let file = File::create(&compressed_path).unwrap();
@@ -164,21 +153,19 @@ fn pubchem_smiles_iterator_streams_smiles_from_gzip_records() {
         was_downloaded: false,
         was_decompressed: false,
     };
+
     let smiles =
         DatasetSmilesIter::from_records(DatasetSmilesRecordIter::for_pubchem(&artifact).unwrap())
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
     assert_eq!(smiles, ["CCO", "c1ccccc1"]);
-
-    fs::remove_dir_all(directory).unwrap();
 }
 
 #[test]
 fn pubchem_record_iterator_streams_identifiers_and_smiles() {
-    let directory = temporary_directory("datasets-pubchem-record-iter");
-    fs::create_dir_all(&directory).unwrap();
-    let compressed_path = directory.join("CID-SMILES.gz");
+    let directory = tempdir().unwrap();
+    let compressed_path = directory.path().join("CID-SMILES.gz");
 
     {
         let file = File::create(&compressed_path).unwrap();
@@ -195,6 +182,7 @@ fn pubchem_record_iterator_streams_identifiers_and_smiles() {
         was_downloaded: false,
         was_decompressed: false,
     };
+
     let records = DatasetSmilesRecordIter::for_pubchem(&artifact)
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
@@ -204,15 +192,13 @@ fn pubchem_record_iterator_streams_identifiers_and_smiles() {
     assert_eq!(records[0].smiles(), "CCO");
     assert_eq!(records[1].id(), "456");
     assert_eq!(records[1].smiles(), "c1ccccc1");
-
-    fs::remove_dir_all(directory).unwrap();
 }
 
 #[test]
 fn massspecgym_smiles_iterator_uses_smiles_tsv_column() {
-    let directory = temporary_directory("datasets-massspecgym-iter");
-    fs::create_dir_all(&directory).unwrap();
-    let dataset_path = directory.join("MassSpecGym.tsv");
+    let directory = tempdir().unwrap();
+    let dataset_path = directory.path().join("MassSpecGym.tsv");
+
     fs::write(&dataset_path, "spec_id\tname\tsmiles\n1\tethanol\tCCO\n2\tbenzene\tc1ccccc1\n")
         .unwrap();
 
@@ -224,6 +210,7 @@ fn massspecgym_smiles_iterator_uses_smiles_tsv_column() {
         was_downloaded: false,
         was_decompressed: false,
     };
+
     let smiles = DatasetSmilesIter::from_records(
         DatasetSmilesRecordIter::for_mass_spec_gym(&artifact).unwrap(),
     )
@@ -231,14 +218,13 @@ fn massspecgym_smiles_iterator_uses_smiles_tsv_column() {
     .unwrap();
 
     assert_eq!(smiles, ["CCO", "c1ccccc1"]);
-
-    fs::remove_dir_all(directory).unwrap();
 }
 
 #[test]
 fn zinc20_record_iterator_streams_records_from_extracted_chunk() {
-    let directory = temporary_directory("datasets-zinc20-iter");
-    let extracted_path = directory.join("ZINC20_smiles_chunk_1");
+    let directory = tempdir().unwrap();
+    let extracted_path = directory.path().join("ZINC20_smiles_chunk_1");
+
     fs::create_dir_all(&extracted_path).unwrap();
     fs::write(
         extracted_path.join("smiles_all_01.txt"),
@@ -253,6 +239,7 @@ fn zinc20_record_iterator_streams_records_from_extracted_chunk() {
         was_downloaded: false,
         was_extracted: false,
     };
+
     let records = DatasetSmilesRecordIter::for_zinc20(&artifact)
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
@@ -262,14 +249,13 @@ fn zinc20_record_iterator_streams_records_from_extracted_chunk() {
     assert_eq!(records[0].id(), "ZINC000000000001_1");
     assert_eq!(records[1].smiles(), "c1ccccc1");
     assert_eq!(records[1].id(), "ZINC000000000002_1");
-
-    fs::remove_dir_all(directory).unwrap();
 }
 
 #[test]
 fn zinc20_record_iterator_rejects_malformed_rows() {
-    let directory = temporary_directory("datasets-zinc20-malformed");
-    let extracted_path = directory.join("ZINC20_smiles_chunk_1");
+    let directory = tempdir().unwrap();
+    let extracted_path = directory.path().join("ZINC20_smiles_chunk_1");
+
     fs::create_dir_all(&extracted_path).unwrap();
     fs::write(extracted_path.join("smiles_all_01.txt"), "CCO\n").unwrap();
 
@@ -280,36 +266,34 @@ fn zinc20_record_iterator_rejects_malformed_rows() {
         was_downloaded: false,
         was_extracted: false,
     };
+
     match DatasetSmilesRecordIter::for_zinc20(&artifact).unwrap().next() {
         Some(Err(DatasetError::Format { dataset_id: "zinc20-smiles", line_number: 1, .. })) => {}
         other => panic!("unexpected result: {other:?}"),
     }
-
-    fs::remove_dir_all(directory).unwrap();
 }
 
 #[test]
 fn untar_gzip_file_materializes_zinc20_chunk_directory() {
-    let directory = temporary_directory("datasets-zinc20-untar");
-    fs::create_dir_all(&directory).unwrap();
-    let compressed_path = directory.join("ZINC20_smiles_chunk_1.tar.gz");
-    let extracted_path = directory.join("ZINC20_smiles_chunk_1");
+    let directory = tempdir().unwrap();
+    let compressed_path = directory.path().join("ZINC20_smiles_chunk_1.tar.gz");
+    let extracted_path = directory.path().join("ZINC20_smiles_chunk_1");
+
     write_zinc20_tar_gzip(&compressed_path, "ZINC20_smiles_chunk_1", b"CCO ZINC000000000001_1\n");
 
     untar_gzip_file(&compressed_path, &extracted_path).unwrap();
+
     assert_eq!(
         fs::read_to_string(extracted_path.join("smiles_all_01.txt")).unwrap(),
         "CCO ZINC000000000001_1\n"
     );
-
-    fs::remove_dir_all(directory).unwrap();
 }
 
 #[test]
 fn massspecgym_smiles_iterator_requires_smiles_header_column() {
-    let directory = temporary_directory("datasets-massspecgym-header");
-    fs::create_dir_all(&directory).unwrap();
-    let dataset_path = directory.join("MassSpecGym.tsv");
+    let directory = tempdir().unwrap();
+    let dataset_path = directory.path().join("MassSpecGym.tsv");
+
     fs::write(&dataset_path, "spec_id\tname\n1\tethanol\n").unwrap();
 
     let artifact = DatasetArtifact {
@@ -320,11 +304,70 @@ fn massspecgym_smiles_iterator_requires_smiles_header_column() {
         was_downloaded: false,
         was_decompressed: false,
     };
+
     match DatasetSmilesRecordIter::for_mass_spec_gym(&artifact) {
         Ok(_) => panic!("expected a missing smiles header to fail"),
         Err(DatasetError::Format { dataset_id: "massspecgym-smiles", line_number: 1, .. }) => {}
         Err(error) => panic!("unexpected error: {error}"),
     }
+}
 
-    fs::remove_dir_all(directory).unwrap();
+#[test]
+fn fetch_dataset_reuses_cached_uncompressed_file() {
+    let directory = tempdir().unwrap();
+    let dataset_directory = directory.path().join("massspecgym-smiles");
+
+    fs::create_dir_all(&dataset_directory).unwrap();
+
+    let dataset_path = dataset_directory.join("MassSpecGym.tsv");
+    fs::write(&dataset_path, "spec_id\tsmiles\n1\tCCO\n").unwrap();
+
+    let artifact = MASS_SPEC_GYM_SMILES
+        .fetch_with_options(&DatasetFetchOptions {
+            cache_dir: Some(directory.path().to_path_buf()),
+            cache_mode: CacheMode::UseCache,
+            gzip_mode: GzipMode::KeepCompressed,
+        })
+        .unwrap();
+
+    assert_eq!(artifact.path(), dataset_path);
+    assert_eq!(artifact.compressed_path(), Some(dataset_path.as_path()));
+    assert_eq!(artifact.decompressed_path(), None);
+    assert!(!artifact.was_downloaded());
+    assert!(!artifact.was_decompressed());
+}
+
+#[test]
+fn fetch_dataset_decompresses_cached_gzip_file() {
+    let directory = tempdir().unwrap();
+    let dataset_directory = directory.path().join("pubchem-smiles");
+
+    fs::create_dir_all(&dataset_directory).unwrap();
+
+    let compressed_path = dataset_directory.join("CID-SMILES.gz");
+
+    {
+        let file = File::create(&compressed_path).unwrap();
+        let mut encoder = GzEncoder::new(file, Compression::default());
+        encoder.write_all(b"1\tCCO\n").unwrap();
+        encoder.finish().unwrap();
+    }
+
+    let decompressed_path = dataset_directory.join("CID-SMILES");
+
+    let artifact = PUBCHEM_SMILES
+        .fetch_with_options(&DatasetFetchOptions {
+            cache_dir: Some(directory.path().to_path_buf()),
+            cache_mode: CacheMode::UseCache,
+            gzip_mode: GzipMode::Decompress,
+        })
+        .unwrap();
+
+    assert_eq!(artifact.path(), decompressed_path);
+    assert_eq!(artifact.compressed_path(), Some(compressed_path.as_path()));
+    assert_eq!(artifact.decompressed_path(), Some(decompressed_path.as_path()));
+    assert!(!artifact.was_downloaded());
+    assert!(artifact.was_decompressed());
+
+    assert_eq!(fs::read_to_string(decompressed_path).unwrap(), "1\tCCO\n");
 }

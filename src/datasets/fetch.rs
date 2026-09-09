@@ -4,8 +4,10 @@ use std::{
     fs::{self, File},
     io::{self, BufWriter, Write},
     path::{Path, PathBuf},
+    time::Duration,
 };
 
+use dirs::cache_dir;
 use flate2::read::GzDecoder;
 use reqwest::blocking::Client;
 use tar::Archive;
@@ -23,12 +25,11 @@ const DOWNLOAD_USER_AGENT: &str = concat!("smiles-parser/", env!("CARGO_PKG_VERS
 
 /// Returns the default cache directory used by dataset fetches.
 ///
-/// The selection order is:
-///
-/// 1. `XDG_CACHE_HOME/smiles-parser/datasets`
-/// 2. `LOCALAPPDATA/smiles-parser/datasets`
-/// 3. `HOME/.cache/smiles-parser/datasets`
-/// 4. `${TMPDIR}/smiles-parser/datasets`
+/// The directory is `smiles-parser/datasets` under the platform cache directory
+/// reported by [`dirs::cache_dir`], which is `$XDG_CACHE_HOME` or
+/// `$HOME/.cache` on Linux, `$HOME/Library/Caches` on macOS and
+/// `%LOCALAPPDATA%` on Windows. When no cache directory can be determined, the
+/// temporary directory is used instead.
 ///
 /// # Examples
 ///
@@ -39,113 +40,76 @@ const DOWNLOAD_USER_AGENT: &str = concat!("smiles-parser/", env!("CARGO_PKG_VERS
 /// ```
 #[must_use]
 pub fn default_dataset_cache_dir() -> PathBuf {
-    if let Some(path) = env::var_os("XDG_CACHE_HOME") {
-        return PathBuf::from(path).join("smiles-parser").join("datasets");
-    }
-    if let Some(path) = env::var_os("LOCALAPPDATA") {
-        return PathBuf::from(path).join("smiles-parser").join("datasets");
-    }
-    if let Some(path) = env::var_os("HOME") {
-        return PathBuf::from(path).join(".cache").join("smiles-parser").join("datasets");
-    }
-    env::temp_dir().join("smiles-parser").join("datasets")
+    cache_dir().unwrap_or_else(env::temp_dir).join("smiles-parser").join("datasets")
 }
 
 pub(crate) fn fetch_dataset<D: DatasetSource + ?Sized>(
     dataset: &D,
     options: &DatasetFetchOptions,
 ) -> Result<DatasetArtifact, DatasetError> {
-    let cache_root = options.cache_dir.clone().unwrap_or_else(default_dataset_cache_dir);
+    let cache_root = match &options.cache_dir {
+        Some(path) => path.clone(),
+        None => default_dataset_cache_dir(),
+    };
+
     let dataset_dir = cache_root.join(dataset.id());
     create_dir_all(&dataset_dir)?;
 
     let compressed_path = dataset_dir.join(dataset.file_name());
     let decompressed_path = dataset_dir.join(dataset.extracted_file_name());
 
-    match dataset.compression() {
-        DatasetCompression::None => {
+    let (path, has_decompressed_path, was_downloaded, was_decompressed) = match (
+        dataset.compression(),
+        options.gzip_mode,
+    ) {
+        (DatasetCompression::None, _)
+        | (DatasetCompression::Gzip | DatasetCompression::TarGzip, GzipMode::KeepCompressed) => {
             let was_downloaded = ensure_downloaded(dataset, &compressed_path, options.cache_mode)?;
-            Ok(DatasetArtifact {
-                dataset_id: dataset.id(),
-                path: compressed_path.clone(),
-                compressed_path: Some(compressed_path),
-                decompressed_path: None,
-                was_downloaded,
-                was_decompressed: false,
-            })
+
+            (compressed_path.clone(), false, was_downloaded, false)
         }
-        DatasetCompression::Gzip => {
-            match options.gzip_mode {
-                GzipMode::KeepCompressed => {
-                    let was_downloaded =
-                        ensure_downloaded(dataset, &compressed_path, options.cache_mode)?;
-                    Ok(DatasetArtifact {
-                        dataset_id: dataset.id(),
-                        path: compressed_path.clone(),
-                        compressed_path: Some(compressed_path),
-                        decompressed_path: None,
-                        was_downloaded,
-                        was_decompressed: false,
-                    })
-                }
-                GzipMode::Decompress | GzipMode::KeepBoth => {
-                    let (was_downloaded, was_decompressed) = ensure_decompressed(
-                        dataset,
-                        &compressed_path,
-                        &decompressed_path,
-                        options.cache_mode,
-                    )?;
-                    Ok(DatasetArtifact {
-                        dataset_id: dataset.id(),
-                        path: decompressed_path.clone(),
-                        compressed_path: compressed_path.is_file().then_some(compressed_path),
-                        decompressed_path: Some(decompressed_path),
-                        was_downloaded,
-                        was_decompressed,
-                    })
-                }
-            }
+
+        (DatasetCompression::Gzip, GzipMode::Decompress | GzipMode::KeepBoth) => {
+            let (was_downloaded, was_decompressed) = ensure_decompressed(
+                dataset,
+                &compressed_path,
+                &decompressed_path,
+                options.cache_mode,
+            )?;
+
+            (decompressed_path.clone(), true, was_downloaded, was_decompressed)
         }
-        DatasetCompression::TarGzip => {
-            match options.gzip_mode {
-                GzipMode::KeepCompressed => {
-                    let was_downloaded =
-                        ensure_downloaded(dataset, &compressed_path, options.cache_mode)?;
-                    Ok(DatasetArtifact {
-                        dataset_id: dataset.id(),
-                        path: compressed_path.clone(),
-                        compressed_path: Some(compressed_path),
-                        decompressed_path: None,
-                        was_downloaded,
-                        was_decompressed: false,
-                    })
-                }
-                GzipMode::Decompress | GzipMode::KeepBoth => {
-                    let (was_downloaded, was_extracted) = ensure_extracted_tar_gzip(
-                        dataset.url(),
-                        &compressed_path,
-                        &decompressed_path,
-                        options.cache_mode,
-                    )?;
-                    Ok(DatasetArtifact {
-                        dataset_id: dataset.id(),
-                        path: decompressed_path.clone(),
-                        compressed_path: compressed_path.is_file().then_some(compressed_path),
-                        decompressed_path: Some(decompressed_path),
-                        was_downloaded,
-                        was_decompressed: was_extracted,
-                    })
-                }
-            }
+
+        (DatasetCompression::TarGzip, GzipMode::Decompress | GzipMode::KeepBoth) => {
+            let (was_downloaded, was_extracted) = ensure_extracted_tar_gzip(
+                dataset.url(),
+                &compressed_path,
+                &decompressed_path,
+                options.cache_mode,
+            )?;
+
+            (decompressed_path.clone(), true, was_downloaded, was_extracted)
         }
-    }
+    };
+
+    Ok(DatasetArtifact {
+        dataset_id: dataset.id(),
+        path,
+        compressed_path: compressed_path.is_file().then_some(compressed_path),
+        decompressed_path: has_decompressed_path.then_some(decompressed_path),
+        was_downloaded,
+        was_decompressed,
+    })
 }
 
 pub(crate) fn fetch_dataset_collection<D: DatasetCollectionSource + ?Sized>(
     dataset: &D,
     options: &DatasetFetchOptions,
 ) -> Result<DatasetCollectionArtifact, DatasetError> {
-    let cache_root = options.cache_dir.clone().unwrap_or_else(default_dataset_cache_dir);
+    let cache_root = match &options.cache_dir {
+        Some(path) => path.clone(),
+        None => default_dataset_cache_dir(),
+    };
     let dataset_dir = cache_root.join(dataset.id());
     create_dir_all(&dataset_dir)?;
 
@@ -278,6 +242,7 @@ fn ensure_decompressed_url(
 fn download_to_path(url: &'static str, target_path: &Path) -> Result<(), DatasetError> {
     let client = Client::builder()
         .user_agent(DOWNLOAD_USER_AGENT)
+        .connect_timeout(Duration::from_secs(30))
         .build()
         .map_err(|source| DatasetError::Download { url, source })?;
     let response = client
@@ -303,10 +268,6 @@ fn download_to_path(url: &'static str, target_path: &Path) -> Result<(), Dataset
         .map_err(|source| DatasetError::Io { path: target_path.to_path_buf(), source })?;
     progress_bar.finish_and_clear();
 
-    if target_path.exists() {
-        fs::remove_file(target_path)
-            .map_err(|source| DatasetError::Io { path: target_path.to_path_buf(), source })?;
-    }
     fs::rename(&temporary_path, target_path)
         .map_err(|source| DatasetError::Io { path: target_path.to_path_buf(), source })?;
     Ok(())
