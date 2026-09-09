@@ -10,7 +10,7 @@ use tempfile::tempdir;
 
 use super::{
     ArchiveMode, CacheMode, DatasetFetchOptions, ZINC20_EXPECTED_RECORD_COUNT, Zinc20Smiles,
-    fetch::{default_dataset_cache_dir, gunzip_file, untar_gzip_file},
+    fetch::{default_dataset_cache_dir, gunzip_file, untar_gzip_file, unzip_file},
     massspecgym::MASS_SPEC_GYM_SMILES,
     pubchem::{PUBCHEM_SMILES, PubChemSmiles},
     reader::{DatasetSmilesIter, DatasetSmilesRecordIter},
@@ -464,4 +464,29 @@ fn zip_dataset_keep_compressed_and_decompress_use_correct_paths() {
 
     assert_eq!(decompressed.path(), extracted_path);
     assert_eq!(fs::read(&extracted_path).unwrap(), b"hello from zip\n");
+}
+
+#[test]
+fn unzip_file_rejects_a_directory_named_like_the_payload() {
+    let directory = tempdir().unwrap();
+    let archive_path = directory.path().join("archive.zip");
+    let extracted_path = directory.path().join("payload.txt");
+
+    {
+        let file = File::create(&archive_path).unwrap();
+        let mut archive = zip::ZipWriter::new(file);
+        archive.add_directory("payload.txt", zip::write::SimpleFileOptions::default()).unwrap();
+        archive.finish().unwrap();
+    }
+
+    match unzip_file(&archive_path, &extracted_path) {
+        Err(DatasetError::Io { path, source }) => {
+            assert_eq!(path, extracted_path);
+            assert_eq!(source.kind(), std::io::ErrorKind::NotFound);
+        }
+        Ok(_) => panic!("expected a directory entry to be rejected"),
+        Err(error) => panic!("unexpected error: {error}"),
+    }
+
+    assert!(!extracted_path.exists());
 }

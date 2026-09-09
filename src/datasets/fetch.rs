@@ -383,7 +383,7 @@ pub(crate) fn unzip_file(
                 source: io::Error::new(io::ErrorKind::InvalidData, source),
             }
         })?;
-        if Path::new(&entry.name()).file_name() == Some(expected_name) {
+        if entry.is_file() && Path::new(entry.name()).file_name() == Some(expected_name) {
             entry_index = Some(index);
             break;
         }
