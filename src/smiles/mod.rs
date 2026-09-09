@@ -9,7 +9,7 @@
 //! into a SMILES string.
 //!
 //! ```rust
-//! use smiles_parser::prelude::Smiles;
+//! use smiles_rs::prelude::Smiles;
 //!
 //! let source = "CC";
 //! let smiles: Smiles = source.parse()?;
@@ -18,7 +18,7 @@
 //! assert_eq!(smiles.number_of_bonds(), 1);
 //! assert_eq!(smiles.to_string(), "CC");
 //!
-//! # Ok::<(), smiles_parser::errors::SmilesErrorWithSpan>(())
+//! # Ok::<(), smiles_rs::errors::SmilesErrorWithSpan>(())
 //! ```
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{fmt, marker::PhantomData};
@@ -100,11 +100,11 @@ impl SymmSssrStatus {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let result = "c1ccccc1".parse::<Smiles>()?.symm_sssr_result();
     /// assert!(result.status().is_complete());
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[must_use]
     pub fn is_complete(self) -> bool {
@@ -116,11 +116,11 @@ impl SymmSssrStatus {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let status = "c1ccccc1".parse::<Smiles>()?.symm_sssr_result().status();
     /// assert!(!status.used_fallback());
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[must_use]
     pub fn used_fallback(self) -> bool {
@@ -132,11 +132,11 @@ impl SymmSssrStatus {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let status = "c1ccccc1".parse::<Smiles>()?.symm_sssr_result().status();
     /// assert!(!status.hit_queue_cutoff());
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[must_use]
     pub fn hit_queue_cutoff(self) -> bool {
@@ -157,11 +157,11 @@ impl SymmSssrResult {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let result = "c1ccccc1".parse::<Smiles>()?.symm_sssr_result();
     /// assert_eq!(result.cycles().len(), 1);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[must_use]
     pub fn cycles(&self) -> &[Vec<usize>] {
@@ -173,11 +173,11 @@ impl SymmSssrResult {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let result = "c1ccccc1".parse::<Smiles>()?.symm_sssr_result();
     /// assert!(result.status().is_complete());
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[must_use]
     pub fn status(&self) -> SymmSssrStatus {
@@ -198,11 +198,11 @@ impl RingMembership {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let ring = "C1CC1O".parse::<Smiles>()?.ring_membership();
     /// assert_eq!(ring.atom_ids(), &[0, 1, 2]);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -215,11 +215,11 @@ impl RingMembership {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let ring = "C1CC1O".parse::<Smiles>()?.ring_membership();
     /// assert_eq!(ring.bond_edges(), &[[0, 1], [0, 2], [1, 2]]);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -232,12 +232,12 @@ impl RingMembership {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let ring = "C1CC1O".parse::<Smiles>()?.ring_membership();
     /// assert!(ring.contains_atom(1));
     /// assert!(!ring.contains_atom(3));
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -250,12 +250,12 @@ impl RingMembership {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let ring = "C1CC1O".parse::<Smiles>()?.ring_membership();
     /// assert!(ring.contains_edge(0, 1));
     /// assert!(!ring.contains_edge(2, 3));
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -278,11 +278,11 @@ impl RingAtomMembership {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let ring = "C1CC1O".parse::<Smiles>()?.ring_atom_membership();
     /// assert_eq!(ring.atom_flags(), &[true, true, true, false]);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -298,12 +298,12 @@ impl RingAtomMembership {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let ring = "C1CC1O".parse::<Smiles>()?.ring_atom_membership();
     /// assert!(ring.contains_atom(2));
     /// assert!(!ring.contains_atom(3));
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -397,7 +397,7 @@ impl Smiles {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// assert_eq!(Smiles::edge_key(4, 1), (1, 4));
     /// ```
@@ -428,11 +428,11 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "CO".parse()?;
     /// assert_eq!(smiles.nodes().len(), 2);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -446,12 +446,12 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "CO".parse()?;
     /// assert_eq!(smiles.node_by_id(1).and_then(|atom| atom.element()), Some(Element::O));
     /// assert!(smiles.node_by_id(99).is_none());
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -492,14 +492,14 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{
+    /// use smiles_rs::{
     ///     bond::{Bond, bond_edge::BondEdge},
     ///     prelude::Smiles,
     /// };
     ///
     /// let smiles: Smiles = "C=O".parse()?;
     /// assert_eq!(smiles.edge_for_node_pair((0, 1)), Some(BondEdge::new(0, 1, Bond::Double, None)));
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -534,11 +534,11 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "CCO".parse()?;
     /// assert_eq!(smiles.edge_count_for_node(1), 2);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -566,11 +566,11 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "C=C".parse()?;
     /// assert_eq!(smiles.connectivity_count(0), 3);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -601,11 +601,11 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "C=C".parse()?;
     /// assert_eq!(smiles.total_valence(0), 4);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -632,12 +632,12 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::{AromaticityPolicy, Smiles};
+    /// use smiles_rs::prelude::{AromaticityPolicy, Smiles};
     ///
     /// let smiles: Smiles = "c1ccccc1".parse()?;
     /// let aromaticity = smiles.aromaticity_assignment_for(AromaticityPolicy::RdkitDefault);
     /// assert_eq!(smiles.smarts_total_valence(0, &aromaticity), 4);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -659,7 +659,7 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{
+    /// use smiles_rs::{
     ///     bond::{Bond, bond_edge::BondEdge},
     ///     prelude::Smiles,
     /// };
@@ -669,7 +669,7 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     ///
     /// assert!(edges.contains(&BondEdge::new(1, 0, Bond::Single, None)));
     /// assert!(edges.contains(&BondEdge::new(1, 2, Bond::Single, None)));
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     pub fn edges_for_node(&self, id: usize) -> impl Iterator<Item = BondEdge> + '_ {
@@ -699,7 +699,7 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{atom::bracketed::chirality::Chirality, prelude::Smiles};
+    /// use smiles_rs::{atom::bracketed::chirality::Chirality, prelude::Smiles};
     ///
     /// let left: Smiles = "F[C@H](Cl)Br".parse()?;
     /// let right: Smiles = "F[C@@H](Cl)Br".parse()?;
@@ -707,7 +707,7 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// assert!(matches!(left.smarts_tetrahedral_chirality(1), Some(Chirality::TH(_))));
     /// assert!(matches!(right.smarts_tetrahedral_chirality(1), Some(Chirality::TH(_))));
     /// assert_ne!(left.smarts_tetrahedral_chirality(1), right.smarts_tetrahedral_chirality(1));
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -730,14 +730,14 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{DoubleBondStereoConfig, prelude::Smiles};
+    /// use smiles_rs::{DoubleBondStereoConfig, prelude::Smiles};
     ///
     /// let trans: Smiles = "F/C=C/F".parse()?;
     /// let plain: Smiles = "CC=CC".parse()?;
     ///
     /// assert_eq!(trans.double_bond_stereo_config(1, 2), Some(DoubleBondStereoConfig::E));
     /// assert_eq!(plain.double_bond_stereo_config(1, 2), None);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -757,11 +757,11 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let ring = "C1CC1O".parse::<Smiles>()?.ring_membership();
     /// assert_eq!(ring.atom_ids(), &[0, 1, 2]);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[must_use]
     pub fn ring_membership(&self) -> RingMembership {
@@ -842,11 +842,11 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let ring = "C1CC1O".parse::<Smiles>()?.ring_atom_membership();
     /// assert_eq!(ring.atom_flags(), &[true, true, true, false]);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[must_use]
     pub fn ring_atom_membership(&self) -> RingAtomMembership {
@@ -866,7 +866,7 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{RingAtomMembership, RingAtomMembershipScratch, prelude::Smiles};
+    /// use smiles_rs::{RingAtomMembership, RingAtomMembershipScratch, prelude::Smiles};
     ///
     /// let smiles: Smiles = "C1CC1O".parse()?;
     /// let mut membership = RingAtomMembership::default();
@@ -874,7 +874,7 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     ///
     /// smiles.write_ring_atom_membership(&mut membership, &mut scratch);
     /// assert_eq!(membership.atom_flags(), &[true, true, true, false]);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     pub fn write_ring_atom_membership(
         &self,
@@ -940,12 +940,12 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let result = "c1ccccc1".parse::<Smiles>()?.symm_sssr_result();
     /// assert_eq!(result.cycles().len(), 1);
     /// assert!(result.status().is_complete());
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[must_use]
     pub fn symm_sssr_result(&self) -> SymmSssrResult {
@@ -963,14 +963,14 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{bond::Bond, prelude::Smiles};
+    /// use smiles_rs::{bond::Bond, prelude::Smiles};
     ///
     /// let raw: Smiles = "C/C=C\\C".parse()?;
     /// let collapsed = raw.with_directional_bonds_collapsed();
     ///
     /// assert_eq!(collapsed.edge_for_node_pair((0, 1)).unwrap().bond(), Bond::Single);
     /// assert_eq!(collapsed.edge_for_node_pair((2, 3)).unwrap().bond(), Bond::Single);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -1014,7 +1014,7 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "CO".parse()?;
     /// let explicit = smiles.with_explicit_hydrogens();
@@ -1025,7 +1025,7 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     ///     explicit.nodes().iter().filter(|atom| atom.element() == Some(Element::H)).count(),
     ///     4
     /// );
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[must_use]
     pub fn with_explicit_hydrogens(&self) -> Self {
@@ -1157,11 +1157,11 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "C=O".parse()?;
     /// assert_eq!(smiles.render(), "C=O");
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[must_use]
     pub fn render(&self) -> String {
@@ -1183,11 +1183,11 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "CCO".parse()?;
     /// assert!(smiles.render_rooted(2).starts_with('O'));
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[must_use]
     pub fn render_rooted(&self, root: usize) -> String {
@@ -1222,12 +1222,12 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let labeled: Smiles = "[13CH3]O".parse()?;
     /// let plain: Smiles = "[12CH3]O".parse()?;
     /// assert_eq!(labeled.non_isomeric().render(), plain.non_isomeric().render());
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[must_use]
     pub fn non_isomeric(&self) -> Self {

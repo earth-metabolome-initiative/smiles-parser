@@ -17,11 +17,11 @@ impl RingNum {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::bond::ring_num::RingNum;
+    /// use smiles_rs::bond::ring_num::RingNum;
     ///
     /// let ring = RingNum::try_new(12)?;
     /// assert_eq!(ring.get(), 12);
-    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// # Ok::<(), smiles_rs::SmilesError>(())
     /// ```
     pub fn try_new(num: u8) -> Result<Self, SmilesError> {
         (num <= 99).then_some(Self(num)).ok_or(SmilesError::RingNumberOverflow(num))
@@ -32,10 +32,10 @@ impl RingNum {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::bond::ring_num::RingNum;
+    /// use smiles_rs::bond::ring_num::RingNum;
     ///
     /// assert_eq!(RingNum::try_new(7)?.get(), 7);
-    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// # Ok::<(), smiles_rs::SmilesError>(())
     /// ```
     #[must_use]
     pub fn get(&self) -> u8 {

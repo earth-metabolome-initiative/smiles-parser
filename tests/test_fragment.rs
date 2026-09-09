@@ -1,5 +1,5 @@
 //! Fragment construction tests.
-use smiles_parser::{
+use smiles_rs::{
     bond::{Bond, bond_edge::bond_edge},
     prelude::{Smiles, SubgraphError},
 };

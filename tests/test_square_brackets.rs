@@ -1,7 +1,7 @@
 //! Test for tokenizing square brackets
 
 use elements_rs::Element;
-use smiles_parser::{errors::SmilesError, smiles::Smiles};
+use smiles_rs::{errors::SmilesError, smiles::Smiles};
 
 /// const for testing square brackets
 const SMILES_WITH_BRACKETS: &[&str] = &[

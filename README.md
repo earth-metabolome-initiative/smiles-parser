@@ -1,4 +1,6 @@
-# SMILES-parser
+# smiles-rs
+[![crates.io](https://img.shields.io/crates/v/smiles-rs.svg)](https://crates.io/crates/smiles-rs)
+[![docs.rs](https://docs.rs/smiles-rs/badge.svg)](https://docs.rs/smiles-rs)
 [![Rust CI](https://github.com/earth-metabolome-initiative/smiles-parser/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/earth-metabolome-initiative/smiles-parser/actions/workflows/rust.yml)
 [![codecov](https://codecov.io/gh/earth-metabolome-initiative/smiles-parser/graph/badge.svg)](https://codecov.io/gh/earth-metabolome-initiative/smiles-parser)
 
@@ -32,7 +34,7 @@ The default `Smiles` type accepts only concrete atoms. Use `WildcardSmiles` for 
 use core::str::FromStr;
 
 use molecular_formulas::prelude::ChemicalFormula;
-use smiles_parser::smiles::Smiles;
+use smiles_rs::smiles::Smiles;
 
 let smiles = Smiles::from_str("CCO").expect("valid SMILES should parse");
 
@@ -70,7 +72,7 @@ assert_eq!(formula.to_string(), "C₂H₆O");
 With the `datasets` feature enabled, the crate can cache and stream public SMILES corpora without storing large fixtures in the repository. `PUBCHEM_SMILES` streams the PubChem `CID-SMILES.gz` file. `ZINC20_SMILES` streams the ZINC20-ML SMILES chunks from [files.docking.org](https://files.docking.org/zinc20-ML/smiles/); ZINC iteration extracts the cached `tar.gz` chunks before reading their `smiles_all_*.txt` members.
 
 ```text
-use smiles_parser::prelude::{SmilesDatasetSource, PUBCHEM_SMILES, ZINC20_SMILES};
+use smiles_rs::prelude::{SmilesDatasetSource, PUBCHEM_SMILES, ZINC20_SMILES};
 
 let mut pubchem = PUBCHEM_SMILES.iter_smiles()?;
 let mut zinc20 = ZINC20_SMILES.iter_smiles()?;

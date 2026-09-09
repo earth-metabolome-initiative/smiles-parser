@@ -1,7 +1,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use smiles_parser::smiles::{Smiles, WildcardSmiles};
+use smiles_rs::smiles::{Smiles, WildcardSmiles};
 
 fn assert_strict_canonicalization(data: &str) {
     match data.parse::<Smiles>() {

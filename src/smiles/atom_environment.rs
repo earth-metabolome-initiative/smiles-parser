@@ -99,14 +99,14 @@ impl<AtomPolicy: SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let mol: Smiles = "CCO".parse()?;
     /// assert!(mol.atom_environment(1, 2).is_none()); // central C, eccentricity 1 < 2
     /// let env = mol.atom_environment(0, 2).unwrap();
     /// assert_eq!(env.center(), 0);
     /// assert_eq!(env.atom_count(), 3);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[must_use]
     pub fn atom_environment(

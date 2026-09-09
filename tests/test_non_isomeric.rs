@@ -1,5 +1,5 @@
 //! Non-isomeric normalization tests.
-use smiles_parser::prelude::Smiles;
+use smiles_rs::prelude::Smiles;
 
 fn ni(s: &str) -> String {
     s.parse::<Smiles>().unwrap().non_isomeric().render()

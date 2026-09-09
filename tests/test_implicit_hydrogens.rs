@@ -19,7 +19,7 @@ mod implicit_hydrogen_common;
 use implicit_hydrogen_common::{
     AROMATIC_CASES, ImplicitHydrogenCase, ORGANIC_SUBSET_CASES, RAW_RDKIT_COMPAT_CASES, all_cases,
 };
-use smiles_parser::smiles::{Smiles, WildcardSmiles};
+use smiles_rs::smiles::{Smiles, WildcardSmiles};
 
 #[test]
 fn implicit_hydrogen_fixtures_match_current_parser_node_order() {

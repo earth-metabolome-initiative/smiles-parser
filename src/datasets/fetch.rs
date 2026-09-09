@@ -21,11 +21,11 @@ use super::{
     },
 };
 
-const DOWNLOAD_USER_AGENT: &str = concat!("smiles-parser/", env!("CARGO_PKG_VERSION"));
+const DOWNLOAD_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 /// Returns the default cache directory used by dataset fetches.
 ///
-/// The directory is `smiles-parser/datasets` under the platform cache directory
+/// The directory is `smiles-rs/datasets` under the platform cache directory
 /// reported by [`dirs::cache_dir`], which is `$XDG_CACHE_HOME` or
 /// `$HOME/.cache` on Linux, `$HOME/Library/Caches` on macOS and
 /// `%LOCALAPPDATA%` on Windows. When no cache directory can be determined, the
@@ -34,13 +34,13 @@ const DOWNLOAD_USER_AGENT: &str = concat!("smiles-parser/", env!("CARGO_PKG_VERS
 /// # Examples
 ///
 /// ```
-/// use smiles_parser::datasets::default_dataset_cache_dir;
+/// use smiles_rs::datasets::default_dataset_cache_dir;
 ///
-/// assert!(default_dataset_cache_dir().ends_with("smiles-parser/datasets"));
+/// assert!(default_dataset_cache_dir().ends_with("smiles-rs/datasets"));
 /// ```
 #[must_use]
 pub fn default_dataset_cache_dir() -> PathBuf {
-    cache_dir().unwrap_or_else(env::temp_dir).join("smiles-parser").join("datasets")
+    cache_dir().unwrap_or_else(env::temp_dir).join("smiles-rs").join("datasets")
 }
 
 pub(crate) fn fetch_dataset<D: DatasetSource + ?Sized>(

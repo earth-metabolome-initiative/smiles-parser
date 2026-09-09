@@ -59,7 +59,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```rust
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let original = Smiles::from_str("C1=CN=CN1").expect("valid Kekule imidazole");
     /// let perception = original.perceive_aromaticity().expect("perception should succeed");
@@ -83,7 +83,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```rust
-    /// use smiles_parser::prelude::{KekulizationMode, Smiles};
+    /// use smiles_rs::prelude::{KekulizationMode, Smiles};
     ///
     /// let aromatic = Smiles::from_str("c1ccccc1").expect("valid aromatic benzene");
     /// let kekule = aromatic
@@ -197,7 +197,7 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```rust
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let aromatic = Smiles::from_str("c1ccccc1").expect("valid aromatic benzene");
     /// let kekule = aromatic.kekulize_standalone().expect("standalone kekulization should succeed");

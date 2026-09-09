@@ -1,5 +1,5 @@
 //! One-shot MAP4 substructure label + public export checks.
-use smiles_parser::prelude::{AtomEnvironment, Fragment, RootError, Smiles, SubgraphError};
+use smiles_rs::prelude::{AtomEnvironment, Fragment, RootError, Smiles, SubgraphError};
 
 fn canon(s: &str) -> String {
     s.parse::<Smiles>().unwrap().canonicalize().render()

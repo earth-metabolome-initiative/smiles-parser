@@ -1,7 +1,7 @@
 //! Rendering-focused tests for SMILES output.
 
 use geometric_traits::traits::SparseValuedMatrixRef;
-use smiles_parser::{
+use smiles_rs::{
     bond::Bond,
     smiles::{Smiles, WildcardSmiles},
 };

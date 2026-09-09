@@ -1,6 +1,6 @@
 //! Tests of the parser module for several corner cases.
 
-use smiles_parser::{
+use smiles_rs::{
     bond::Bond,
     smiles::{Smiles, WildcardSmiles},
 };

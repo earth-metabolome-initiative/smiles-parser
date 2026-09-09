@@ -21,7 +21,7 @@ impl AtomSymbol {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::atom_symbol::AtomSymbol;
+    /// use smiles_rs::atom::atom_symbol::AtomSymbol;
     ///
     /// assert_eq!(AtomSymbol::new(Some(Element::C)), AtomSymbol::Element(Element::C));
     /// assert_eq!(AtomSymbol::new(None), AtomSymbol::WildCard);
@@ -38,7 +38,7 @@ impl AtomSymbol {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::atom::atom_symbol::AtomSymbol;
+    /// use smiles_rs::atom::atom_symbol::AtomSymbol;
     ///
     /// assert_eq!(AtomSymbol::new_wildcard(), AtomSymbol::WildCard);
     /// ```
@@ -52,7 +52,7 @@ impl AtomSymbol {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::atom_symbol::AtomSymbol;
+    /// use smiles_rs::atom::atom_symbol::AtomSymbol;
     ///
     /// assert!(AtomSymbol::new_wildcard().is_wildcard());
     /// assert!(!AtomSymbol::Element(Element::O).is_wildcard());
@@ -67,7 +67,7 @@ impl AtomSymbol {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::atom_symbol::AtomSymbol;
+    /// use smiles_rs::atom::atom_symbol::AtomSymbol;
     ///
     /// assert_eq!(AtomSymbol::Element(Element::N).element(), Some(Element::N));
     /// assert_eq!(AtomSymbol::WildCard.element(), None);
@@ -86,7 +86,7 @@ impl AtomSymbol {
     ///
     /// ```
     /// use elements_rs::Element;
-    /// use smiles_parser::atom::atom_symbol::AtomSymbol;
+    /// use smiles_rs::atom::atom_symbol::AtomSymbol;
     ///
     /// assert_eq!(AtomSymbol::Element(Element::S).into_element(), Some(Element::S));
     /// assert_eq!(AtomSymbol::WildCard.into_element(), None);

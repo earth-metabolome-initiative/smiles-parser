@@ -32,10 +32,10 @@ impl Chirality {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::atom::bracketed::chirality::Chirality;
+    /// use smiles_rs::atom::bracketed::chirality::Chirality;
     ///
     /// assert_eq!(Chirality::try_th(1)?, Chirality::TH(1));
-    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// # Ok::<(), smiles_rs::SmilesError>(())
     /// ```
     pub fn try_th(num: u8) -> Result<Self, SmilesError> {
         (1..=2).contains(&num).then_some(Self::TH(num)).ok_or(SmilesError::InvalidChirality)
@@ -49,10 +49,10 @@ impl Chirality {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::atom::bracketed::chirality::Chirality;
+    /// use smiles_rs::atom::bracketed::chirality::Chirality;
     ///
     /// assert_eq!(Chirality::try_al(2)?, Chirality::AL(2));
-    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// # Ok::<(), smiles_rs::SmilesError>(())
     /// ```
     pub fn try_al(num: u8) -> Result<Self, SmilesError> {
         (1..=2).contains(&num).then_some(Self::AL(num)).ok_or(SmilesError::InvalidChirality)
@@ -66,10 +66,10 @@ impl Chirality {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::atom::bracketed::chirality::Chirality;
+    /// use smiles_rs::atom::bracketed::chirality::Chirality;
     ///
     /// assert_eq!(Chirality::try_sp(3)?, Chirality::SP(3));
-    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// # Ok::<(), smiles_rs::SmilesError>(())
     /// ```
     pub fn try_sp(num: u8) -> Result<Self, SmilesError> {
         (1..=3).contains(&num).then_some(Self::SP(num)).ok_or(SmilesError::InvalidChirality)
@@ -83,10 +83,10 @@ impl Chirality {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::atom::bracketed::chirality::Chirality;
+    /// use smiles_rs::atom::bracketed::chirality::Chirality;
     ///
     /// assert_eq!(Chirality::try_tb(20)?, Chirality::TB(20));
-    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// # Ok::<(), smiles_rs::SmilesError>(())
     /// ```
     pub fn try_tb(num: u8) -> Result<Self, SmilesError> {
         (1..=20).contains(&num).then_some(Self::TB(num)).ok_or(SmilesError::InvalidChirality)
@@ -100,10 +100,10 @@ impl Chirality {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::atom::bracketed::chirality::Chirality;
+    /// use smiles_rs::atom::bracketed::chirality::Chirality;
     ///
     /// assert_eq!(Chirality::try_oh(30)?, Chirality::OH(30));
-    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// # Ok::<(), smiles_rs::SmilesError>(())
     /// ```
     pub fn try_oh(num: u8) -> Result<Self, SmilesError> {
         (1..=30).contains(&num).then_some(Self::OH(num)).ok_or(SmilesError::InvalidChirality)

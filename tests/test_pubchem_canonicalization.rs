@@ -15,7 +15,7 @@ use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use molecular_formulas::prelude::ChemicalFormula;
 use rayon::prelude::*;
-use smiles_parser::prelude::{
+use smiles_rs::prelude::{
     ArchiveMode, CacheMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES, Smiles,
     WildcardSmiles,
 };

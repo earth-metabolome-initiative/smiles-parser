@@ -39,14 +39,14 @@ impl BondEntry {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{
+    /// use smiles_rs::{
     ///     bond::{Bond, ring_num::RingNum},
     ///     smiles::BondEntry,
     /// };
     ///
     /// let entry = BondEntry::new(Bond::Double, Some(RingNum::try_new(1)?), 0);
     /// assert_eq!(entry.bond(), Bond::Double);
-    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// # Ok::<(), smiles_rs::SmilesError>(())
     /// ```
     #[inline]
     #[must_use]
@@ -70,7 +70,7 @@ impl BondEntry {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{bond::Bond, smiles::BondEntry};
+    /// use smiles_rs::{bond::Bond, smiles::BondEntry};
     ///
     /// let entry = BondEntry::new(Bond::Triple, None, 0);
     /// assert_eq!(entry.bond(), Bond::Triple);
@@ -86,14 +86,14 @@ impl BondEntry {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::{
+    /// use smiles_rs::{
     ///     bond::{Bond, ring_num::RingNum},
     ///     smiles::BondEntry,
     /// };
     ///
     /// let entry = BondEntry::new(Bond::Single, Some(RingNum::try_new(4)?), 0);
     /// assert_eq!(entry.ring_num().map(|num| num.get()), Some(4));
-    /// # Ok::<(), smiles_parser::SmilesError>(())
+    /// # Ok::<(), smiles_rs::SmilesError>(())
     /// ```
     #[inline]
     #[must_use]
@@ -157,7 +157,7 @@ impl PartialEq for BondEntry {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         // Aromaticity must agree, and the kekule order (single/double) only
-        // matters for non-aromatic bonds. smiles-parser stores aromatic rings
+        // matters for non-aromatic bonds. This crate stores aromatic rings
         // with an alternating Single/Double kekule order, while RDKit gives
         // every aromatic bond one uniform type, so requiring the kekule order
         // to match would make an aromatic bond stored as Single in one molecule
@@ -396,11 +396,11 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     ///
     /// ```
     /// use geometric_traits::traits::SizedSparseMatrix;
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "C=O".parse()?;
     /// assert_eq!(smiles.bond_matrix().number_of_defined_values(), 2);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -413,11 +413,11 @@ impl<AtomPolicy: crate::smiles::SmilesAtomPolicy> Smiles<AtomPolicy> {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let smiles: Smiles = "CCO".parse()?;
     /// assert_eq!(smiles.number_of_bonds(), 2);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -531,7 +531,7 @@ mod tests {
     fn mces_matches_aromatic_bonds_across_differing_kekule_orders() {
         // The same aromatic carbon/nitrogen bond stored as Single in one
         // molecule and as Double in another must still be a compatible edge for
-        // labeled MCES, since aromatization in smiles-parser leaves an
+        // labeled MCES, since aromatization in this crate leaves an
         // arbitrary kekule order on aromatic bonds while RDKit treats
         // every aromatic bond as one uniform type. Without collapsing
         // the kekule order the two edges would compare unequal and no

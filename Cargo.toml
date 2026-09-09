@@ -1,12 +1,16 @@
 [package]
-name = "smiles-parser"
+name = "smiles-rs"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.92"
 authors = ["Earth Metabolome Initiative"]
 license = "MIT"
 repository = "https://github.com/earth-metabolome-initiative/smiles-parser"
-description = "A SMILES parser in Rust"
-readme = "README.md"
+description = "A SMILES parser producing molecular graphs, with no_std support"
+documentation = "https://docs.rs/smiles-rs"
+keywords = ["smiles", "chemistry", "cheminformatics", "parser", "molecule"]
+categories = ["science", "parser-implementations", "no-std"]
+exclude = [".github/", ".cargo/", "fuzz/"]
 
 [features]
 default = []

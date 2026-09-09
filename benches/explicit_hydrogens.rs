@@ -8,7 +8,7 @@ use std::{
 };
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use smiles_parser::prelude::Smiles;
+use smiles_rs::prelude::Smiles;
 
 fn fixed_cases() -> [(&'static str, Smiles); 6] {
     [

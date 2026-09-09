@@ -10,9 +10,7 @@
 //!   decompressed, or both
 //!
 //! ```no_run
-//! use smiles_parser::datasets::{
-//!     ArchiveMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES,
-//! };
+//! use smiles_rs::datasets::{ArchiveMode, DatasetFetchOptions, DatasetSource, PUBCHEM_SMILES};
 //!
 //! let artifact = PUBCHEM_SMILES.fetch_with_options(&DatasetFetchOptions {
 //!     archive_mode: ArchiveMode::Decompress,
@@ -20,17 +18,17 @@
 //! })?;
 //!
 //! println!("{}", artifact.path().display());
-//! # Ok::<(), smiles_parser::DatasetError>(())
+//! # Ok::<(), smiles_rs::DatasetError>(())
 //! ```
 //!
 //! ```no_run
-//! use smiles_parser::datasets::{PUBCHEM_SMILES, SmilesDatasetSource};
+//! use smiles_rs::datasets::{PUBCHEM_SMILES, SmilesDatasetSource};
 //!
 //! let mut smiles = PUBCHEM_SMILES.iter_smiles()?;
 //! if let Some(first) = smiles.next() {
 //!     println!("{}", first?);
 //! }
-//! # Ok::<(), smiles_parser::DatasetError>(())
+//! # Ok::<(), smiles_rs::DatasetError>(())
 //! ```
 mod coconut;
 mod fetch;

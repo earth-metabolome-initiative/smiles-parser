@@ -17,7 +17,7 @@
 //! # Examples
 //!
 //! ```
-//! use smiles_parser::prelude::{GraphSimilarities, Smiles};
+//! use smiles_rs::prelude::{GraphSimilarities, Smiles};
 //!
 //! let benzene: Smiles = "c1ccccc1".parse()?;
 //! let pyridine: Smiles = "c1ccncc1".parse()?;
@@ -25,7 +25,7 @@
 //! let result = benzene.mces(&pyridine);
 //! assert_eq!(result.matched_edges().len(), 4);
 //! assert!(result.johnson_similarity() < 1.0);
-//! # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+//! # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
 //! ```
 pub use geometric_traits::traits::{
     GraphSimilarities, InitialProductVertexOrdering, LargestFragmentMetric, McesBuilder,
@@ -45,12 +45,12 @@ impl Smiles {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let a: Smiles = "CCO".parse()?;
     /// let b: Smiles = "CCN".parse()?;
     /// assert_eq!(a.mces(&b).matched_edges().len(), 1);
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
@@ -66,13 +66,13 @@ impl Smiles {
     /// # Examples
     ///
     /// ```
-    /// use smiles_parser::prelude::Smiles;
+    /// use smiles_rs::prelude::Smiles;
     ///
     /// let a: Smiles = "c1ccccc1".parse()?;
     /// let b: Smiles = "c1ccccc1C".parse()?;
     /// let result = a.mces_with(&b).search_budget(50_000).compute();
     /// assert!(result.search_completed());
-    /// # Ok::<(), smiles_parser::SmilesErrorWithSpan>(())
+    /// # Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
     /// ```
     #[inline]
     #[must_use]
