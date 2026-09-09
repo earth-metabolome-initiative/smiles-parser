@@ -25,12 +25,11 @@ const DOWNLOAD_USER_AGENT: &str = concat!("smiles-parser/", env!("CARGO_PKG_VERS
 
 /// Returns the default cache directory used by dataset fetches.
 ///
-/// The selection order is:
-///
-/// 1. `XDG_CACHE_HOME/smiles-parser/datasets`
-/// 2. `LOCALAPPDATA/smiles-parser/datasets`
-/// 3. `HOME/.cache/smiles-parser/datasets`
-/// 4. `${TMPDIR}/smiles-parser/datasets`
+/// The directory is `smiles-parser/datasets` under the platform cache directory
+/// reported by [`dirs::cache_dir`], which is `$XDG_CACHE_HOME` or
+/// `$HOME/.cache` on Linux, `$HOME/Library/Caches` on macOS and
+/// `%LOCALAPPDATA%` on Windows. When no cache directory can be determined, the
+/// temporary directory is used instead.
 ///
 /// # Examples
 ///
