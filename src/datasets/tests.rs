@@ -120,6 +120,34 @@ fn gunzip_file_materializes_plaintext_copy() {
 }
 
 #[test]
+fn gunzip_file_removes_the_partial_output_when_decompression_fails() {
+    let directory = tempdir().unwrap();
+    let compressed_path = directory.path().join("sample.txt.gz");
+    let decompressed_path = directory.path().join("sample.txt");
+    let partial_path = directory.path().join("sample.txt.part");
+
+    {
+        let file = File::create(&compressed_path).unwrap();
+        let mut encoder = GzEncoder::new(file, Compression::default());
+        encoder.write_all(&vec![b'A'; 64 * 1024]).unwrap();
+        encoder.finish().unwrap();
+    }
+
+    let truncated = File::options().write(true).open(&compressed_path).unwrap();
+    truncated.set_len(64).unwrap();
+    drop(truncated);
+
+    match gunzip_file(&compressed_path, &decompressed_path) {
+        Err(DatasetError::Io { .. }) => {}
+        Ok(_) => panic!("expected a truncated archive to fail"),
+        Err(error) => panic!("unexpected error: {error}"),
+    }
+
+    assert!(!partial_path.exists());
+    assert!(!decompressed_path.exists());
+}
+
+#[test]
 fn pubchem_and_massspecgym_constants_are_usable_dataset_handles() {
     assert_eq!(PUBCHEM_SMILES.id(), "pubchem-smiles");
     assert_eq!(MASS_SPEC_GYM_SMILES.id(), "massspecgym-smiles");
