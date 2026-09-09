@@ -9,17 +9,7 @@
 
 Parses SMILES strings into molecular graphs, following the [OpenSMILES specification](http://opensmiles.org/opensmiles.html). `no_std` with `alloc`, no unsafe code.
 
-## What it does
-
-- **Canonicalization**: `canonicalize` and `canonical_labeling` give a canonical SMILES and a canonical atom ordering.
-- **Aromaticity perception**: `perceive_aromaticity` under the RDKit default, MDL and simple models, plus `kekulize` back to alternating bonds.
-- **Maximum common edge subgraph**: `mces` compares two molecules through [`geometric-traits`](https://crates.io/crates/geometric-traits).
-- **Ring analysis**: symmetrized SSSR, ring membership, and fragment and connected component decomposition.
-- **Atom environments**: `atom_environment` yields radius-bounded neighbourhoods, the basis for MAP4-style fingerprints.
-- **Stereochemistry**: tetrahedral and double bond configuration, preserved across canonicalization.
-- **Molecular formulas**: conversion into [`molecular-formulas`](https://crates.io/crates/molecular-formulas) types.
-- **Wildcard SMILES**: `WildcardSmiles` accepts `*` atoms, and conversion back into `Smiles` is fallible.
-- **Public corpora**: PubChem, ZINC20, COCONUT, LOTUS and MassSpecGym stream from a local cache behind the `datasets` feature.
+Beyond parsing it canonicalizes molecules through `canonicalize` and `canonical_labeling`, perceives aromaticity under the RDKit default, MDL and simple models, and kekulizes back to alternating bonds. It computes symmetrized SSSR rings and ring membership, fragments and connected components, radius-bounded atom environments for MAP4-style fingerprints, and the maximum common edge subgraph of two molecules through [`geometric-traits`](https://crates.io/crates/geometric-traits). Tetrahedral and double bond stereochemistry survive canonicalization, formulas convert into [`molecular-formulas`](https://crates.io/crates/molecular-formulas) types, and `WildcardSmiles` accepts `*` atoms with a fallible conversion back into `Smiles`.
 
 ## Example
 
@@ -44,5 +34,5 @@ assert_eq!(formula.to_string(), "C₂H₆O");
 
 | Feature | Effect |
 | ------- | ------ |
-| `datasets` | Fetches and streams public SMILES corpora, requires `std`. See [`datasets`](https://docs.rs/smiles-rs/latest/smiles_rs/datasets/). |
+| `datasets` | Streams PubChem, ZINC20, COCONUT, LOTUS and MassSpecGym from a local cache, requires `std`. See [`datasets`](https://docs.rs/smiles-rs/latest/smiles_rs/datasets/). |
 | `fuzzing` | Exposes the parser internals the fuzz targets drive. |
