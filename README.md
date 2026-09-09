@@ -1,79 +1,48 @@
 # smiles-rs
-[![Rust CI](https://github.com/earth-metabolome-initiative/smiles-parser/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/earth-metabolome-initiative/smiles-parser/actions/workflows/rust.yml)
-[![codecov](https://codecov.io/gh/earth-metabolome-initiative/smiles-parser/graph/badge.svg)](https://codecov.io/gh/earth-metabolome-initiative/smiles-parser)
+[![crates.io](https://img.shields.io/crates/v/smiles-rs.svg)](https://crates.io/crates/smiles-rs)
+[![docs.rs](https://img.shields.io/docsrs/smiles-rs)](https://docs.rs/smiles-rs)
+[![downloads](https://img.shields.io/crates/d/smiles-rs.svg)](https://crates.io/crates/smiles-rs)
+[![Rust CI](https://github.com/earth-metabolome-initiative/smiles-rs/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/earth-metabolome-initiative/smiles-rs/actions/workflows/rust.yml)
+[![codecov](https://codecov.io/gh/earth-metabolome-initiative/smiles-rs/graph/badge.svg)](https://codecov.io/gh/earth-metabolome-initiative/smiles-rs)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/earth-metabolome-initiative/smiles-rs/blob/main/LICENSE)
+[![MSRV](https://img.shields.io/badge/rustc-1.92%2B-orange.svg)](https://blog.rust-lang.org/)
 
-A parser that checks the validity of SMILES strings and converts them into molecular graph representations.
+Parses SMILES strings into molecular graphs, following the [OpenSMILES specification](http://opensmiles.org/opensmiles.html). `no_std` with `alloc`, no unsafe code.
 
-## Parsing Specification
-This parser was designed by following the [OpenSMILES specification](http://opensmiles.org/opensmiles.html) and [Wikipedia Article](https://en.wikipedia.org/wiki/Simplified_Molecular_Input_Line_Entry_System).
-It also accepts bracketed aromatic `te` as a compatibility extension.
-The default `Smiles` type accepts only concrete atoms. Use `WildcardSmiles` for SMILES strings that intentionally contain wildcard (`*`) atoms.
-`WildcardSmiles` exposes the same graph inspection and transformation APIs, and conversion back to `Smiles` is fallible so wildcard atoms cannot enter the strict type by accident.
+## What it does
 
-## SMILES Parsing Rules:
+- **Canonicalization**: `canonicalize` and `canonical_labeling` give a canonical SMILES and a canonical atom ordering.
+- **Aromaticity perception**: `perceive_aromaticity` under the RDKit default, MDL and simple models, plus `kekulize` back to alternating bonds.
+- **Maximum common edge subgraph**: `mces` compares two molecules through [`geometric-traits`](https://crates.io/crates/geometric-traits).
+- **Ring analysis**: symmetrized SSSR, ring membership, and fragment and connected component decomposition.
+- **Atom environments**: `atom_environment` yields radius-bounded neighbourhoods, the basis for MAP4-style fingerprints.
+- **Stereochemistry**: tetrahedral and double bond configuration, preserved across canonicalization.
+- **Molecular formulas**: conversion into [`molecular-formulas`](https://crates.io/crates/molecular-formulas) types.
+- **Wildcard SMILES**: `WildcardSmiles` accepts `*` atoms, and conversion back into `Smiles` is fallible.
+- **Public corpora**: PubChem, ZINC20, COCONUT, LOTUS and MassSpecGym stream from a local cache behind the `datasets` feature.
 
-### Valid SMILES Characters:
-
-| Character | SMILES Purpose |
-| --------- | -------------- |
-| `A–Z, a–z` | **Atom symbols**. Unbracketed atoms are limited to the organic subset `B C N O P S F Cl Br I` plus aromatic forms `b c n o p s`. Inside brackets, atom symbols must match a valid element symbol (e.g., `Si`, `Na`) or a supported aromatic lowercase form (e.g., `se`, `as`, `te`). Aromatic atoms are denoted by lowercase symbols. Multi-character element symbols use initial uppercase + lowercase (e.g., `Cl`, `Br`, `Si`), except bracketed aromatic symbols like `se`, `as`, `te`. |
-| `[` `]` | **Bracket atoms**. Enter/exit bracket-atom grammar: `[` *isotope? symbol chiral? hcount? charge? class?* `]`. Brackets are required for non-organic-subset elements and whenever isotope, explicit hydrogen count, charge, chirality, or atom class are specified. |
-| `*` | **Wildcard atom**. Rejected by `Smiles`; accepted by `WildcardSmiles` either unbracketed (`*`) or bracketed (`[*]`), and in brackets may carry isotope/chirality/H-count/charge/class. |
-| `@` | **Chirality tag introducer** inside bracket atoms. Used as `@` / `@@` and extended forms like `@TH1`, `@AL1`, `@SP1`, `@TB1`, `@OH1` |
-| `+` `-` | **Charge signs** inside bracket atoms (e.g., `[O-]`, `[Cu+2]`, `[Ti++++]`). Note: `-` is also a **bond symbol** outside brackets.|
-| `:` `-` `=` `#` `$` `/` `\` `.` | **Bond symbols** in the main chain. `.` is the dot/disconnect (“no bond between components”). `-` is an explicit single bond (assumed to be single bond if bond is omitted from notation) and must be distinguished from charge sign by context (inside vs outside brackets). `:` represents an aromatic *one and a half* bond but may also be used for class. |
-| `:` `0-9` | The `:` may also be used to represent arbitrary integers that do not have chemical meaning in the SMILES string (inside of brackets only), but may be used by applications working with SMILES strings, for classifying atoms in said applications (`[CH4:2]` marks Methane as being in class `2`)j.|  
-| `%` `0–9` | **Digits** occur in multiple sub-grammars. Outside brackets, digits denote **ring closures**: `0–9` for single-digit ring numbers, and `%` followed by **exactly two digits** for ring numbers `00–99` (e.g., `C%12...%12`). Inside brackets, digits may appear as **isotope** (before symbol), **H-count** (after `H`), **charge magnitude** (after `+`/`-`), and **atom class** (after `:`). Note: `%123` is parsed as ring closure `%12` followed by ring closure `3`. |
-| `(` `)` | **Branching**. Parentheses introduce a branch off the current atom. |
-
-## Example Usage
+## Example
 
 ```rust
 use core::str::FromStr;
 
 use molecular_formulas::prelude::ChemicalFormula;
-use smiles_rs::smiles::Smiles;
+use smiles_rs::prelude::Smiles;
 
-let smiles = Smiles::from_str("CCO").expect("valid SMILES should parse");
+let ethanol = Smiles::from_str("CCO")?;
 
-// The molecular graph contains 3 atoms and 2 bonds for ethanol.
-assert_eq!(smiles.nodes().len(), 3);
-assert_eq!(smiles.number_of_bonds(), 2);
+assert_eq!(ethanol.nodes().len(), 3);
+assert_eq!(ethanol.number_of_bonds(), 2);
+assert_eq!(ethanol.render(), "CCO");
 
-// You can inspect each node in the graph.
-let node_summaries: Vec<(usize, String)> = smiles
-    .nodes()
-    .iter()
-    .enumerate()
-    .map(|(index, atom)| (index, atom.to_string()))
-    .collect();
-
-assert_eq!(
-    node_summaries,
-    vec![
-        (0, "C".to_string()),
-        (1, "C".to_string()),
-        (2, "O".to_string()),
-    ]
-);
-
-// You can also inspect the rendered graph again as a SMILES string.
-assert_eq!(smiles.render(), "CCO");
-
-// Strict SMILES contain only concrete atoms, so molecular formula conversion is infallible.
-let formula: ChemicalFormula<u32, i32> = ChemicalFormula::from(&smiles);
+let formula: ChemicalFormula<u32, i32> = ChemicalFormula::from(&ethanol);
 assert_eq!(formula.to_string(), "C₂H₆O");
+# Ok::<(), smiles_rs::SmilesErrorWithSpan>(())
 ```
 
-## Dataset Downloads
+## Features
 
-With the `datasets` feature enabled, the crate can cache and stream public SMILES corpora without storing large fixtures in the repository. `PUBCHEM_SMILES` streams the PubChem `CID-SMILES.gz` file. `ZINC20_SMILES` streams the ZINC20-ML SMILES chunks from [files.docking.org](https://files.docking.org/zinc20-ML/smiles/); ZINC iteration extracts the cached `tar.gz` chunks before reading their `smiles_all_*.txt` members.
-
-```text
-use smiles_rs::prelude::{SmilesDatasetSource, PUBCHEM_SMILES, ZINC20_SMILES};
-
-let mut pubchem = PUBCHEM_SMILES.iter_smiles()?;
-let mut zinc20 = ZINC20_SMILES.iter_smiles()?;
-```
-
-Full-corpus validation is intentionally kept in ignored release-mode tests because PubChem and ZINC20 are large external datasets. Use `ZINC20_VALIDATE_CHUNKS=1` or `ZINC20_VALIDATE_LIMIT=100000` for smaller ZINC sweeps.
+| Feature | Effect |
+| ------- | ------ |
+| `datasets` | Fetches and streams public SMILES corpora, requires `std`. See [`datasets`](https://docs.rs/smiles-rs/latest/smiles_rs/datasets/). |
+| `fuzzing` | Exposes the parser internals the fuzz targets drive. |
