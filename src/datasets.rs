@@ -32,6 +32,7 @@
 //! }
 //! # Ok::<(), smiles_parser::DatasetError>(())
 //! ```
+mod coconut;
 mod fetch;
 mod massspecgym;
 mod progress;
@@ -43,6 +44,7 @@ mod tests;
 mod types;
 mod zinc20;
 
+pub use coconut::{COCONUT_SMILES, CoconutSmiles};
 pub use fetch::default_dataset_cache_dir;
 pub use massspecgym::{MASS_SPEC_GYM_SMILES, MassSpecGymSmiles};
 pub use pubchem::{PUBCHEM_SMILES, PubChemSmiles};
