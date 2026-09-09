@@ -1,6 +1,4 @@
 # smiles-rs
-[![crates.io](https://img.shields.io/crates/v/smiles-rs.svg)](https://crates.io/crates/smiles-rs)
-[![docs.rs](https://docs.rs/smiles-rs/badge.svg)](https://docs.rs/smiles-rs)
 [![Rust CI](https://github.com/earth-metabolome-initiative/smiles-parser/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/earth-metabolome-initiative/smiles-parser/actions/workflows/rust.yml)
 [![codecov](https://codecov.io/gh/earth-metabolome-initiative/smiles-parser/graph/badge.svg)](https://codecov.io/gh/earth-metabolome-initiative/smiles-parser)
 
