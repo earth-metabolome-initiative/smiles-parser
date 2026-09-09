@@ -63,8 +63,7 @@ struct DatasetReader {
 enum LineParser {
     PubChem,
     MassSpecGym { smiles_column: usize },
-    Zinc20,
-    Lotus,
+    SmilesThenId,
 }
 
 impl DatasetSmilesIter {
@@ -146,7 +145,7 @@ impl DatasetSmilesRecordIter {
                 paths,
                 next_path_index: 0,
                 current: None,
-                parser: LineParser::Zinc20,
+                parser: LineParser::SmilesThenId,
                 line_number: 0,
                 line_buffer: String::new(),
             }),
@@ -186,7 +185,7 @@ impl DatasetSmilesRecordIter {
     }
 
     pub(crate) fn for_lotus(artifact: &DatasetArtifact) -> Result<Self, DatasetError> {
-        Self::from_artifact(artifact, LineParser::Lotus)
+        Self::from_artifact(artifact, LineParser::SmilesThenId)
     }
 
     fn from_artifact(artifact: &DatasetArtifact, parser: LineParser) -> Result<Self, DatasetError> {
@@ -370,39 +369,29 @@ fn parse_smiles_record(
             let id = tsv_field(line, 0).unwrap_or("");
             Ok(DatasetSmilesRecord::new(id.to_owned(), smiles.to_owned()))
         }
-        LineParser::Zinc20 => {
+        LineParser::SmilesThenId => {
             let mut fields = line.split_whitespace();
             let smiles = fields.next().ok_or_else(|| {
                 DatasetError::Format {
                     dataset_id,
                     line_number,
-                    message: "expected a ZINC20 SMILES record".into(),
+                    message: "expected a whitespace-separated SMILES and identifier record".into(),
                 }
             })?;
             let id = fields.next().ok_or_else(|| {
                 DatasetError::Format {
                     dataset_id,
                     line_number,
-                    message: "expected a ZINC20 SMILES and identifier record".into(),
+                    message: "expected a whitespace-separated SMILES and identifier record".into(),
                 }
             })?;
             if fields.next().is_some() {
                 return Err(DatasetError::Format {
                     dataset_id,
                     line_number,
-                    message: "expected exactly two whitespace-separated ZINC20 fields".into(),
+                    message: "expected exactly two whitespace-separated fields".into(),
                 });
             }
-            Ok(DatasetSmilesRecord::new(id.to_owned(), smiles.to_owned()))
-        }
-        LineParser::Lotus => {
-            let (smiles, id) = line.split_once(' ').ok_or_else(|| {
-                DatasetError::Format {
-                    dataset_id,
-                    line_number,
-                    message: "expected a SMILES ID record".into(),
-                }
-            })?;
             Ok(DatasetSmilesRecord::new(id.to_owned(), smiles.to_owned()))
         }
     }
