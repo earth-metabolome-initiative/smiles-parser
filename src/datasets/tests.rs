@@ -96,7 +96,7 @@ fn default_fetch_options_keep_compressed_cache_behavior() {
 
 #[test]
 fn default_dataset_cache_dir_has_stable_suffix() {
-    let cache_dir = default_dataset_cache_dir().unwrap();
+    let cache_dir = default_dataset_cache_dir();
 
     assert!(cache_dir.ends_with(PathBuf::from("smiles-parser").join("datasets")));
 }

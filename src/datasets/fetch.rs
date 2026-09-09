@@ -39,15 +39,15 @@ const DOWNLOAD_USER_AGENT: &str = concat!("smiles-parser/", env!("CARGO_PKG_VERS
 ///
 /// assert!(
 ///     default_dataset_cache_dir()
-///         .expect("need system cache dir")
 ///         .ends_with("smiles-parser/datasets")
 /// );
 /// ```
 #[must_use]
-pub fn default_dataset_cache_dir() -> Result<PathBuf, DatasetError> {
+pub fn default_dataset_cache_dir() -> PathBuf {
     cache_dir()
-        .map(|path| path.join("smiles-parser").join("datasets"))
-        .ok_or(DatasetError::CacheDirectoryUnavailable)
+        .unwrap_or_else(env::temp_dir)
+        .join("smiles-parser")
+        .join("datasets")
 }
 
 pub(crate) fn fetch_dataset<D: DatasetSource + ?Sized>(
@@ -56,7 +56,7 @@ pub(crate) fn fetch_dataset<D: DatasetSource + ?Sized>(
 ) -> Result<DatasetArtifact, DatasetError> {
     let cache_root = match &options.cache_dir {
         Some(path) => path.clone(),
-        None => default_dataset_cache_dir()?,
+        None => default_dataset_cache_dir(),
     };
 
     let dataset_dir = cache_root.join(dataset.id());
@@ -115,7 +115,7 @@ pub(crate) fn fetch_dataset_collection<D: DatasetCollectionSource + ?Sized>(
 ) -> Result<DatasetCollectionArtifact, DatasetError> {
     let cache_root = match &options.cache_dir {
         Some(path) => path.clone(),
-        None => default_dataset_cache_dir()?,
+        None => default_dataset_cache_dir(),
     };
     let dataset_dir = cache_root.join(dataset.id());
     create_dir_all(&dataset_dir)?;
